@@ -13,9 +13,17 @@ LICENSE
 """
 
 import pyqtgraph as pg
+from pyqtgraph.Qt import QtCore, QtGui
+
 class SegmentItem(pg.LinearRegionItem):
     def __init__(self, seg_infos, global_end):
         super().__init__(movable=False, values=(0, global_end))
+
+        # Some adaptations
+        brush = QtGui.QBrush(QtGui.QColor(0, 0, 0, 0))
+        self.setBrush(brush)
+        hover_brush = QtGui.QBrush(QtGui.QColor(0, 0, 255, 100))
+        self.setHoverBrush(hover_brush)
 
         # Get segment informations
         self.start = seg_infos[0]
@@ -31,3 +39,10 @@ class SegmentItem(pg.LinearRegionItem):
 
         # For now just print the label
         print(self.label)
+
+
+    def hoverEvent(self, ev):
+        if (not ev.isExit()) and ev.acceptDrags(QtCore.Qt.LeftButton):
+            self.setMouseHover(True)
+        else:
+            self.setMouseHover(False)
