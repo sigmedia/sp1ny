@@ -57,12 +57,13 @@ class OneShotArea(DockArea):
 
         # Generate reference part
         dock_coef = DockWithWav("??", (950, 200), # FIXME: deal with label name
-                               self.coef, self.wav,
-                               self.frameshift, self.ticks,
+                                self.coef, self.wav,
+                                self.frameshift, self.ticks,
                                 self.alignment.segments)
 
         # Generate alignment part
-        dock_align = DockAlignment("Lab", (950, 20), self.alignment.segments) # Size doesn't seem to affect anything
+        dock_align = DockAlignment("Lab", (950, 20),
+                                   self.alignment.segments, self.wav) # Size doesn't seem to affect anything
 
         # Fix x-axis
         dock_coef.data_plot.setXLink(dock_align.alignment_plot)

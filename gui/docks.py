@@ -24,24 +24,27 @@ import pyqtgraph as pg
 from .segment import *
 
 class DockWithWav(Dock):
-    def __init__(self, name, size, coef, wav, frameshift, ticks, alignment=None):
+    def __init__(self, name, size, data, wav, frameshift, ticks, alignment=None):
         Dock.__init__(self, name=name, size=size)
 
-        max_dur = coef.shape[0] * frameshift
+        self.data = data
+        self.wav = wav
+        self.alignment = alignment
+        max_dur = self.data.shape[0] * frameshift
 
-        self.__plotData(coef, frameshift, ticks)
-        self.__plotWav(wav, max_dur)
-        self.__applyAlignment(alignment)
+        self.__plotData(frameshift, ticks)
+        self.__plotWav(max_dur)
+        self.__applyAlignment()
 
         # FIXME: temporary Refinement
         self.data_plot.getAxis('left').setStyle(showValues=False)
         self.wav_plot.getAxis('left').setStyle(showValues=False)
 
-    def __plotData(self, data, frameshift, ticks, y_scale=16e3):  # FIXME: y_scale is non sense for now!
+    def __plotData(self, frameshift, ticks, y_scale=16e3):  # FIXME: y_scale is non sense for now!
         # Generate image data
         img = pg.ImageItem()
-        img.setImage(data.T)
-        img.scale(frameshift, 1.0/(data.shape[1]/y_scale))
+        img.setImage(self.data.T)
+        img.scale(frameshift, 1.0/(self.data.shape[1]/y_scale))
 
         # Define and assign histogram
         hist = pg.HistogramLUTWidget()
@@ -59,29 +62,29 @@ class DockWithWav(Dock):
         self.data_plot = plot
         self.addWidget(plot)
 
-    def __plotWav(self, wav_data, max_dur):
-        max_point = int(max_dur * wav_data[1])
-        if max_point > wav_data[0].shape[0]:
-            max_point = wav_data[0].shape[0]
+    def __plotWav(self, max_dur):
+        max_point = int(max_dur * self.wav[1])
+        if max_point > self.wav[0].shape[0]:
+            max_point = self.wav[0].shape[0]
 
         wav_plot = pg.PlotWidget(name="%s waveform" % self.name)
         wav_plot.plot(x=np.linspace(0, max_dur, max_point),
-                      y=wav_data[0][:max_point])
+                      y=self.wav[0][:max_point])
 
-        if max_point < wav_data[0].shape[0]:
-            wav_plot.plot(x=np.linspace(max_dur, wav_data[0].shape[0]/float(wav_data[1]), wav_data[0].shape[0]-max_point),
-                          y=wav_data[0][max_point:], pen={'color': "F00"})
+        if max_point < self.wav[0].shape[0]:
+            wav_plot.plot(x=np.linspace(max_dur, self.wav[0].shape[0]/float(self.wav[1]), self.wav[0].shape[0]-max_point),
+                          y=self.wav[0][max_point:], pen={'color': "F00"})
         wav_plot.setMaximumHeight(int(self.frameGeometry().height() * 20/100))
 
         # Add the wav plot to the dock!
         self.wav_plot = wav_plot
         self.addWidget(wav_plot)
 
-    def __applyAlignment(self, alignment):
+    def __applyAlignment(self):
         for p in self.widgets:
-            for i, elt in enumerate(alignment):
+            for i, elt in enumerate(self.alignment):
                 # Add boundaries
-                seg = SegmentItem(elt, global_end=alignment[-1][1])
+                seg = SegmentItem(elt, self.wav)
                 p.addItem(seg)
 
 
@@ -161,25 +164,25 @@ class DockDiff(Dock):
 
 
 class DockAlignment(Dock):
-    def __init__(self, name, size, alignment, wav=None):
+    def __init__(self, name, size, alignment, wav):
         Dock.__init__(self, name=name, size=size)
 
         self.alignment = alignment
         self.wav = wav
-        self.__plotAlignment(alignment)
+        self.__plotAlignment()
 
         # FIXME: temporary refinement
         self.alignment_plot.getAxis('left').setStyle(showValues=False)
 
-    def __plotAlignment(self, alignment):
+    def __plotAlignment(self):
         alignment_plot = pg.PlotWidget(name=self.name())
 
-        for i, elt in enumerate(alignment):
+        for i, elt in enumerate(self.alignment):
             # Generate region item
-            seg = SegmentItem(elt, global_end=alignment[-1][1])
+            seg = SegmentItem(elt, self.wav)
             alignment_plot.addItem(seg)
 
-            # Add label
+            # Add label (FIXME: should be moved to the SegmentItem directly!)
             label = pg.TextItem(text=elt[2],anchor=(0.5,0.5))
             alignment_plot.addItem(label)
             label.setPos((elt[1]+elt[0])/2, 0.5)

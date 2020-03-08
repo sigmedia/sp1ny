@@ -15,9 +15,12 @@ LICENSE
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui
 
+
+import sounddevice as sd
+
 class SegmentItem(pg.LinearRegionItem):
-    def __init__(self, seg_infos, global_end):
-        super().__init__(movable=False, values=(0, global_end))
+    def __init__(self, seg_infos, wav):
+        super().__init__(movable=False, values=(0, wav[0].shape[0]/wav[1]))
 
         # Some adaptations
         brush = QtGui.QBrush(QtGui.QColor(0, 0, 0, 0))
@@ -30,6 +33,9 @@ class SegmentItem(pg.LinearRegionItem):
         self.end = seg_infos[1]
         self.label = seg_infos[2]
 
+        # Save wav for playback!
+        self.wav = wav
+
         # Set the bounds
         self.setBounds((seg_infos[0], seg_infos[1]))
 
@@ -37,8 +43,13 @@ class SegmentItem(pg.LinearRegionItem):
     def mouseClickEvent(self, ev):
         super().mouseClickEvent(ev)
 
-        # For now just print the label
-        print(self.label)
+        # Extract position
+        start = int(self.start * self.wav[1])
+        end = int(self.end * self.wav[1])
+
+        # Play subpart
+        sd.play(self.wav[0][start:end], self.wav[1])
+        status = sd.wait()
 
 
     def hoverEvent(self, ev):
