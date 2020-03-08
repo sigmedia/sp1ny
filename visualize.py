@@ -34,10 +34,10 @@ from fastdtw import fastdtw
 import librosa
 import pyworld as pw
 
-# Plotting
+# Plotting & rendering
 import matplotlib.cm
 from pyqtgraph.dockarea import *
-from pyqtgraph.Qt import QtCore, QtGui
+from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 import pyqtgraph as pg
 
 # Utils
@@ -65,17 +65,60 @@ pg.setConfigOptions(imageAxisOrder='row-major')
 ###############################################################################
 # Functions
 ###############################################################################
+class GUIVisu(QtGui.QMainWindow):
+    def __init__(self, wav, coef, frameshift, alignment):
+        super().__init__()
+
+        self.plot_area = OneShotArea(wav, coef, frameshift, alignment)
+        self.plot_area.setMinimumSize(1000, 620)
+
+        ##########################################
+        # Setup the status bar
+        ##########################################
+        self.status = QtWidgets.QStatusBar()
+        self.status.setMaximumSize(1000, 50)
+        self.status.showMessage("Ok go maybe?!")
+
+        ##########################################
+        # Define the left part of the window
+        ##########################################
+        left_layout = QtWidgets.QVBoxLayout()
+        left_layout.addWidget(self.plot_area)
+        left_layout.addWidget(self.status)
+
+        ##########################################
+        # Define the right part of the window
+        ##########################################
+        # Define play button
+        self.bPlay = QtWidgets.QPushButton("Play", self)
+        # self.bPlay.clicked.connect(self.play)
+        self.bPlay.setDefault(False)
+        self.bPlay.setAutoDefault(False)
+
+        right_layout = QtWidgets.QVBoxLayout()
+        right_layout.addWidget(self.bPlay)
+
+        ##########################################
+        # Finalize the main part layout
+        ##########################################
+        main_layout = QtWidgets.QVBoxLayout()
+        main_layout.addLayout(left_layout, 3)
+        main_layout.addLayout(right_layout, 1)
+
+        ##########################################
+        # Set the window layout
+        ##########################################
+        cent_widget = QtWidgets.QWidget()
+        cent_widget.setLayout(main_layout)
+        self.setCentralWidget(cent_widget)
+
+
 def build_gui(wav, coef, frameshift, alignment=None):
 
     # Generate application
     app = QtGui.QApplication(["ok"])
-    win = QtGui.QMainWindow()
+    win = GUIVisu(wav, coef, frameshift, alignment)
     win.setWindowTitle('pyqtgraph example: PlotWidget')
-    win.resize(1000, 620)
-
-    # Fill frame
-    area = OneShotArea(wav, coef, frameshift, alignment)
-    win.setCentralWidget(area)
 
     # Add exit shortcut!
     win.actionExit = QtGui.QAction(('E&xit'), win)
