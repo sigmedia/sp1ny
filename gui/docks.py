@@ -21,6 +21,7 @@ from pyqtgraph.dockarea import *
 from pyqtgraph.Qt import QtCore, QtGui
 import pyqtgraph as pg
 
+from .segment import *
 
 class DockWithWav(Dock):
     def __init__(self, name, size, coef, wav, frameshift, ticks, alignment=None):
@@ -80,8 +81,7 @@ class DockWithWav(Dock):
         for p in self.widgets:
             for i, elt in enumerate(alignment):
                 # Add boundaries
-                seg = pg.LinearRegionItem(movable=False)
-                seg.setBounds((elt[0], elt[1]))
+                seg = SegmentItem(elt, global_end=alignment[-1][1])
                 p.addItem(seg)
 
 
@@ -175,9 +175,8 @@ class DockAlignment(Dock):
         alignment_plot = pg.PlotWidget(name=self.name())
 
         for i, elt in enumerate(alignment):
-            # Add boundaries
-            seg = pg.LinearRegionItem(movable=False)
-            seg.setBounds((elt[0], elt[1]))
+            # Generate region item
+            seg = SegmentItem(elt, global_end=alignment[-1][1])
             alignment_plot.addItem(seg)
 
             # Add label
