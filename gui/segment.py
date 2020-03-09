@@ -19,7 +19,7 @@ from pyqtgraph.Qt import QtCore, QtGui
 import sounddevice as sd
 
 class SegmentItem(pg.LinearRegionItem):
-    def __init__(self, seg_infos, wav=None, T=0):
+    def __init__(self, seg_infos, wav=None, T=0, showLabel=True):
         self.T = T
         if wav is not None:
             self.T = wav[0].shape[0]/wav[1]
@@ -44,6 +44,11 @@ class SegmentItem(pg.LinearRegionItem):
         # Set the bounds
         self.setBounds((seg_infos[0], seg_infos[1]))
 
+        # Add label
+        if showLabel:
+            text = pg.TextItem(text=self.label,anchor=(0.5,0.5))
+            text.setPos((self.end+self.start)/2, 0.5)
+            text.setParentItem(self)
 
     def mouseClickEvent(self, ev):
         super().mouseClickEvent(ev)
