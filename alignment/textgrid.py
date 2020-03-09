@@ -12,23 +12,26 @@ LICENSE
     Created:  6 March 2020
 """
 
-# Linear algebra
-import numpy as np
+# Logging
+import logging
 
 # Regular expression
 import re
 
+# Textgrid utilities
 import tgt
 
 class TGTAlignment:
     def __init__(self, input_file, wav=None, reference=None):
+        self.logger = logging.getLogger("TGTAlignment")
         self.wav = wav
         self.__extract_alignment(input_file)
 
-        if reference is not None:
-            self.reference = self.segments[reference]
-        else: # Select a random tier!
-            self.reference = self.segments[list(self.segments.keys())[0]]
+        if reference is None:
+            reference = list(self.segments.keys())[0]
+
+        self.reference = self.segments[reference]
+        self.logger.debug("The reference tier is \"%s\"" % reference)
 
     def __extract_alignment(self, input_file):
         self.segments = dict()
@@ -41,4 +44,9 @@ class TGTAlignment:
             cur_tier_segments = []
             for an in cur_tier.annotations:
                 cur_tier_segments.append((an.start_time, an.end_time, an.text))
-            self.segments[cur_tier.name] = cur_tier_segments
+
+            if cur_tier_segments:
+                self.segments[cur_tier.name] = cur_tier_segments
+                self.logger.debug("%s added" % cur_tier.name)
+            else:
+                self.logger.warning("%s is empty, we ignore it!" % cur_tier.name)
