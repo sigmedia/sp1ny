@@ -58,6 +58,9 @@ from gui.utils import *
 from gui.docks import *
 from gui.one_shot import *
 
+# Sound
+import sounddevice as sd
+
 ###############################################################################
 # global constants
 ###############################################################################
@@ -83,7 +86,6 @@ class GUIVisu(QtGui.QMainWindow):
         # Setup the status bar
         ##########################################
         self.status = QtWidgets.QStatusBar()
-        self.status.setMaximumSize(1000, 50)
         self.status.showMessage(self.filename)
 
         ##########################################
@@ -98,7 +100,7 @@ class GUIVisu(QtGui.QMainWindow):
         ##########################################
         # Define play button
         self.bPlay = QtWidgets.QPushButton("Play", self)
-        # self.bPlay.clicked.connect(self.play)
+        self.bPlay.clicked.connect(self.play)
         self.bPlay.setDefault(False)
         self.bPlay.setAutoDefault(False)
 
@@ -108,8 +110,8 @@ class GUIVisu(QtGui.QMainWindow):
         ##########################################
         # Finalize the main part layout
         ##########################################
-        main_layout = QtWidgets.QVBoxLayout()
-        main_layout.addLayout(left_layout, 3)
+        main_layout = QtWidgets.QHBoxLayout()
+        main_layout.addLayout(left_layout, 10)
         main_layout.addLayout(right_layout, 1)
 
         ##########################################
@@ -119,6 +121,11 @@ class GUIVisu(QtGui.QMainWindow):
         cent_widget.setLayout(main_layout)
         self.setCentralWidget(cent_widget)
 
+
+    def play(self):
+        # Play subpart
+        sd.play(self.wav[0], self.wav[1])
+        status = sd.wait()
 
 def build_gui(infos, frameshift, alignment=None):
 
