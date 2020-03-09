@@ -24,6 +24,9 @@ import traceback
 import time
 import logging
 
+# Profiling
+import cProfile
+
 # Linear algebra
 import numpy as np
 import scipy as sp
@@ -48,6 +51,7 @@ from sig_proc.spectrum import *
 
 # Alignment
 from alignment.htk_lab import *
+from alignment.textgrid import *
 
 # GUI
 from gui.utils import *
@@ -66,11 +70,13 @@ pg.setConfigOptions(imageAxisOrder='row-major')
 # Functions
 ###############################################################################
 class GUIVisu(QtGui.QMainWindow):
-    def __init__(self, wav_file, coef, frameshift, alignment):
+    def __init__(self, infos, frameshift, alignment):
         super().__init__()
 
-        wav = librosa.core.load(args.wav_file, mono=True, sr=16000)  # FIXME: rethink this part
-        self.plot_area = OneShotArea(wav, coef, frameshift, alignment)
+        self.wav = infos[0]
+        self.coef = infos[1]
+        self.filename = infos[2]
+        self.plot_area = OneShotArea(self.wav, self.coef, frameshift, alignment)
 
 
         ##########################################
@@ -78,7 +84,7 @@ class GUIVisu(QtGui.QMainWindow):
         ##########################################
         self.status = QtWidgets.QStatusBar()
         self.status.setMaximumSize(1000, 50)
-        self.status.showMessage(wav_file)
+        self.status.showMessage(self.filename)
 
         ##########################################
         # Define the left part of the window
@@ -114,11 +120,11 @@ class GUIVisu(QtGui.QMainWindow):
         self.setCentralWidget(cent_widget)
 
 
-def build_gui(wav_file, coef, frameshift, alignment=None):
+def build_gui(infos, frameshift, alignment=None):
 
     # Generate application
     app = QtGui.QApplication(["ok"])
-    win = GUIVisu(wav_file, coef, frameshift, alignment)
+    win = GUIVisu(infos, frameshift, alignment)
     win.setWindowTitle('pyqtgraph example: PlotWidget')
 
     # Add exit shortcut!
@@ -141,21 +147,38 @@ def main():
     """
     global args
 
+    # # Enab
+    # pr = cProfile.Profile()
+    # pr.enable()
+
     # Load waves
-    wav = librosa.core.load(args.wav_file, mono=True, sr=16000)
+    logger.info("Loading wav")
+    wav = librosa.core.load(args.wav_file, sr=None)
 
     # Compute spectrum
+    logger.info("Compute spectrogram")
     frameshift=0.0005
     sp_analyzer = SpectrumAnalysis(wav, frameshift=frameshift)
     sp_analyzer.analyze()
 
     # Load alignment
+    logger.info("Load alignment")
     alignment = None
     if args.alignment_file is not None:
-        alignment = HTKAlignment(args.alignment_file, wav)
+        if args.alignment_file.endswith(".lab"):
+            alignment = HTKAlignment(args.alignment_file, wav)
+        elif args.alignment_file.endswith(".TextGrid"):
+            alignment = TGTAlignment(args.alignment_file, wav)
+        else:
+            raise Exception("The alignment cannot be parsed, format is unknown")
 
     # Generate window
-    build_gui(args.wav_file, sp_analyzer.spectrum, frameshift, alignment)
+    logger.info("Rendering")
+    infos = (wav, sp_analyzer.spectrum, args.wav_file)
+    build_gui(infos, frameshift, alignment)
+
+    # pr.disable()
+    # pr.dump_stats("myscript.cprof")
 
 ###############################################################################
 #  Envelopping

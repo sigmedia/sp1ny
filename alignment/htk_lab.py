@@ -22,9 +22,11 @@ class HTKAlignment:
     def __init__(self, htk_file, wav=None):
         self.wav = wav
         self.__extract_alignment(htk_file)
+        self.reference = self.segments["default"]
 
     def __extract_alignment(self, htk_file):
-        self.segments = []
+        self.segments = dict()
+        self.segments["default"] = []
         with open(htk_file) as f:
             for l in f:
                 # Preprocess
@@ -44,4 +46,4 @@ class HTKAlignment:
                     raise("label not correct : " + elts[2])
 
                 # Finalize by adding everything to the list
-                self.segments.append(elts)
+                self.segments["default"].append(elts)

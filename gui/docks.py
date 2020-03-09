@@ -82,10 +82,13 @@ class DockWithWav(Dock):
         self.addWidget(wav_plot)
 
     def __applyAlignment(self):
-        for i, elt in enumerate(self.alignment):
-            # Add boundaries
-            seg = SegmentItem(elt, self.wav)
-            self.data_plot.addItem(seg)
+        if self.alignment is None:
+            pass
+        else:
+            for i, elt in enumerate(self.alignment.reference):
+                # Add boundaries
+                seg = SegmentItem(elt, self.wav)
+                self.data_plot.addItem(seg)
 
 
 class DockDiff(Dock):
@@ -156,10 +159,13 @@ class DockDiff(Dock):
 
 
     def __applyAlignment(self):
-        for i, elt in enumerate(self.alignment):
-            # Add boundaries
-            seg = SegmentItem(elt, wav=None, T=self.T)
-            self.data_plot.addItem(seg)
+        if self.alignment is None:
+            pass
+        else:
+            for i, elt in enumerate(self.alignment.reference):
+                # Add boundaries
+                seg = SegmentItem(elt, wav=None, T=self.T)
+                self.data_plot.addItem(seg)
 
 
 
@@ -172,24 +178,37 @@ class DockAlignment(Dock):
         self.__plotAlignment()
 
         # FIXME: temporary refinement
-        self.alignment_plot.getAxis('left').setStyle(showValues=False)
+        for w in self.widgets:
+            w.getAxis('left').setStyle(showValues=False)
 
     def __plotAlignment(self):
-        alignment_plot = pg.PlotWidget(name=self.name())
+        if self.alignment is None:
+            self.alignment_plot = pg.PlotWidget(name=self.name())
 
-        for i, elt in enumerate(self.alignment):
-            # Generate region item
-            seg = SegmentItem(elt, self.wav)
-            alignment_plot.addItem(seg)
+            # If we don't have any reference just stop here!
+            if self.wav is None:
+                return
 
-            # Add label (FIXME: should be moved to the SegmentItem directly!)
-            label = pg.TextItem(text=elt[2],anchor=(0.5,0.5))
-            alignment_plot.addItem(label)
-            label.setPos((elt[1]+elt[0])/2, 0.5)
+            seg = SegmentItem(((0, self.wav[0].shape[0]/self.wav[1], "")), self.wav)
+            self.alignment_plot.addItem(seg)
+            return
 
-        # Force the Y range to fit the text!
-        alignment_plot.setYRange(0, 1.0)
+        for k in self.alignment.segments:
+            alignment_plot = pg.PlotWidget(name="%s_%s" % (self.name(), k))
+            alignment_plot.setYRange(0, 1)
+            for i, elt in enumerate(self.alignment.segments[k]):
+                # Generate region item
+                seg = SegmentItem(elt, self.wav)
+                alignment_plot.addItem(seg)
 
-        # Save everything
-        self.alignment_plot = alignment_plot
-        self.addWidget(alignment_plot)
+                # Add label (FIXME: should be moved to the SegmentItem directly!)
+                label = pg.TextItem(text=elt[2],anchor=(0.5,0.5))
+                label.setPos((elt[1]+elt[0])/2, 0.5)
+
+            self.addWidget(alignment_plot)
+
+        # We need a reference plot!
+        self.alignment_plot = self.widgets[-1]
+        for i in range(len(self.widgets)-1):
+            self.widgets[i].hideAxis('bottom')
+            self.widgets[i].setXLink(self.alignment_plot)

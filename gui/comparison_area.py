@@ -76,34 +76,30 @@ class NSIMComparisonArea(DockArea):
 
     def __fill(self):
 
-        if self.alignment is None:
-            segments = []
-        else:
-            segments = self.alignment.segments
 
         # Generate reference part
         dock_ref = DockWithWav("Reference", (950, 200),
                                self.ref, self.ref_wav,
                                self.frameshift, self.ticks,
-                               segments)
+                               self.alignment)
         dock_ref.setToolTip(self.ref_filename)
 
         # Generate other part
         dock_other = DockWithWav("Other", (950, 200),
                                  self.other, self.other_wav,
                                  self.frameshift, self.ticks,
-                                 segments)
+                                 self.alignment)
         dock_other.setToolTip(self.other_filename)
 
         # Generate difference map part
         dock_diff = DockDiff("Difference", (950, 200),
                              self.nmap,
                              self.frameshift, self.ticks,
-                             segments)
+                             self.alignment)
 
         # Generate alignment part
         dock_align = DockAlignment("Lab", (950, 20),
-                                   segments, self.ref_wav) # Size doesn't seem to affect anything
+                                   self.alignment, self.ref_wav) # Size doesn't seem to affect anything
 
         # Fix x-axis
         dock_ref.data_plot.setXLink(dock_align.alignment_plot)
