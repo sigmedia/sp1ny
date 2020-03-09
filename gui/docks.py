@@ -87,7 +87,7 @@ class DockWithWav(Dock):
         else:
             for i, elt in enumerate(self.alignment.reference):
                 # Add boundaries
-                seg = SegmentItem(elt, self.wav)
+                seg = SegmentItem(elt, self.wav, showLabel=False)
                 self.data_plot.addItem(seg)
 
 
@@ -164,7 +164,7 @@ class DockDiff(Dock):
         else:
             for i, elt in enumerate(self.alignment.reference):
                 # Add boundaries
-                seg = SegmentItem(elt, wav=None, T=self.T)
+                seg = SegmentItem(elt, wav=None, T=self.T, showLabel=False)
                 self.data_plot.addItem(seg)
 
 
