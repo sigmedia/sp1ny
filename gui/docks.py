@@ -41,6 +41,9 @@ class DockWithWav(Dock):
         self.data_plot.getAxis('left').setWidth(50)
         self.wav_plot.getAxis('left').setWidth(50)
 
+        # Reactivate autorange
+        self.data_plot.autoRange()
+
     def __plotData(self, frameshift, ticks, y_scale=16e3):  # FIXME: y_scale is non sense for now!
         # Generate image data
         img = pg.ImageItem()
@@ -61,6 +64,7 @@ class DockWithWav(Dock):
 
         # Add plot
         self.data_plot = plot
+        self.data_plot.disableAutoRange()
         self.addWidget(plot)
 
     def __plotWav(self, max_dur):
@@ -175,14 +179,17 @@ class DockAlignment(Dock):
     def __init__(self, name, size, alignment, wav):
         Dock.__init__(self, name=name, size=size)
 
+        self.segments = []
         self.alignment = alignment
         self.wav = wav
+
         self.__plotAlignment()
 
         # FIXME: temporary refinement
         for w in self.widgets:
             w.getAxis('left').setWidth(50)
             w.getAxis('left').setStyle(showValues=False)
+            w.autoRange()
 
     def __plotAlignment(self):
         if self.alignment is None:
@@ -198,6 +205,7 @@ class DockAlignment(Dock):
 
         for k in self.alignment.segments:
             alignment_plot = pg.PlotWidget(name="%s_%s" % (self.name(), k))
+            alignment_plot.disableAutoRange()
             alignment_plot.getAxis("left").setLabel(k)
             alignment_plot.setYRange(0, 1)
             for i, elt in enumerate(self.alignment.segments[k]):
