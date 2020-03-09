@@ -19,33 +19,29 @@ import numpy as np
 import re
 
 class HTKAlignment:
-    def __init__(self, htk_file,wav):
+    def __init__(self, htk_file, wav=None):
         self.wav = wav
         self.__extract_alignment(htk_file)
 
     def __extract_alignment(self, htk_file):
         self.segments = []
-        if htk_file is not None:
-            with open(htk_file) as f:
-                for l in f:
-                    # Preprocess
-                    l = l.strip()
-                    elts = l.split()
-                    assert len(elts) == 3
+        with open(htk_file) as f:
+            for l in f:
+                # Preprocess
+                l = l.strip()
+                elts = l.split()
+                assert len(elts) == 3
 
-                    # Convert to seconds
-                    elts[0] = int(elts[0]) / 10000000
-                    elts[1] = int(elts[1]) / 10000000
+                # Convert to seconds
+                elts[0] = int(elts[0]) / 10000000
+                elts[1] = int(elts[1]) / 10000000
 
-                    # Extract monophone label
-                    m = re.search('-(.+?)\+', elts[2])
-                    if m:
-                        elts[2] = m.group(1)
-                    else:
-                        raise("label not correct : " + elts[2])
+                # Extract monophone label
+                m = re.search('-(.+?)\+', elts[2])
+                if m:
+                    elts[2] = m.group(1)
+                else:
+                    raise("label not correct : " + elts[2])
 
-                    # Finalize by adding everything to the list
-                    self.segments.append(elts)
-        else:
-            default = (0, self.wav[0].shape[0]/self.wav[1], "<>")
-            self.segments.append(default)
+                # Finalize by adding everything to the list
+                self.segments.append(elts)

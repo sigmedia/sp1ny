@@ -19,8 +19,13 @@ from pyqtgraph.Qt import QtCore, QtGui
 import sounddevice as sd
 
 class SegmentItem(pg.LinearRegionItem):
-    def __init__(self, seg_infos, wav):
-        super().__init__(movable=False, values=(0, wav[0].shape[0]/wav[1]))
+    def __init__(self, seg_infos, wav=None, T=0):
+        self.T = T
+        if wav is not None:
+            self.T = wav[0].shape[0]/wav[1]
+        if (self.T == 0):
+            raise Exception("T should be different from 0 or a wav object should be given!")
+        super().__init__(movable=False, values=(0, self.T))
 
         # Some adaptations
         brush = QtGui.QBrush(QtGui.QColor(0, 0, 0, 0))
@@ -42,6 +47,10 @@ class SegmentItem(pg.LinearRegionItem):
 
     def mouseClickEvent(self, ev):
         super().mouseClickEvent(ev)
+
+        # Potentially, there is nothing to play !
+        if self.wav is None:
+            return
 
         # Extract position
         start = int(self.start * self.wav[1])

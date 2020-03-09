@@ -66,18 +66,19 @@ pg.setConfigOptions(imageAxisOrder='row-major')
 # Functions
 ###############################################################################
 class GUIVisu(QtGui.QMainWindow):
-    def __init__(self, wav, coef, frameshift, alignment):
+    def __init__(self, wav_file, coef, frameshift, alignment):
         super().__init__()
 
+        wav = librosa.core.load(args.wav_file, mono=True, sr=16000)  # FIXME: rethink this part
         self.plot_area = OneShotArea(wav, coef, frameshift, alignment)
-        self.plot_area.setMinimumSize(1000, 620)
+
 
         ##########################################
         # Setup the status bar
         ##########################################
         self.status = QtWidgets.QStatusBar()
         self.status.setMaximumSize(1000, 50)
-        self.status.showMessage("Ok go maybe?!")
+        self.status.showMessage(wav_file)
 
         ##########################################
         # Define the left part of the window
@@ -113,11 +114,11 @@ class GUIVisu(QtGui.QMainWindow):
         self.setCentralWidget(cent_widget)
 
 
-def build_gui(wav, coef, frameshift, alignment=None):
+def build_gui(wav_file, coef, frameshift, alignment=None):
 
     # Generate application
     app = QtGui.QApplication(["ok"])
-    win = GUIVisu(wav, coef, frameshift, alignment)
+    win = GUIVisu(wav_file, coef, frameshift, alignment)
     win.setWindowTitle('pyqtgraph example: PlotWidget')
 
     # Add exit shortcut!
@@ -149,10 +150,12 @@ def main():
     sp_analyzer.analyze()
 
     # Load alignment
-    alignment = HTKAlignment(args.alignment_file, wav)
+    alignment = None
+    if args.alignment_file is not None:
+        alignment = HTKAlignment(args.alignment_file, wav)
 
     # Generate window
-    build_gui(wav, sp_analyzer.spectrum, frameshift, alignment)
+    build_gui(args.wav_file, sp_analyzer.spectrum, frameshift, alignment)
 
 ###############################################################################
 #  Envelopping

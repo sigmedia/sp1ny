@@ -21,6 +21,7 @@ from pyqtgraph.dockarea import *
 from pyqtgraph.Qt import QtCore, QtGui
 import pyqtgraph as pg
 
+from .utils import *
 from .segment import *
 
 class DockWithWav(Dock):
@@ -81,30 +82,32 @@ class DockWithWav(Dock):
         self.addWidget(wav_plot)
 
     def __applyAlignment(self):
-        for p in self.widgets:
-            for i, elt in enumerate(self.alignment):
-                # Add boundaries
-                seg = SegmentItem(elt, self.wav)
-                p.addItem(seg)
+        for i, elt in enumerate(self.alignment):
+            # Add boundaries
+            seg = SegmentItem(elt, self.wav)
+            self.data_plot.addItem(seg)
 
 
 class DockDiff(Dock):
-    def __init__(self, name, size, coef, frameshift, ticks, alignment=None):
+    def __init__(self, name, size, data, frameshift, ticks, alignment=None):
         Dock.__init__(self, name=name, size=size)
 
-        self.__plotData(coef, frameshift, ticks)
-        self.__plotDiffByFrame(coef, frameshift)
-        self.__applyAlignment(alignment)
+        self.data = data
+        self.alignment = alignment
+        self.T = data.shape[0] * frameshift
+        self.__plotData(frameshift, ticks)
+        self.__plotDiffByFrame(frameshift)
+        self.__applyAlignment()
 
         # FIXME: temporary Refinement
         self.data_plot.getAxis('left').setStyle(showValues=False)
         self.dist_plot.getAxis('left').setStyle(showValues=False)
 
-    def __plotData(self, data, frameshift, ticks, y_scale=16e3):  # FIXME: y_scale is non sense for now!
+    def __plotData(self, frameshift, ticks, y_scale=16e3):  # FIXME: y_scale is non sense for now!
         # Generate image data
         img = pg.ImageItem()
-        img.setImage(data.T)
-        img.scale(frameshift, 1.0/(data.shape[1]/y_scale))
+        img.setImage(self.data.T)
+        img.scale(frameshift, 1.0/(self.data.shape[1]/y_scale))
 
         # Define and assign histogram
         hist = pg.HistogramLUTWidget()
@@ -122,12 +125,12 @@ class DockDiff(Dock):
         self.data_plot = plot
         self.addWidget(plot)
 
-    def __plotDiffByFrame(self, data, frameshift):
+    def __plotDiffByFrame(self, frameshift):
 
-        data_per_frame = np.mean(data, axis=1)
+        data_per_frame = np.mean(self.data, axis=1)
 
         # - Generate color map
-        pos, rgba_colors = zip(*_cmapToColormap(matplotlib.cm.jet, alpha=150))
+        pos, rgba_colors = zip(*cmapToColormap(matplotlib.cm.jet, alpha=150))
         cmap =  pg.ColorMap(pos, rgba_colors)
         lut = cmap.getLookupTable(0.0, 1.0, 10)
         ticks = list(enumerate(lut))
@@ -152,14 +155,11 @@ class DockDiff(Dock):
         self.addWidget(dist_plot)
 
 
-    def __applyAlignment(self, alignment):
-        for p in self.widgets:
-            for i, elt in enumerate(alignment):
-                boundary = pg.InfiniteLine(pos=elt[0], angle=90, pen={'color': "F009", "width": 2})
-                p.addItem(boundary)
-
-            boundary = pg.InfiniteLine(pos=alignment[-1][1], angle=90, pen={'color': "F009", "width": 2})
-            p.addItem(boundary)
+    def __applyAlignment(self):
+        for i, elt in enumerate(self.alignment):
+            # Add boundaries
+            seg = SegmentItem(elt, wav=None, T=self.T)
+            self.data_plot.addItem(seg)
 
 
 
