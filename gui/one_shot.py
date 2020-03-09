@@ -65,7 +65,7 @@ class OneShotArea(DockArea):
 
         # Generate alignment part
         self.logger.debug("Plot alignment part")
-        dock_align = DockAlignment("Lab", (950, 20),
+        dock_align = DockAlignment("Annotations", (950, 20),
                                    self.alignment, self.wav) # Size doesn't seem to affect anything
 
         # Fix x-axis
