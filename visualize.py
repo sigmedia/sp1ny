@@ -153,7 +153,7 @@ def main():
 
     # Load waves
     logger.info("Loading wav")
-    wav = librosa.core.load(args.wav_file, sr=None)
+    wav = librosa.core.load(args.wav_file)
 
     # Compute spectrum
     logger.info("Compute spectrogram")
