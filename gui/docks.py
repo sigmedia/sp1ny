@@ -37,9 +37,9 @@ class DockWithWav(Dock):
         self.__plotWav(max_dur)
         self.__applyAlignment()
 
-        # FIXME: temporary Refinement
-        self.data_plot.getAxis('left').setStyle(showValues=False)
-        self.wav_plot.getAxis('left').setStyle(showValues=False)
+        # Label space
+        self.data_plot.getAxis('left').setWidth(50)
+        self.wav_plot.getAxis('left').setWidth(50)
 
     def __plotData(self, frameshift, ticks, y_scale=16e3):  # FIXME: y_scale is non sense for now!
         # Generate image data
@@ -103,8 +103,10 @@ class DockDiff(Dock):
         self.__applyAlignment()
 
         # FIXME: temporary Refinement
-        self.data_plot.getAxis('left').setStyle(showValues=False)
-        self.dist_plot.getAxis('left').setStyle(showValues=False)
+        self.data_plot.getAxis('left').setLabel("Difference map")
+        self.data_plot.getAxis('left').setWidth(50)
+        self.dist_plot.getAxis('left').setLabel("Difference by frame")
+        self.dist_plot.getAxis('left').setWidth(50)
 
     def __plotData(self, frameshift, ticks, y_scale=16e3):  # FIXME: y_scale is non sense for now!
         # Generate image data
@@ -179,6 +181,7 @@ class DockAlignment(Dock):
 
         # FIXME: temporary refinement
         for w in self.widgets:
+            w.getAxis('left').setWidth(50)
             w.getAxis('left').setStyle(showValues=False)
 
     def __plotAlignment(self):
@@ -195,15 +198,12 @@ class DockAlignment(Dock):
 
         for k in self.alignment.segments:
             alignment_plot = pg.PlotWidget(name="%s_%s" % (self.name(), k))
+            alignment_plot.getAxis("left").setLabel(k)
             alignment_plot.setYRange(0, 1)
             for i, elt in enumerate(self.alignment.segments[k]):
                 # Generate region item
                 seg = SegmentItem(elt, self.wav)
                 alignment_plot.addItem(seg)
-
-                # Add label (FIXME: should be moved to the SegmentItem directly!)
-                label = pg.TextItem(text=elt[2],anchor=(0.5,0.5))
-                label.setPos((elt[1]+elt[0])/2, 0.5)
 
             self.addWidget(alignment_plot)
 
