@@ -25,17 +25,15 @@ from .utils import *
 from .segment import *
 
 class DockWithWav(Dock):
-    def __init__(self, name, size, data, wav, frameshift, ticks, alignment=None):
+    def __init__(self, name, size, data, wav, frameshift, ticks):
         Dock.__init__(self, name=name, size=size)
 
         self.data = data
         self.wav = wav
-        self.alignment = alignment
         max_dur = self.data.shape[0] * frameshift
 
         self.__plotData(frameshift, ticks)
         self.__plotWav(max_dur)
-        self.__applyAlignment()
 
         # Label space
         self.data_plot.getAxis('left').setWidth(50)
@@ -85,26 +83,15 @@ class DockWithWav(Dock):
         self.wav_plot = wav_plot
         self.addWidget(wav_plot)
 
-    def __applyAlignment(self):
-        if self.alignment is None:
-            pass
-        else:
-            for i, elt in enumerate(self.alignment.reference):
-                # Add boundaries
-                seg = SegmentItem(elt, self.wav, showLabel=False)
-                self.data_plot.addItem(seg)
-
 
 class DockDiff(Dock):
-    def __init__(self, name, size, data, frameshift, ticks, alignment=None):
+    def __init__(self, name, size, data, frameshift, ticks):
         Dock.__init__(self, name=name, size=size)
 
         self.data = data
-        self.alignment = alignment
         self.T = data.shape[0] * frameshift
         self.__plotData(frameshift, ticks)
         self.__plotDiffByFrame(frameshift)
-        self.__applyAlignment()
 
         # FIXME: temporary Refinement
         self.data_plot.getAxis('left').setLabel("Difference map")
@@ -162,17 +149,6 @@ class DockDiff(Dock):
         # Add plot to dock!
         self.dist_plot = dist_plot
         self.addWidget(dist_plot)
-
-
-    def __applyAlignment(self):
-        if self.alignment is None:
-            pass
-        else:
-            for i, elt in enumerate(self.alignment.reference):
-                # Add boundaries
-                seg = SegmentItem(elt, wav=None, T=self.T, showLabel=False)
-                self.data_plot.addItem(seg)
-
 
 
 class DockAlignment(Dock):

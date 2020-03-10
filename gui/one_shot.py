@@ -60,8 +60,7 @@ class OneShotArea(DockArea):
         self.logger.debug("Plot coefficient part")
         dock_coef = DockWithWav("??", (950, 200), # FIXME: deal with label name
                                 self.coef, self.wav,
-                                self.frameshift, self.ticks,
-                                self.alignment)
+                                self.frameshift, self.ticks)
 
         # Generate alignment part
         self.logger.debug("Plot alignment part")
