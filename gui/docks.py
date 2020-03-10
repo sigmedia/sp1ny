@@ -168,42 +168,28 @@ class DockAlignment(Dock):
             w.autoRange()
 
     def __plotAlignment(self):
-        # Factor
         lim_factor = 1.1
-        if self.alignment is None:
-            self.alignment_plot = pg.PlotWidget(name=self.name())
-
-            # If we don't have any reference just stop here!
-            if self.wav is None:
-                return
-
-            seg = SegmentItem(((0, self.wav[0].shape[0]/self.wav[1], "")), self.wav)
-            self.alignment_plot.addItem(seg)
-            self.alignment_plot.setLimits(xMax=self.wav[0].shape[0]/self.wav[1]*lim_factor)
-            return
-
-
         T_max = self.wav[0].shape[0]/self.wav[1]
         for k in self.alignment.segments:
-            alignment_plot = pg.PlotWidget(name="%s_%s" % (self.name(), k))
-            alignment_plot.disableAutoRange()
-            alignment_plot.getAxis("left").setLabel(k)
-            alignment_plot.setYRange(0, 1)
+            reference_plot = pg.PlotWidget(name="%s_%s" % (self.name(), k))
+            reference_plot.disableAutoRange()
+            reference_plot.getAxis("left").setLabel(k)
+            reference_plot.setYRange(0, 1)
             for i, elt in enumerate(self.alignment.segments[k]):
                 # Generate region item
                 seg = SegmentItem(elt, self.wav)
-                alignment_plot.addItem(seg)
+                reference_plot.addItem(seg)
 
 
             if T_max < self.alignment.segments[k][-1][1]:
                 T_max = self.alignment.segments[k][-1][1]
 
-            self.addWidget(alignment_plot)
+            self.addWidget(reference_plot)
 
         # We need a reference plot!
-        self.alignment_plot = self.widgets[-1]
-        self.alignment_plot.setLimits(xMax=T_max*lim_factor)
+        self.reference_plot = self.widgets[-1]
+        self.reference_plot.setLimits(xMax=T_max*lim_factor)
         for i in range(len(self.widgets)-1):
             self.widgets[i].hideAxis('bottom')
-            self.widgets[i].setXLink(self.alignment_plot)
+            self.widgets[i].setXLink(self.reference_plot)
             self.widgets[i].setLimits(xMax=T_max*lim_factor)

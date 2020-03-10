@@ -86,6 +86,7 @@ class GUIVisu(QtGui.QMainWindow):
         # Setup the status bar
         ##########################################
         self.status = QtWidgets.QStatusBar()
+        self.status.setMaximumHeight(20)
         self.status.showMessage(self.filename)
 
         ##########################################
@@ -154,9 +155,6 @@ def main():
     """
     global args
 
-    # # Enab
-    # pr = cProfile.Profile()
-    # pr.enable()
 
     # Load waves
     logger.info("Loading wav")
@@ -184,8 +182,6 @@ def main():
     infos = (wav, sp_analyzer.spectrum, args.wav_file)
     build_gui(infos, frameshift, alignment)
 
-    # pr.disable()
-    # pr.dump_stats("myscript.cprof")
 
 ###############################################################################
 #  Envelopping

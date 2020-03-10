@@ -58,24 +58,33 @@ class OneShotArea(DockArea):
     def __fill(self):
         # Generate reference part
         self.logger.debug("Plot coefficient part")
-        dock_coef = DockWithWav("??", (950, 200), # FIXME: deal with label name
+        dock_coef = DockWithWav("Signal", (950, 200), # FIXME: deal with label name
                                 self.coef, self.wav,
                                 self.frameshift, self.ticks)
 
         # Generate alignment part
-        self.logger.debug("Plot alignment part")
-        dock_align = DockAlignment("Annotations", (950, 20),
-                                   self.alignment, self.wav) # Size doesn't seem to affect anything
+        if self.alignment is not None:
+            self.logger.debug("Plot alignment part")
+            dock_align = DockAlignment("Annotations", (950, 20),
+                                       self.alignment, self.wav) # Size doesn't seem to affect anything
+            reference_plot = dock_align.reference_plot
+        else:
+            reference_plot = dock_coef.wav_plot
+
 
         # Fix x-axis
         self.logger.debug("Link everything")
-        dock_coef.data_plot.setXLink(dock_align.alignment_plot)
-        dock_coef.wav_plot.setXLink(dock_align.alignment_plot)
+        dock_coef.data_plot.setXLink(reference_plot)
+        if self.alignment is not None:
+            dock_coef.wav_plot.setXLink(reference_plot)
 
         # Set axes labels
-        dock_align.alignment_plot.setLabel('bottom', 'Time', units='s')
+        reference_plot.setLabel('bottom', 'Time', units='s')
 
         # - Add docks
         self.logger.debug("Add docks to the area")
-        self.addDock(dock_align, "left")
-        self.addDock(dock_coef, "top", dock_align)
+        if self.alignment is not None:
+            self.addDock(dock_align, "left")
+            self.addDock(dock_coef, "top", dock_align)
+        else:
+            self.addDock(dock_coef, "left")
