@@ -192,6 +192,8 @@ class DockAlignment(Dock):
             w.autoRange()
 
     def __plotAlignment(self):
+        # Factor
+        lim_factor = 1.1
         if self.alignment is None:
             self.alignment_plot = pg.PlotWidget(name=self.name())
 
@@ -201,8 +203,11 @@ class DockAlignment(Dock):
 
             seg = SegmentItem(((0, self.wav[0].shape[0]/self.wav[1], "")), self.wav)
             self.alignment_plot.addItem(seg)
+            self.alignment_plot.setLimits(xMax=self.wav[0].shape[0]/self.wav[1]*lim_factor)
             return
 
+
+        T_max = self.wav[0].shape[0]/self.wav[1]
         for k in self.alignment.segments:
             alignment_plot = pg.PlotWidget(name="%s_%s" % (self.name(), k))
             alignment_plot.disableAutoRange()
@@ -213,10 +218,16 @@ class DockAlignment(Dock):
                 seg = SegmentItem(elt, self.wav)
                 alignment_plot.addItem(seg)
 
+
+            if T_max < self.alignment.segments[k][-1][1]:
+                T_max = self.alignment.segments[k][-1][1]
+
             self.addWidget(alignment_plot)
 
         # We need a reference plot!
         self.alignment_plot = self.widgets[-1]
+        self.alignment_plot.setLimits(xMax=T_max*lim_factor)
         for i in range(len(self.widgets)-1):
             self.widgets[i].hideAxis('bottom')
             self.widgets[i].setXLink(self.alignment_plot)
+            self.widgets[i].setLimits(xMax=T_max*lim_factor)

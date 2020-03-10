@@ -15,7 +15,6 @@ LICENSE
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui
 
-
 import sounddevice as sd
 
 class SegmentItem(pg.LinearRegionItem):
@@ -53,17 +52,28 @@ class SegmentItem(pg.LinearRegionItem):
     def mouseClickEvent(self, ev):
         super().mouseClickEvent(ev)
 
-        # Potentially, there is nothing to play !
-        if self.wav is None:
-            return
+        # Check which key is pressed
+        modifierPressed = QtGui.QApplication.keyboardModifiers()
+        modifierName = ''
 
-        # Extract position
-        start = int(self.start * self.wav[1])
-        end = int(self.end * self.wav[1])
+        if (ev.buttons() == QtCore.Qt.LeftButton) and ev.double():
+            if (modifierPressed & QtCore.Qt.ControlModifier) == QtCore.Qt.ControlModifier:
+                # Potentially, there is nothing to play !
+                if self.wav is None:
+                    return
 
-        # Play subpart
-        sd.play(self.wav[0][start:end], self.wav[1])
-        status = sd.wait()
+                # Extract position
+                start = int(self.start * self.wav[1])
+                end = int(self.end * self.wav[1])
+
+                # Play subpart
+                sd.play(self.wav[0][start:end], self.wav[1])
+                status = sd.wait()
+
+            elif (modifierPressed & QtCore.Qt.ShiftModifier) == QtCore.Qt.ShiftModifier:
+                self.parentWidget().setXRange(0, self.parentWidget().state["limits"]["xLimits"][1])
+            elif (not modifierPressed):
+                self.parentWidget().setXRange(self.start, self.end)
 
 
     def hoverEvent(self, ev):
