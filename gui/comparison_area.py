@@ -80,41 +80,46 @@ class NSIMComparisonArea(DockArea):
         # Generate reference part
         dock_ref = DockWithWav("Reference", (950, 200),
                                self.ref, self.ref_wav,
-                               self.frameshift, self.ticks,
-                               self.alignment)
+                               self.frameshift, self.ticks)
         dock_ref.setToolTip(self.ref_filename)
 
         # Generate other part
         dock_other = DockWithWav("Other", (950, 200),
                                  self.other, self.other_wav,
-                                 self.frameshift, self.ticks,
-                                 self.alignment)
+                                 self.frameshift, self.ticks)
         dock_other.setToolTip(self.other_filename)
 
         # Generate difference map part
         dock_diff = DockDiff("Difference", (950, 200),
                              self.nmap,
-                             self.frameshift, self.ticks,
-                             self.alignment)
+                             self.frameshift, self.ticks)
 
         # Generate alignment part
-        dock_align = DockAlignment("Lab", (950, 20),
-                                   self.alignment, self.ref_wav) # Size doesn't seem to affect anything
+        if self.alignment is not None:
+            dock_align = DockAlignment("Lab", (950, 20),
+                                       self.alignment, self.ref_wav) # Size doesn't seem to affect anything
+            reference_plot = dock_align.reference_plot
+        else:
+            reference_plot = dock_ref.wav_plot
 
         # Fix x-axis
-        dock_ref.data_plot.setXLink(dock_align.alignment_plot)
-        dock_ref.wav_plot.setXLink(dock_align.alignment_plot)
-        dock_other.data_plot.setXLink(dock_align.alignment_plot)
-        dock_other.wav_plot.setXLink(dock_align.alignment_plot)
-        dock_diff.data_plot.setXLink(dock_align.alignment_plot)
-        dock_diff.dist_plot.setXLink(dock_align.alignment_plot)
+        dock_ref.data_plot.setXLink(reference_plot)
+        dock_ref.wav_plot.setXLink(reference_plot)
+        dock_other.data_plot.setXLink(reference_plot)
+        dock_other.wav_plot.setXLink(reference_plot)
+        dock_diff.data_plot.setXLink(reference_plot)
+        dock_diff.dist_plot.setXLink(reference_plot)
 
         # Set axes labels
-        dock_align.widgets[0].setLabel('bottom', 'Time', units='s')
+        reference_plot.setLabel('bottom', 'Time', units='s')
 
         # - Add docks
-        self.addDock(dock_align, "left")
-        self.addDock(dock_ref, "top", dock_align)
+        if self.alignment is not None:
+            self.addDock(dock_align, "left")
+            self.addDock(dock_ref, "top", dock_align)
+        else:
+            self.addDock(dock_ref, "left")
+
         self.addDock(dock_other, "top", dock_ref)
         self.addDock(dock_diff, "top", dock_other)
 
