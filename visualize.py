@@ -46,16 +46,16 @@ import pyqtgraph as pg
 import re
 
 # Signal processing helpers
-from sig_proc.spectrum import *
+from pyprag.sig_proc.spectrum import *
 
 # Alignment
-from alignment.htk_lab import *
-from alignment.textgrid import *
+from pyprag.alignment.htk_lab import *
+from pyprag.alignment.textgrid import *
 
 # GUI
-from gui.utils import *
-from gui.docks import *
-from gui.one_shot import *
+from pyprag.gui.utils import *
+from pyprag.gui.docks import *
+from pyprag.gui.one_shot import *
 
 # Sound
 import sounddevice as sd
@@ -154,7 +154,6 @@ def main():
     """Main entry function
     """
     global args
-
 
     # Load waves
     logger.info("Loading wav")

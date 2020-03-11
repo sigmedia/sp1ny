@@ -27,8 +27,8 @@ import pyqtgraph as pg
 import collections
 
 #
-from .utils import *
-from .docks import *
+from pyprag.gui.utils import *
+from pyprag.gui.docks import *
 
 #####################################################################################################
 # Classes

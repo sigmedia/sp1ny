@@ -24,8 +24,8 @@ from pyqtgraph.Qt import QtCore, QtGui
 import pyqtgraph as pg
 
 #
-from .utils import *
-from .docks import *
+from pyprag.gui.utils import *
+from pyprag.gui.docks import *
 
 #####################################################################################################
 # Classes

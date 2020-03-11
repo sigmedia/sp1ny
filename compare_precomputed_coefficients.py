@@ -42,11 +42,11 @@ import pyqtgraph as pg
 import re
 
 # Alignment
-from alignment.htk_lab import *
+from pyprag.alignment.htk_lab import *
 
 # GUI
-from gui.utils import *
-from gui.comparison_area import *
+from pyprag.gui.utils import *
+from pyprag.gui.comparison_area import *
 
 ###############################################################################
 # global constants

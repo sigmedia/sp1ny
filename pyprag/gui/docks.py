@@ -21,9 +21,9 @@ from pyqtgraph.dockarea import *
 from pyqtgraph.Qt import QtCore, QtGui
 import pyqtgraph as pg
 
-from .utils import *
-from .items import *
-from .widgets import *
+from pyprag.gui.utils import *
+from pyprag.gui.items import *
+from pyprag.gui.widgets import *
 
 class DockWithWav(Dock):
     def __init__(self, name, size, data, wav, frameshift, ticks):

@@ -1,8 +1,7 @@
 import numpy as np
 import pyqtgraph as pg
 
-from .items import *
-
+from pyprag.gui.items import *
 
 class SelectableWavPlotWidget(pg.PlotWidget):
 
