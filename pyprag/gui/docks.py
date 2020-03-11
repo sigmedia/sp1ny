@@ -44,9 +44,11 @@ class DockWithWav(Dock):
         self.data_plot.autoRange()
 
     def __plotData(self, frameshift, ticks, y_scale=16e3):  # FIXME: y_scale is non sense for now!
+        lim_factor = 1.1
         self.data_plot = SelectableImagePlotWidget(self.data, frameshift, ticks,
                                                    name="%s coef" % self.name,
                                                    wav=self.wav)
+        self.data_plot.setLimits(xMax=self.data.shape[0]*frameshift*lim_factor)
         self.data_plot.hideAxis('bottom')
 
         # Add plot
@@ -54,7 +56,9 @@ class DockWithWav(Dock):
         self.addWidget(self.data_plot)
 
     def __plotWav(self, max_dur):
+        lim_factor = 1.1
         self.wav_plot = SelectableWavPlotWidget(self.wav, max_dur, name="%s waveform" % self.name)
+        self.wav_plot.setLimits(xMax=max_dur*lim_factor)
         self.wav_plot.setMaximumHeight(int(self.frameGeometry().height() * 20/100))
         self.addWidget(self.wav_plot)
 
