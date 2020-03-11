@@ -15,7 +15,7 @@ LICENSE
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui
 
-import sounddevice as sd
+from pyprag.audio.player import *
 
 class SelectablePlotItem(pg.PlotItem):
     def __init__(self, wav=None, **kwargs):
@@ -93,8 +93,7 @@ class SegmentItem(pg.LinearRegionItem):
                 end = int(self.end * self._wav[1])
 
                 # Play subpart
-                sd.play(self._wav[0][start:end], self._wav[1])
-                status = sd.wait()
+                player.play(self._wav[0][start:end], self._wav[1])
 
             elif (modifierPressed & QtCore.Qt.ShiftModifier) == QtCore.Qt.ShiftModifier:
                 self.parentWidget().setXRange(0, self.parentWidget().state["limits"]["xLimits"][1])

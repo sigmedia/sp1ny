@@ -45,6 +45,9 @@ import pyqtgraph as pg
 # Utils
 import re
 
+# Player
+from pyprag.audio.player import player
+
 # Signal processing helpers
 from pyprag.sig_proc.spectrum import *
 
@@ -56,9 +59,6 @@ from pyprag.alignment.textgrid import *
 from pyprag.gui.utils import *
 from pyprag.gui.docks import *
 from pyprag.gui.one_shot import *
-
-# Sound
-import sounddevice as sd
 
 ###############################################################################
 # global constants
@@ -124,8 +124,7 @@ class GUIVisu(QtGui.QMainWindow):
 
     def play(self):
         # Play subpart
-        sd.play(self.wav[0], self.wav[1])
-        status = sd.wait()
+        player.play(self.wav[0], self.wav[1])
 
 def build_gui(infos, frameshift, alignment=None):
 
