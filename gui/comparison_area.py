@@ -75,8 +75,6 @@ class NSIMComparisonArea(DockArea):
         self.__fill()
 
     def __fill(self):
-
-
         # Generate reference part
         dock_ref = DockWithWav("Reference", (950, 200),
                                self.ref, self.ref_wav,

@@ -22,7 +22,8 @@ from pyqtgraph.Qt import QtCore, QtGui
 import pyqtgraph as pg
 
 from .utils import *
-from .segment import *
+from .items import *
+from .widgets import *
 
 class DockWithWav(Dock):
     def __init__(self, name, size, data, wav, frameshift, ticks):
@@ -43,45 +44,19 @@ class DockWithWav(Dock):
         self.data_plot.autoRange()
 
     def __plotData(self, frameshift, ticks, y_scale=16e3):  # FIXME: y_scale is non sense for now!
-        # Generate image data
-        img = pg.ImageItem()
-        img.setImage(self.data.T)
-        img.scale(frameshift, 1.0/(self.data.shape[1]/y_scale))
-
-        # Define and assign histogram
-        hist = pg.HistogramLUTWidget()
-        hist.setImageItem(img)
-        hist.gradient.restoreState(
-            {'mode': 'rgb', 'ticks': ticks}
-        )
-
-        # Generate plot
-        plot = pg.PlotWidget(name="%s coef" % self.name)
-        plot.addItem(img)
-        plot.hideAxis('bottom')
+        self.data_plot = SelectableImagePlotWidget(self.data, frameshift, ticks,
+                                                   name="%s coef" % self.name,
+                                                   wav=self.wav)
+        self.data_plot.hideAxis('bottom')
 
         # Add plot
-        self.data_plot = plot
         self.data_plot.disableAutoRange()
-        self.addWidget(plot)
+        self.addWidget(self.data_plot)
 
     def __plotWav(self, max_dur):
-        max_point = int(max_dur * self.wav[1])
-        if max_point > self.wav[0].shape[0]:
-            max_point = self.wav[0].shape[0]
-
-        wav_plot = pg.PlotWidget(name="%s waveform" % self.name)
-        wav_plot.plot(x=np.linspace(0, max_dur, max_point),
-                      y=self.wav[0][:max_point])
-
-        if max_point < self.wav[0].shape[0]:
-            wav_plot.plot(x=np.linspace(max_dur, self.wav[0].shape[0]/float(self.wav[1]), self.wav[0].shape[0]-max_point),
-                          y=self.wav[0][max_point:], pen={'color': "F00"})
-        wav_plot.setMaximumHeight(int(self.frameGeometry().height() * 20/100))
-
-        # Add the wav plot to the dock!
-        self.wav_plot = wav_plot
-        self.addWidget(wav_plot)
+        self.wav_plot = SelectableWavPlotWidget(self.wav, max_dur, name="%s waveform" % self.name)
+        self.wav_plot.setMaximumHeight(int(self.frameGeometry().height() * 20/100))
+        self.addWidget(self.wav_plot)
 
 
 class DockDiff(Dock):
@@ -177,7 +152,7 @@ class DockAlignment(Dock):
             reference_plot.setYRange(0, 1)
             for i, elt in enumerate(self.alignment.segments[k]):
                 # Generate region item
-                seg = SegmentItem(elt, self.wav)
+                seg = AnnotationItem(elt, self.wav)
                 reference_plot.addItem(seg)
 
 

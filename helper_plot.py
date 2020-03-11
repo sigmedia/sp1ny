@@ -40,6 +40,7 @@ def main():
     wav_src="results_qomex/%s_qomex/preprocessed_input/%s/wav/%s.wav" % (model, args.exp, args.basename)
     wav_tgt = "results_qomex/%s_wavenet/preprocessed_input/%s/wav/%s_gen.wav" % (model, args.exp, args.basename)
 
+    # cmd = "python3 compare_precomputed_coefficients.py -f %s -d %s %s %s %s %s" % (types[args.type][0], types[args.type][1], wav_src, src, wav_tgt, tgt)
     cmd = "python3 compare_precomputed_coefficients.py -f %s -d %s -a %s %s %s %s %s" % (types[args.type][0], types[args.type][1], alignment_file, wav_src, src, wav_tgt, tgt)
     os.system(cmd)
 
