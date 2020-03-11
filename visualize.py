@@ -35,7 +35,6 @@ from fastdtw import fastdtw
 
 # Audio, dsp
 import librosa
-import pyworld as pw
 
 # Plotting & rendering
 import matplotlib.cm
@@ -145,6 +144,7 @@ def build_gui(infos, frameshift, alignment=None):
     win.show()
     if (sys.flags.interactive != 1) or not hasattr(QtCore, 'PYQT_VERSION'):
         QtGui.QApplication.instance().exec_()
+
 
 
 ###############################################################################

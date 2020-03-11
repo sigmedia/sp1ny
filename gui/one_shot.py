@@ -52,7 +52,6 @@ class OneShotArea(DockArea):
         ticks = list(enumerate(lut))
         self.ticks = [(ticks[i][0]/ticks[-1][0], ticks[i][1]) for i in range(len(ticks))]
 
-
         self.__fill()
 
     def __fill(self):
