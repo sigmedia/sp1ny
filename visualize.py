@@ -163,7 +163,6 @@ def main():
     logger.info("Compute spectrogram")
     frameshift=0.0005
     sp_analyzer = SpectrumAnalysis(wav, frameshift=frameshift)
-    sp_analyzer.analyze()
 
     # Load annotation
     logger.info("Load annotation")

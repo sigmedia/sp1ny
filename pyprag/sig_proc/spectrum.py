@@ -7,25 +7,63 @@ AUTHOR
 
 DESCRIPTION
 
+    Module containing classes related to spectrum analysis
+
 LICENSE
-    This script is in the public domain, free from copyrights or restrictions.
-    Created:  6 March 2020
 """
 
-# Linear algebra
+# Base line imports
 import numpy as np
-
 import librosa
 
+
+###############################################################################
+# Classes
+###############################################################################
+
 class SpectrumAnalysis:
+    """Spectrum analysis class
+
+    Attributes
+    ----------
+    wav : tuple(np.array, int)
+        The signal information as loaded using librosa. The tuple contain an array of samples and the sample rate
+
+    fft_len : int
+        The length of the FFT
+
+    frameshift : float
+        The frameshift (in seconds)
+
+    Spectrum : np.array(nb_frames, fft_len)
+        The matrix containing the spectrum
+    """
+
     def __init__(self, wav, fft_len=512, frameshift=0.005):
+        """
+        Parameters
+        ----------
+        wav : tuple(np.array, int)
+            The signal information as loaded using librosa. The tuple contain an array of samples and the sample rate
+
+        fft_len : int, optional
+            The length of the FFT (default=512)
+
+        frameshift : float, optional
+            The frameshift (in seconds) (default=0.005)
+
+        """
         self.wav = wav
         self.fft_len = fft_len
         self.frameshift = frameshift
-
         self.spectrum = None
 
-    def analyze(self):
+        self.__process()
+
+    def __process(self):
+        """Method which compute the spectrum and fill the object attributes
+
+        """
         # Compute spectrogram
         frameshift = int(self.frameshift * self.wav[1])
         sp = librosa.core.stft(self.wav[0],
