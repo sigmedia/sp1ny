@@ -1,4 +1,4 @@
-name: pygrad
+name: pyprag
 channels:
   - conda-forge
   - defaults
@@ -75,6 +75,7 @@ dependencies:
   - pthread-stubs=0.4=h14c3975_1001
   - pycparser=2.19=py37_0
   - pyparsing=2.4.6=py_0
+  - pyprof2calltree=1.4.4=py_0
   - pyqt=5.12.3=py37hcca6a23_1
   - pysoundfile=0.10.2=py_1001
   - python=3.7.6=h0371630_2
@@ -102,5 +103,4 @@ dependencies:
     - pyqtgraph==0.11.0.dev0+g556ba55
     - pyqtwebengine==5.12.1
     - tgt==1.4.4
-prefix: /home/lemagues/environment/local/miniconda3/envs/pygrad
-
+prefix: /home/lemagues/environment/local/miniconda3/envs/pyprag
