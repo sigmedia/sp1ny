@@ -7,9 +7,9 @@ AUTHOR
 
 DESCRIPTION
 
+    Module containing GUI related useful functions
+
 LICENSE
-    This script is in the public domain, free from copyrights or restrictions.
-    Created:  6 March 2020
 """
 
 # Linear algebra
@@ -22,14 +22,32 @@ import matplotlib.cm
 import collections
 
 #####################################################################################################
-# Helper
+# Functions
 #####################################################################################################
+
 def cmapToColormap(cmap, nTicks=16, alpha=255):
-    """
-    Converts a Matplotlib cmap to pyqtgraphs colormaps. No dependency on matplotlib.
-    Parameters:
-    *cmap*: Cmap object. Imported from matplotlib.cm.*
-    *nTicks*: Number of ticks to create when dict of functions is used. Otherwise unused.
+    """Converts a Matplotlib cmap to pyqtgraphs colormaps. No dependency on matplotlib.
+
+    Parameters
+    ---------
+    cmap : Cmap object
+        The colormap imported from matplotlib.cm.*
+
+    nTicks : int, optional
+        The number of ticks to create when dict of functions is used. Otherwise unused. (default: 16)
+
+    alpha : int, optional
+        The alpha opacity coefficient, between 0 and 255. (default: 255)
+
+    Returns
+    -------
+    list
+        A list of tuples. Each tuple contains the position and the color tuple in RGBA format (R, G, B, alpha)
+
+    Raises
+    ------
+    ValueError
+        if cmap is not a correct color map object
     """
 
     # Case #1: a dictionary with 'red'/'green'/'blue' values as list of ranges (e.g. 'jet')

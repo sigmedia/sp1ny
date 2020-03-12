@@ -7,9 +7,9 @@ AUTHOR
 
 DESCRIPTION
 
+    Module to provide the different areas which are comparing *aligned* signals
+
 LICENSE
-    This script is in the public domain, free from copyrights or restrictions.
-    Created:  6 March 2020
 """
 
 # Linear algebra
@@ -26,7 +26,7 @@ import pyqtgraph as pg
 # Utils
 import collections
 
-#
+# pyprag internal imports
 from pyprag.gui.utils import *
 from pyprag.gui.docks import *
 
@@ -35,7 +35,53 @@ from pyprag.gui.docks import *
 #####################################################################################################
 
 class NSIMComparisonArea(DockArea):
-    def __init__(self, ref_infos, other_infos, frameshift, alignment=None, color_map=matplotlib.cm.bone):
+    """Dock area containing (from top to bottom):
+        - A dock containg a NSIM map and the corresponding average per frame
+        - A dock containing a wav plot and the corresponding data for the other signal
+        - A dock containing a wav plot and the corresponding data for the reference signal
+        - A dock containing the annotation plots (if any available)
+
+    Attributes
+    ----------
+    ref : np.array
+        The reference coefficients (matrix)
+
+    ref_wav : tuple(np.array, int)
+        The reference signal information of the reference as loaded using librosa. The tuple contain an array of samples and the sample rate.
+
+    ref_filename : str
+        The filename of the reference coefficients
+
+    other : np.array
+        The other signal coefficients (matrix)
+
+    other_wav : tuple(np.array, int)
+        The other signal information as loaded using librosa. The tuple contain an array of samples and the sample rate.
+
+    other_filename : str
+        The filename of the other signal coefficients
+
+    frameshift : float
+        The frameshift used to extract the coefficients ftrom the signals
+
+    nsim : float
+        The NSIM value
+
+    nmap : np.array
+        The intermediate matrix averaged to get the final NSIM
+
+    y_scale : TODO
+        NOT TO BE USED FOR NOW
+
+    annotation : pyprag.annotation.AnnotationLoader
+        The annotations if available, else None
+
+
+    ticks : TODO
+        The color map ticks
+
+    """
+    def __init__(self, ref_infos, other_infos, frameshift, annotation=None, color_map=matplotlib.cm.bone):
         # Superclass initialisation
         DockArea.__init__(self)
 
@@ -50,7 +96,7 @@ class NSIMComparisonArea(DockArea):
 
         self.frameshift = frameshift
         self.y_scale = 16e3
-        self.alignment = alignment
+        self.annotation = annotation
 
         # Compute NSIM
         nsim_cptr = NSIM(self.ref, self.other)
@@ -75,6 +121,9 @@ class NSIMComparisonArea(DockArea):
         self.__fill()
 
     def __fill(self):
+        """Helper to fill the dock area
+
+        """
         # Generate reference part
         dock_ref = DockWithWav("Reference", (950, 200),
                                self.ref, self.ref_wav,
@@ -88,14 +137,14 @@ class NSIMComparisonArea(DockArea):
         dock_other.setToolTip(self.other_filename)
 
         # Generate difference map part
-        dock_diff = DockDiff("Difference", (950, 200),
+        dock_diff = DockAvg("Difference", (950, 200),
                              self.nmap,
                              self.frameshift, self.ticks)
 
-        # Generate alignment part
-        if self.alignment is not None:
-            dock_align = DockAlignment("Lab", (950, 20),
-                                       self.alignment, self.ref_wav) # Size doesn't seem to affect anything
+        # Generate annotation part
+        if self.annotation is not None:
+            dock_align = DockAnnotation("Lab", (950, 20),
+                                       self.annotation, self.ref_wav) # Size doesn't seem to affect anything
             reference_plot = dock_align.reference_plot
         else:
             reference_plot = dock_ref.wav_plot
@@ -105,14 +154,14 @@ class NSIMComparisonArea(DockArea):
         dock_ref.wav_plot.setXLink(reference_plot)
         dock_other.data_plot.setXLink(reference_plot)
         dock_other.wav_plot.setXLink(reference_plot)
-        dock_diff.data_plot.setXLink(reference_plot)
-        dock_diff.dist_plot.setXLink(reference_plot)
+        dock_diff.avg_plot.setXLink(reference_plot)
+        dock_diff.avg_plot.setXLink(reference_plot)
 
         # Set axes labels
         reference_plot.setLabel('bottom', 'Time', units='s')
 
         # - Add docks
-        if self.alignment is not None:
+        if self.annotation is not None:
             self.addDock(dock_align, "left")
             self.addDock(dock_ref, "top", dock_align)
         else:
@@ -123,7 +172,35 @@ class NSIMComparisonArea(DockArea):
 
 
 class NSIM:
+    """Helper to compute the Neurogram Similarity Index Measure (NSIM) and its corresponding map
+
+    Attributes
+    ----------
+    _window : np.array
+        The gaussian window matrix
+
+    _r : np.array
+        The reference data matrix
+
+    _d : np.array
+        The "degraded" data matrix
+
+    """
+
     def __init__(self, r, d):
+        """
+        Parameters
+        ----------
+        self : type
+            description
+
+        r : np.array
+            The reference data matrix
+
+        d : np.array
+            The "degraded" data matrix
+
+        """
         self._window =  np.array([[0.0113, 0.0838, 0.0113],
                                   [0.0838, 0.6193, 0.0838],
                                   [0.0113, 0.0838, 0.0113]])
@@ -133,6 +210,11 @@ class NSIM:
 
     def compute(self):
         """NSIM Metric based on visqol implementation
+
+        Returns
+        -------
+        tuple(float, np.array)
+           a tuple containing the NSIM value and the intermediate matrix
 
         """
         # 2-D Gaussian filter of size 3 with std=0.5
