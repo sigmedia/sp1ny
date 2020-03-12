@@ -41,8 +41,8 @@ import pyqtgraph as pg
 # Utils
 import re
 
-# Alignment
-from pyprag.alignment.htk_lab import *
+# Annotation
+from pyprag.annotation.htk_lab import *
 
 # GUI
 from pyprag.gui.utils import *
@@ -60,10 +60,10 @@ pg.setConfigOptions(imageAxisOrder='row-major')
 # Functions
 ###############################################################################
 class GUIVisu(QtGui.QMainWindow):
-    def __init__(self, ref_infos, other_infos, frameshift, alignment):
+    def __init__(self, ref_infos, other_infos, frameshift, annotation):
         super().__init__()
 
-        self.plot_area = NSIMComparisonArea(ref_infos, other_infos, frameshift, alignment)
+        self.plot_area = NSIMComparisonArea(ref_infos, other_infos, frameshift, annotation)
 
         ##########################################
         # Define the left part of the window
@@ -102,11 +102,11 @@ class GUIVisu(QtGui.QMainWindow):
 ###############################################################################
 # Functions
 ###############################################################################
-def build_gui(ref_infos, other_infos, frameshift, alignment=None):
+def build_gui(ref_infos, other_infos, frameshift, annotation=None):
 
     # Generate application
     app = QtGui.QApplication(["ok"])
-    win = GUIVisu(ref_infos, other_infos, frameshift, alignment)
+    win = GUIVisu(ref_infos, other_infos, frameshift, annotation)
     win.setWindowTitle('pyqtgraph example: PlotWidget')
 
     # Add exit shortcut!
@@ -136,10 +136,10 @@ def main():
     """
     global args
 
-    # Load alignment
-    alignment = None
-    if args.alignment_file is not None:
-        alignment = HTKAlignment(args.alignment_file)
+    # Load annotation
+    annotation = None
+    if args.annotation_file is not None:
+        annotation = HTKAnnotation(args.annotation_file)
 
     # Load Reference
     ref = load_coef(args.coef_ref_file, args.dim)
@@ -179,7 +179,7 @@ def main():
     #     y = y[s:e]
 
 
-    build_gui(ref_infos, other_infos, args.frameshift, alignment)
+    build_gui(ref_infos, other_infos, args.frameshift, annotation)
 
 
 ###############################################################################
@@ -190,8 +190,8 @@ if __name__ == '__main__':
         parser = argparse.ArgumentParser(description="")
 
         # Add options
-        parser.add_argument("-a", "--alignment_file", default=None, type=str,
-                            help="The alignment file (HTK full label for now)")
+        parser.add_argument("-a", "--annotation_file", default=None, type=str,
+                            help="The annotation file (HTK full label for now)")
         parser.add_argument("-d", "--dim", default=40, type=int,
                             help="The dimension of one frame")
         parser.add_argument("-f", "--frameshift", default=0.005, type=float,

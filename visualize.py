@@ -7,6 +7,7 @@ AUTHOR
 
 DESCRIPTION
 
+
 LICENSE
     This script is in the public domain, free from copyrights or restrictions.
     Created: 24 October 2019
@@ -51,9 +52,9 @@ from pyprag.audio.player import player
 # Signal processing helpers
 from pyprag.sig_proc.spectrum import *
 
-# Alignment
-from pyprag.alignment.htk_lab import *
-from pyprag.alignment.textgrid import *
+# Annotation
+from pyprag.annotation.htk_lab import *
+from pyprag.annotation.textgrid import *
 
 # GUI
 from pyprag.gui.utils import *
@@ -72,13 +73,13 @@ pg.setConfigOptions(imageAxisOrder='row-major')
 # Functions
 ###############################################################################
 class GUIVisu(QtGui.QMainWindow):
-    def __init__(self, infos, frameshift, alignment):
+    def __init__(self, infos, frameshift, annotation):
         super().__init__()
 
         self.wav = infos[0]
         self.coef = infos[1]
         self.filename = infos[2]
-        self.plot_area = OneShotArea(self.wav, self.coef, frameshift, alignment)
+        self.plot_area = OneShotArea(self.wav, self.coef, frameshift, annotation)
 
 
         ##########################################
@@ -126,11 +127,11 @@ class GUIVisu(QtGui.QMainWindow):
         # Play subpart
         player.play(self.wav[0], self.wav[1])
 
-def build_gui(infos, frameshift, alignment=None):
+def build_gui(infos, frameshift, annotation=None):
 
     # Generate application
     app = QtGui.QApplication(["ok"])
-    win = GUIVisu(infos, frameshift, alignment)
+    win = GUIVisu(infos, frameshift, annotation)
     win.setWindowTitle('pyqtgraph example: PlotWidget')
 
     # Add exit shortcut!
@@ -164,21 +165,21 @@ def main():
     sp_analyzer = SpectrumAnalysis(wav, frameshift=frameshift)
     sp_analyzer.analyze()
 
-    # Load alignment
-    logger.info("Load alignment")
-    alignment = None
-    if args.alignment_file is not None:
-        if args.alignment_file.endswith(".lab"):
-            alignment = HTKAlignment(args.alignment_file, wav)
-        elif args.alignment_file.endswith(".TextGrid"):
-            alignment = TGTAlignment(args.alignment_file, wav)
+    # Load annotation
+    logger.info("Load annotation")
+    annotation = None
+    if args.annotation_file is not None:
+        if args.annotation_file.endswith(".lab"):
+            annotation = HTKAnnotation(args.annotation_file, wav)
+        elif args.annotation_file.endswith(".TextGrid"):
+            annotation = TGTAnnotation(args.annotation_file, wav)
         else:
-            raise Exception("The alignment cannot be parsed, format is unknown")
+            raise Exception("The annotation cannot be parsed, format is unknown")
 
     # Generate window
     logger.info("Rendering")
     infos = (wav, sp_analyzer.spectrum, args.wav_file)
-    build_gui(infos, frameshift, alignment)
+    build_gui(infos, frameshift, annotation)
 
 
 ###############################################################################
@@ -189,8 +190,8 @@ if __name__ == '__main__':
         parser = argparse.ArgumentParser(description="")
 
         # Add options
-        parser.add_argument("-a", "--alignment_file", default=None, type=str,
-                            help="The alignment file (HTK full label for now)")
+        parser.add_argument("-a", "--annotation_file", default=None, type=str,
+                            help="The annotation file (HTK label or TextGrid)")
         parser.add_argument("-l", "--log_file", default=None,
                             help="Logger file")
         parser.add_argument("-v", "--verbosity", action="count", default=0,
