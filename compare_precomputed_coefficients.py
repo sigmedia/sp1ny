@@ -150,10 +150,10 @@ def main():
     other_wav = librosa.core.load(args.wav_other_file)
 
     # Adapt sizes
-    m = np.min((ref.shape[0], other.shape[0]))
+    m = np.min((ref_wav[0].shape[0], other_wav[0].shape[0])) / ref_wav[1]
+    m = int(m / (args.frameshift / 1000))
     ref = ref[0:m, :]
     other = other[0:m, :]
-    assert ref.shape[0] == other.shape[0]
 
     # Generate info maps
     ref_infos = (ref, ref_wav, args.coef_ref_file)
@@ -194,8 +194,8 @@ if __name__ == '__main__':
                             help="The annotation file (HTK full label for now)")
         parser.add_argument("-d", "--dim", default=40, type=int,
                             help="The dimension of one frame")
-        parser.add_argument("-f", "--frameshift", default=0.005, type=float,
-                            help="The coefogram frameshift")
+        parser.add_argument("-f", "--frameshift", default=5, type=float,
+                            help="The coefogram frameshift (in ms)")
         parser.add_argument("-l", "--log_file", default=None,
                             help="Logger file")
         parser.add_argument("-s", "--start", default=0, type=int,
