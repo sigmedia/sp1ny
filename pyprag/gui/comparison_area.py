@@ -155,7 +155,7 @@ class NSIMComparisonArea(DockArea):
         dock_other.data_plot.setXLink(reference_plot)
         dock_other.wav_plot.setXLink(reference_plot)
         dock_diff.avg_plot.setXLink(reference_plot)
-        dock_diff.avg_plot.setXLink(reference_plot)
+        dock_diff.data_plot.setXLink(reference_plot)
 
         # Set axes labels
         reference_plot.setLabel('bottom', 'Time', units='s')
