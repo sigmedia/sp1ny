@@ -157,12 +157,23 @@ def main():
 
     # Load waves
     logger.info("Loading wav")
-    wav = librosa.core.load(args.wav_file)
+    wav = librosa.core.load(args.wav_file, sr=None)
+
+    # Convert frameshift from ms to s
+    frameshift = args.frameshift/1000
 
     # Compute spectrum
-    logger.info("Compute spectrogram")
-    frameshift=0.0005
-    sp_analyzer = SpectrumAnalysis(wav, frameshift=frameshift)
+    if args.coefficient_file is None:
+        logger.info("Compute spectrogram")
+        sp_analyzer = SpectrumAnalysis(wav, frameshift=frameshift)
+        coef_matrix = sp_analyzer.spectrum
+    else:
+        logger.info("Loading coefficient file")
+        if args.dimension is None:
+            raise Exception("The coefficient file is given but not the dimension of the coefficient vector")
+
+        coef_matrix = np.fromfile(args.coefficient_file, dtype=np.float32)
+        coef_matrix = coef_matrix.reshape((args.dimension, -1)).T
 
     # Load annotation
     logger.info("Load annotation")
@@ -177,7 +188,7 @@ def main():
 
     # Generate window
     logger.info("Rendering")
-    infos = (wav, sp_analyzer.spectrum, args.wav_file)
+    infos = (wav, coef_matrix, args.wav_file)
     build_gui(infos, frameshift, annotation)
 
 
@@ -195,6 +206,9 @@ if __name__ == '__main__':
                             help="Logger file")
         parser.add_argument("-v", "--verbosity", action="count", default=0,
                             help="increase output verbosity")
+        parser.add_argument("-c", "--coefficient_file", default=None, type=str)
+        parser.add_argument("-d", "--dimension", default=None, type=int)
+        parser.add_argument("-f", "--frameshift", default=5, type=int)
 
         # Add arguments
         parser.add_argument("wav_file")
