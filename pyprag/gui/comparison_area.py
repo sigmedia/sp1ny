@@ -62,7 +62,7 @@ class NSIMComparisonArea(DockArea):
         The filename of the other signal coefficients
 
     frameshift : float
-        The frameshift used to extract the coefficients ftrom the signals
+        The frameshift used to extract the coefficients from the signals in ms
 
     nsim : float
         The NSIM value
@@ -187,7 +187,7 @@ class NSIM:
 
     """
 
-    def __init__(self, r, d):
+    def __init__(self, r, d, type_window='gaussian', size_window=3):
         """
         Parameters
         ----------
@@ -200,13 +200,50 @@ class NSIM:
         d : np.array
             The "degraded" data matrix
 
+        type_window: string
+            The type of window used to build the kernel (gaussian or average)
+
+        size_window: int
+            The size of squared window (=> shape is (size_window, size_window))
         """
-        self._window =  np.array([[0.0113, 0.0838, 0.0113],
-                                  [0.0838, 0.6193, 0.0838],
-                                  [0.0113, 0.0838, 0.0113]])
+        # self._window =  np.array([[0.0113, 0.0838, 0.0113],
+        #                           [0.0838, 0.6193, 0.0838],
+        #                           [0.0113, 0.0838, 0.0113]])
+        self._window = self.computeWindow(type_window, size_window)
         self._window = self._window / np.sum(self._window)
         self._r = r
         self._d = d
+
+    def computeWindow(self, type="gaussian", size=3, sig=0.5):
+        '''
+        H = FSPECIAL('gaussian',HSIZE,SIGMA) returns a rotationally
+        symmetric Gaussian lowpass filter  of size HSIZE with standard
+        deviation SIGMA (positive). HSIZE can be a vector specifying the
+        number of rows and columns in H or a scalar, in which case H is a
+        square matrix.
+        The default HSIZE is [3 3], the default SIGMA is 0.5.
+        '''
+        if(type == 'gaussian'):
+            siz = (size-1)/2
+
+            # Prepare matrix meshing
+            xx = np.arange(-siz,siz+1)
+            x, y = np.meshgrid(xx,xx,indexing="xy")
+
+            # compute window
+            a = np.exp(-(x**2+y**2)/(2*sig**2))
+            eps = np.spacing(1)
+            a[a<(eps*a.max())] = 0
+            suma = a.sum()
+
+            if suma != 0:
+                a = a/suma
+                return a
+
+            raise Exception("Computing gaussian window: suma == 0!")
+        elif(type == 'average'):
+            siz = [size, size]
+            return np.ones(siz)/np.prod(siz)
 
     def compute(self):
         """NSIM Metric based on visqol implementation
