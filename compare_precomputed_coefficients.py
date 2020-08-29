@@ -150,10 +150,14 @@ def main():
     other_wav = librosa.core.load(args.wav_other_file)
 
     # Adapt sizes
+    frameshift = (args.frameshift / 1000)
     m = np.min((ref_wav[0].shape[0], other_wav[0].shape[0])) / ref_wav[1]
-    m = int(m / (args.frameshift / 1000))
-    ref = ref[0:m, :]
-    other = other[0:m, :]
+    m = int(m / frameshift)
+
+    # Apply delay
+    delay = args.ondelay // args.frameshift
+    ref = ref[delay:m+delay, :]
+    other = other[delay:m+delay, :]
 
     # Generate info maps
     ref_infos = (ref, ref_wav, args.coef_ref_file)
@@ -179,7 +183,7 @@ def main():
     #     y = y[s:e]
 
 
-    build_gui(ref_infos, other_infos, args.frameshift, annotation)
+    build_gui(ref_infos, other_infos, frameshift, annotation)
 
 
 ###############################################################################
@@ -195,9 +199,11 @@ if __name__ == '__main__':
         parser.add_argument("-d", "--dim", default=40, type=int,
                             help="The dimension of one frame")
         parser.add_argument("-f", "--frameshift", default=5, type=float,
-                            help="The coefogram frameshift (in ms)")
+                            help="The frameshift (in ms)")
         parser.add_argument("-l", "--log_file", default=None,
                             help="Logger file")
+        parser.add_argument("-o", "--ondelay", default=0, type=int,
+                            help="Delay in milliseconds")
         parser.add_argument("-s", "--start", default=0, type=int,
                             help="start position for the vector")
         parser.add_argument("-e", "--end", default=np.Inf, type=int,
