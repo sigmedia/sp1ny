@@ -13,6 +13,7 @@ LICENSE
 """
 
 import numpy as np
+from scipy import signal
 import pyqtgraph as pg
 
 from pyprag.gui.items import *
@@ -33,8 +34,7 @@ class SelectableWavPlotWidget(pg.PlotWidget):
         The plot item contained in the widget
 
     """
-
-    def __init__(self, wav, max_dur, parent=None, background='sdefault', **kwargs):
+    def __init__(self, wav, max_dur, parent=None, background='sdefault', step=2, **kwargs):
         """
         Parameters
         ----------
@@ -72,15 +72,17 @@ class SelectableWavPlotWidget(pg.PlotWidget):
         if max_point > self._wav[0].shape[0]:
             max_point = self._wav[0].shape[0]
 
-        # Plot wave form until max_dur
-        self.plotItem.plot(x=np.linspace(0, max_dur, max_point),
-                           y=self._wav[0][:max_point])
+        self.step = step  # FIXME: hardcoded
 
-        # Plot remaing sample
-        if max_point < self._wav[0].shape[0]:
-            self.plotItem.plot(x=np.linspace(max_dur, self._wav[0].shape[0]/float(self._wav[1]),
-                                             self._wav[0].shape[0]-max_point),
-                               y=self._wav[0][max_point:], pen={'color': "F00"})
+        # Plot wave form until max_dur
+        self.plotItem.plot(x=np.arange(0, max_point, self.step)*max_dur/max_point,
+                           y=self._wav[0][0:max_point:self.step])
+
+        # #  Plot remaing sample
+        # if max_point < self._wav[0].shape[0]:
+        #     self.plotItem.plot(x=np.arange(max_point, self._wav[0].shape[0], self.step)*max_dur/max_point,
+        #                        y=self._wav[0][max_point:-1:self.step],
+        #                        pen={'color': "F00"})
 
         ## Explicitly wrap methods from plotItem
         ## NOTE: If you change this list, update the documentation above as well.
@@ -89,9 +91,8 @@ class SelectableWavPlotWidget(pg.PlotWidget):
                   'setXLink', 'setYLink', 'enableAutoRange', 'disableAutoRange',
                   'setLimits', 'register', 'unregister', 'viewRect']:
             setattr(self, m, getattr(self.plotItem, m))
-        #QtCore.QObject.connect(self.plotItem, QtCore.SIGNAL('viewChanged'), self.viewChanged)
-        self.plotItem.sigRangeChanged.connect(self.viewRangeChanged)
 
+        self.plotItem.sigRangeChanged.connect(self.viewRangeChanged)
 
 
 class SelectableImagePlotWidget(pg.PlotWidget):
