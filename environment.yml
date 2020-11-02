@@ -1,4 +1,4 @@
-name: pyprag
+name: pypraaqt
 channels:
   - conda-forge
   - defaults
