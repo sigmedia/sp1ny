@@ -131,8 +131,8 @@ class SegmentItem(pg.LinearRegionItem):
 
         Additionnal operations are available:
            - C-<double click> = play if wav is not None
-           - S-<click> = zoom
-           - <click> = unzoom
+           - S-<double click> = unzoom
+           - <double click> = zoom
 
         Parameters
         ----------
