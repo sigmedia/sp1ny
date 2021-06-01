@@ -34,6 +34,60 @@ from pyprag.gui.docks import *
 # Classes
 #####################################################################################################
 
+class MAPComparisonArea(DockArea):
+    """Dock area containing (from top to bottom):
+        - A dock containg a NSIM map and the corresponding average per frame
+        - A dock containing a wav plot and the corresponding data for the other signal
+        - A dock containing a wav plot and the corresponding data for the reference signal
+        - A dock containing the annotation plots (if any available)
+
+    Attributes
+    ----------
+    ref : np.array
+        The reference coefficients (matrix)
+
+    ref_filename : str
+        The filename of the reference coefficients
+
+    other : np.array
+        The other signal coefficients (matrix)
+
+    other_filename : str
+        The filename of the other signal coefficients
+
+    ticks : TODO
+        The color map ticks
+
+    """
+    def __init__(self, ref_infos, other_infos, color_map=matplotlib.cm.bone):
+        # Superclass initialisation
+        DockArea.__init__(self)
+
+        # - Set useful variables
+        self.ref = ref_infos[0]
+        self.ref_filename = ref_infos[1]
+
+        self.other = other_infos[0]
+        self.other_filename = other_infos[1]
+
+        # - Generate color map
+        pos, rgba_colors = zip(*cmapToColormap(color_map))
+        cmap =  pg.ColorMap(pos, rgba_colors)
+        lut = cmap.getLookupTable(0.0, 1.0, 10)
+        ticks = list(enumerate(lut))
+        self.ticks = [(ticks[i][0]/ticks[-1][0], ticks[i][1]) for i in range(len(ticks))]
+
+        self.__fill()
+
+    def __fill(self):
+        """Helper to fill the dock area
+
+        """
+        cur_dock = ComparisonDock("Comparison MAP", (950, 950), self.ref, self.other, self.ticks)
+        self.addDock(cur_dock)
+
+
+
 class NSIMComparisonArea(DockArea):
     """Dock area containing (from top to bottom):
         - A dock containg a NSIM map and the corresponding average per frame

@@ -304,3 +304,88 @@ class DockAnnotation(Dock):
             self.widgets[i].hideAxis('bottom')
             self.widgets[i].setXLink(self.reference_plot)
             self.widgets[i].setLimits(xMax=T_max*lim_factor)
+
+
+
+class ComparisonDock(Dock):
+    """Dock containinhg a data surface plot (matrix data for now) and the corresponding waveform
+
+    Attributes
+    ----------
+    data : np.array
+        matrix containing the data to render
+
+    wav : tuple(np.array, int)
+        The signal information as loaded using librosa. The tuple contain an array of samples and the sample rate.
+
+    data_plot :
+        The plot item rendering the data part
+
+    wav_plot :
+        The plot item rendering the waveform
+    """
+    def __init__(self, name, size, data_ref, data_other, ticks):
+        """
+        Parameters
+        ----------
+        name : string
+            The name of the dock
+
+        size : TODO
+            The size of the widget
+
+        data : np.array
+            The data to render
+
+        wav : tuple(np.array, int)
+            The signal information as loaded using librosa. The tuple contain an array of samples and the sample rate.
+
+        frameshift : float
+            The frameshift used to extract the data from the signal
+
+        ticks : TODO
+            The color map ticks
+
+        """
+        Dock.__init__(self, name=name, size=size)
+
+        self._data_ref = data_ref
+        self._data_other = data_other
+        self.__plotData(ticks)
+
+    def __plotData(self, ticks, y_scale=16e3):  # FIXME: y_scale is non sense for now!
+        """Helper to plot the data
+
+        Parameters
+        ----------
+        frameshift : float
+            The frameshift used to extract the signals
+
+        ticks : TODO
+            The color map ticks
+
+        y_scale : int
+            SHOULD NOT BE USED FOR NOW!
+
+        """
+        self.data_plot = pg.PlotWidget()
+
+        # Generate image data
+        img = pg.ImageItem()
+        img.setImage(self._data_ref.T)
+
+        # Define and assign histogram
+        self.hist = pg.HistogramLUTWidget()
+        self.hist.setImageItem(img)
+        self.hist.gradient.restoreState(
+            {'mode': 'rgb', 'ticks': ticks}
+        )
+
+        # Generate plot
+        self.data_plot.plotItem = SelectablePlotItem()
+        self.data_plot.plotItem.getViewBox().addItem(img)
+        self.data_plot.setCentralItem(self.data_plot.plotItem)
+
+        # Add plot
+        self.data_plot.disableAutoRange()
+        self.addWidget(self.data_plot)
