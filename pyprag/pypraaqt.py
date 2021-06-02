@@ -15,36 +15,23 @@ LICENSE
 
 # System/default
 import sys
-import os
 
 # Arguments
 import argparse
 
 # Messaging/logging
-import traceback
-import time
 import logging
-
-# Profiling
-import cProfile
 
 # Linear algebra
 import numpy as np
-import scipy as sp
-from scipy import signal
-from fastdtw import fastdtw
 
 # Audio, dsp
 import librosa
 
 # Plotting & rendering
-import matplotlib.cm
 from pyqtgraph.dockarea import *
 from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 import pyqtgraph as pg
-
-# Utils
-import re
 
 # Player
 from pyprag.audio.player import player
@@ -57,8 +44,6 @@ from pyprag.annotation.htk_lab import *
 from pyprag.annotation.textgrid import *
 
 # GUI
-from pyprag.gui.utils import *
-from pyprag.gui.docks import *
 from pyprag.gui.one_shot import *
 
 ###############################################################################
@@ -122,7 +107,6 @@ class GUIVisu(QtGui.QMainWindow):
         cent_widget.setLayout(main_layout)
         self.setCentralWidget(cent_widget)
 
-
     def play(self):
         # Play subpart
         player.play(self.wav[0], self.wav[1])
@@ -143,7 +127,7 @@ def build_gui(infos, frameshift, annotation=None):
     # Start the application
     win.show()
     if (sys.flags.interactive != 1) or not hasattr(QtCore, 'PYQT_VERSION'):
-        QtGui.QApplication.instance().exec_()
+        app.exec()
 
 
 def entry_point(args, logger):

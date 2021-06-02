@@ -143,7 +143,6 @@ class SegmentItem(pg.LinearRegionItem):
 
         # Check which key is pressed
         modifierPressed = QtGui.QApplication.keyboardModifiers()
-        modifierName = ''
 
         if (ev.buttons() == QtCore.Qt.LeftButton) and ev.double():
             if (modifierPressed & QtCore.Qt.ControlModifier) == QtCore.Qt.ControlModifier:
@@ -269,7 +268,6 @@ class SelectableViewBox(pg.ViewBox):
         """
         # Check which key is pressed
         modifierPressed = QtGui.QApplication.keyboardModifiers()
-        modifierName = ''
 
         # Ignore any event while selecting the region
         if not self._select:

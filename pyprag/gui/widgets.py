@@ -34,7 +34,7 @@ class SelectableWavPlotWidget(pg.PlotWidget):
         The plot item contained in the widget
 
     """
-    def __init__(self, wav, max_dur, parent=None, background='sdefault', step=2, **kwargs):
+    def __init__(self, wav, max_dur, parent=None, background='default', **kwargs):
         """
         Parameters
         ----------
@@ -56,43 +56,16 @@ class SelectableWavPlotWidget(pg.PlotWidget):
             arguments passed to pg.PlotWidget
 
         """
-        pg.GraphicsView.__init__(self, parent, background)
-        self.setSizePolicy(QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Expanding)
-        self.enableMouse(False)
+        super().__init__(parent=parent, background=background)
 
         # Save reference to wav
         self._wav = wav
+        x = np.arange(self._wav[0].shape[0]) / self._wav[1]
 
         # Prepare plot item
         self.plotItem = SelectablePlotItem(**kwargs)
         self.setCentralItem(self.plotItem)
-
-        # Compute maximum point
-        max_point = int(max_dur * self._wav[1])
-        if max_point > self._wav[0].shape[0]:
-            max_point = self._wav[0].shape[0]
-
-        self.step = step  # FIXME: hardcoded
-
-        # Plot wave form until max_dur
-        self.plotItem.plot(x=np.arange(0, max_point, self.step)*max_dur/max_point,
-                           y=self._wav[0][0:max_point:self.step])
-
-        # #  Plot remaing sample
-        # if max_point < self._wav[0].shape[0]:
-        #     self.plotItem.plot(x=np.arange(max_point, self._wav[0].shape[0], self.step)*max_dur/max_point,
-        #                        y=self._wav[0][max_point:-1:self.step],
-        #                        pen={'color': "F00"})
-
-        ## Explicitly wrap methods from plotItem
-        ## NOTE: If you change this list, update the documentation above as well.
-        for m in ['addItem', 'removeItem', 'autoRange', 'clear', 'setXRange',
-                  'setYRange', 'setRange', 'setAspectLocked', 'setMouseEnabled',
-                  'setXLink', 'setYLink', 'enableAutoRange', 'disableAutoRange',
-                  'setLimits', 'register', 'unregister', 'viewRect']:
-            setattr(self, m, getattr(self.plotItem, m))
-
-        self.plotItem.sigRangeChanged.connect(self.viewRangeChanged)
+        self.plotItem.plot(x, self._wav[0])
 
 
 class SelectableImagePlotWidget(pg.PlotWidget):
@@ -144,7 +117,7 @@ class SelectableImagePlotWidget(pg.PlotWidget):
         # Generate image data
         img = pg.ImageItem()
         img.setImage(self._data.T)
-        img.scale(frameshift, 1.0/(self._data.shape[1]/self._y_scale))
+        img.setTransform(QtGui.QTransform.fromScale(frameshift, 1.0/(self._data.shape[1]/self._y_scale)))
 
         # Define and assign histogram
         self.hist = pg.HistogramLUTWidget()
@@ -157,16 +130,6 @@ class SelectableImagePlotWidget(pg.PlotWidget):
         self.plotItem = SelectablePlotItem(**kwargs)
         self.plotItem.getViewBox().addItem(img)
         self.setCentralItem(self.plotItem)
-
-        ## Explicitly wrap methods from plotItem
-        ## NOTE: If you change this list, update the documentation above as well.
-        for m in ['addItem', 'removeItem', 'autoRange', 'clear', 'setXRange',
-                  'setYRange', 'setRange', 'setAspectLocked', 'setMouseEnabled',
-                  'setXLink', 'setYLink', 'enableAutoRange', 'disableAutoRange',
-                  'setLimits', 'register', 'unregister', 'viewRect']:
-            setattr(self, m, getattr(self.plotItem, m))
-
-        self.plotItem.sigRangeChanged.connect(self.viewRangeChanged)
 
 
 class MAPPlotWidget(pg.PlotWidget):
@@ -218,7 +181,7 @@ class MAPPlotWidget(pg.PlotWidget):
         # Generate image data
         img = pg.ImageItem()
         img.setImage(self._data.T)
-        img.scale(frameshift, 1.0/(self._data.shape[1]/self._y_scale))
+        img.setTransform(QtGui.QTransform.fromScale(frameshift, 1.0/(self._data.shape[1]/self._y_scale)))
 
         # Define and assign histogram
         self.hist = pg.HistogramLUTWidget()

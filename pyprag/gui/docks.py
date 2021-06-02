@@ -179,7 +179,7 @@ class DockAvg(Dock):
         # Generate image data
         img = pg.ImageItem()
         img.setImage(self.data.T)
-        img.scale(frameshift, 1.0/(self.data.shape[1]/y_scale))
+        img.setTransform(QtGui.QTransform.fromScale(frameshift, 1.0/(self.data.shape[1]/y_scale)))
 
         # Define and assign histogram
         hist = pg.HistogramLUTWidget()
