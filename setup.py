@@ -19,20 +19,14 @@ from setuptools import setup, find_packages
 
 # Define meta-informations variable
 REQUIREMENTS = [
-    # # Configuration
-    # "pyyaml",
+    # Math
+    "matplotlib", "numpy", "scipy",
 
-    # # Math
-    # "pycwt", "matplotlib", "numpy", "scipy",
+    # Audio/speech
+    "librosa", "tgt", "pyworld", "sounddevice",
 
-    # # Audio/speech
-    # "soundfile", "tgt", "wavio",
-
-    # # Parallel
-    # "joblib",
-
-    # # Rendering
-    # "pyqt5"
+    # Rendering
+    "pyqtgraph==0.12.1", "pyside6"
 ]
 
 EXTRA_REQUIREMENTS = {
