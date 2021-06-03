@@ -85,7 +85,7 @@ class DockWithWav(Dock):
         # Reactivate autorange
         self.data_plot.autoRange()
 
-    def __plotData(self, frameshift, ticks, y_scale=16e3):  # FIXME: y_scale is non sense for now!
+    def __plotData(self, frameshift, ticks):
         """Helper to plot the data
 
         Parameters
@@ -101,7 +101,7 @@ class DockWithWav(Dock):
 
         """
         lim_factor = 1.1
-        self.data_plot = SelectableImagePlotWidget(self.data, frameshift, ticks,
+        self.data_plot = SelectableImagePlotWidget(self.data, frameshift, ticks, self.wav[1] / 2.0,
                                                    name="%s coef" % self.name,
                                                    wav=self.wav)
         self.data_plot.setLimits(xMax=self.data.shape[0]*frameshift*lim_factor)
@@ -148,10 +148,11 @@ class DockAvg(Dock):
         The plot item rendering the waveform
 
     """
-    def __init__(self, name, size, data, frameshift, ticks):
+    def __init__(self, name, size, data, frameshift, ticks, y_scale):
         Dock.__init__(self, name=name, size=size)
 
         self.data = data
+        self._y_scale = y_scale
         self.__plotData(frameshift, ticks)
         self.__plotDiffByFrame(frameshift)
 
@@ -161,7 +162,7 @@ class DockAvg(Dock):
         self.avg_plot.getAxis('left').setLabel("Difference by frame")
         self.avg_plot.getAxis('left').setWidth(50)
 
-    def __plotData(self, frameshift, ticks, y_scale=16e3):  # FIXME: y_scale is non sense for now!
+    def __plotData(self, frameshift, ticks):  # FIXME: y_scale is non sense for now!
         """Helper to plot the data
 
         Parameters
@@ -179,7 +180,7 @@ class DockAvg(Dock):
         # Generate image data
         img = pg.ImageItem()
         img.setImage(self.data.T)
-        img.setTransform(QtGui.QTransform.fromScale(frameshift, 1.0/(self.data.shape[1]/y_scale)))
+        img.setTransform(QtGui.QTransform.fromScale(frameshift, 1.0/(self.data.shape[1]/self._y_scale)))
 
         # Define and assign histogram
         hist = pg.HistogramLUTWidget()
@@ -324,7 +325,7 @@ class ComparisonDock(Dock):
     wav_plot :
         The plot item rendering the waveform
     """
-    def __init__(self, name, size, data_ref, data_other, ticks):
+    def __init__(self, name, size, data_ref, data_other, ticks, y_scale):
         """
         Parameters
         ----------
@@ -351,9 +352,10 @@ class ComparisonDock(Dock):
 
         self._data_ref = data_ref
         self._data_other = data_other
+        self._y_scale = y_scale
         self.__plotData(ticks)
 
-    def __plotData(self, ticks, y_scale=16e3):  # FIXME: y_scale is non sense for now!
+    def __plotData(self, ticks):  # FIXME: y_scale is non sense for now!
         """Helper to plot the data
 
         Parameters

@@ -83,7 +83,7 @@ class SelectableImagePlotWidget(pg.PlotWidget):
         The histogram widget to control the image colorimetrie
     """
 
-    def __init__(self, data, frameshift, ticks, parent=None, background='default', **kwargs):
+    def __init__(self, data, frameshift, ticks, y_scale, parent=None, background='default', **kwargs):
         """
         Parameters
         ----------
@@ -112,7 +112,7 @@ class SelectableImagePlotWidget(pg.PlotWidget):
 
         # Save reference to data
         self._data = data
-        self._y_scale = 16e03 # FIXME: find a way to improve this!
+        self._y_scale = y_scale
 
         # Generate image data
         img = pg.ImageItem()

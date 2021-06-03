@@ -43,9 +43,6 @@ class OneShotArea(DockArea):
     coef : np.array
        The matrix of coefficients to render
 
-    y_scale : 16e3
-       The y-axis scale information (TODO: keep it this way for now)
-
     annotation: pypgrag.annotation.AnnotationLoader
        The annotations if available, else None
 
@@ -76,10 +73,9 @@ class OneShotArea(DockArea):
 
         self.logger = logging.getLogger("OneShotArea")
 
-        self.wav =wav
+        self.wav = wav
         self.coef = coef
         self.frameshift = frameshift
-        self.y_scale = 16e3
         self.annotation = annotation
 
         # - Generate color map
