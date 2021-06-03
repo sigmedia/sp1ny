@@ -66,7 +66,6 @@ class GUIVisu(QtGui.QMainWindow):
         self.filename = infos[2]
         self.plot_area = OneShotArea(self.wav, self.coef, frameshift, annotation)
 
-
         ##########################################
         # Setup the status bar
         ##########################################
@@ -134,18 +133,26 @@ def entry_point(args, logger):
     """Main entry function
     """
 
+    if (args.annotation_file == "") and (args.wav_file == "") and (args.coefficient_file == ""):
+        logger.error("You need to give an annotation file (-a, --annotation-file), a coefficient file (-c, --coefficient-file) and/or a wav file (-w, --wav-file)")
+        sys.exit(-1)
+
     # Load waves
-    logger.info("Loading wav")
-    wav = librosa.core.load(args.wav_file, sr=None)
+    wav = None
+    if args.wav_file != "":
+        logger.info("Loading wav")
+        wav = librosa.core.load(args.wav_file, sr=None)
 
     # Convert frameshift from ms to s
     frameshift = args.frameshift/1000
 
     # Compute spectrum
-    if args.coefficient_file is None:
-        logger.info("Compute spectrogram")
-        sp_analyzer = SpectrumAnalysis(wav, frameshift=frameshift)
-        coef_matrix = sp_analyzer.spectrum
+    coef_matrix = None
+    if args.coefficient_file == "":
+        if wav is not None:
+            logger.info("Compute spectrogram")
+            sp_analyzer = SpectrumAnalysis(wav, frameshift=frameshift)
+            coef_matrix = sp_analyzer.spectrum
     else:
         logger.info("Loading coefficient file")
         if args.dimension is None:
@@ -157,7 +164,7 @@ def entry_point(args, logger):
     # Load annotation
     logger.info("Load annotation")
     annotation = None
-    if args.annotation_file is not None:
+    if args.annotation_file != "":
         if args.annotation_file.endswith(".lab"):
             annotation = HTKAnnotation(args.annotation_file, wav)
         elif args.annotation_file.endswith(".TextGrid"):
@@ -174,18 +181,20 @@ def main():
     parser = argparse.ArgumentParser(description="")
 
     # Add options
-    parser.add_argument("-a", "--annotation_file", default=None, type=str,
+    parser.add_argument("-a", "--annotation-file", default="", type=str,
                         help="The annotation file (HTK label or TextGrid)")
-    parser.add_argument("-l", "--log_file", default=None,
+    parser.add_argument("-l", "--log-file", default="",
                         help="Logger file")
     parser.add_argument("-v", "--verbosity", action="count", default=0,
                         help="increase output verbosity")
-    parser.add_argument("-c", "--coefficient_file", default=None, type=str)
-    parser.add_argument("-d", "--dimension", default=None, type=int)
-    parser.add_argument("-f", "--frameshift", default=5, type=int)
-
-    # Add arguments
-    parser.add_argument("wav_file")
+    parser.add_argument("-c", "--coefficient-file", default="", type=str,
+                        help="The coefficient file")
+    parser.add_argument("-d", "--dimension", default=0, type=int,
+                        help="The dimension of the coefficient vector")
+    parser.add_argument("-f", "--frameshift", default=5, type=int,
+                        help="The frameshift in milliseconds")
+    parser.add_argument("-w", "--wav_file", default="", type=str,
+                        help="The wave file")
 
     # Parsing arguments
     args = parser.parse_args()
@@ -209,7 +218,7 @@ def main():
     logger.addHandler(ch)
 
     # create file handler
-    if args.log_file is not None:
+    if args.log_file != "":
         fh = logging.FileHandler(args.log_file)
         logger.addHandler(fh)
 

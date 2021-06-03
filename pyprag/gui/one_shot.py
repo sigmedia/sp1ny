@@ -73,10 +73,13 @@ class OneShotArea(DockArea):
 
         self.logger = logging.getLogger("OneShotArea")
 
-        self.wav = wav
         self.coef = coef
-        self.frameshift = frameshift
         self.annotation = annotation
+        if wav is not None:
+            self.wav = wav
+        else:
+            self.wav = (np.zeros((self.coef.shape[0])), 1/frameshift)
+        self.frameshift = frameshift
 
         # - Generate color map
         self.logger.debug("Generate ticks for data plotting")
