@@ -16,8 +16,8 @@ import numpy as np
 
 # Plotting
 import matplotlib.cm
-from pyqtgraph.dockarea import *
-from pyqtgraph.Qt import QtCore, QtGui
+from pyqtgraph.dockarea import Dock
+from pyqtgraph.Qt import QtGui
 import pyqtgraph as pg
 
 # Pyprag imports
@@ -83,7 +83,11 @@ class DockWithWav(Dock):
         self.wav_plot.getAxis('left').setWidth(50)
 
         # Reactivate autorange
-        self.data_plot.autoRange()
+        self.wav_plot.autoRange()
+
+        # Link the X-Axes
+        self.data_plot.setXLink(self.wav_plot)
+
 
     def __plotData(self, frameshift, ticks):
         """Helper to plot the data

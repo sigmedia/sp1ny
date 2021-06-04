@@ -111,11 +111,10 @@ class OneShotArea(DockArea):
             reference_plot = dock_coef.wav_plot
 
 
-        # Fix x-axis
+        # Override x-axis
         self.logger.debug("Link everything")
-        dock_coef.data_plot.setXLink(reference_plot)
         if self.annotation is not None:
-            dock_coef.wav_plot.setXLink(reference_plot)
+            reference_plot.setXLink(dock_coef.wav_plot)
 
         # Set axes labels
         reference_plot.setLabel('bottom', 'Time', units='s')
