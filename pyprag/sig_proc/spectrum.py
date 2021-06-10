@@ -21,6 +21,7 @@ import librosa
 # Classes
 ###############################################################################
 
+
 class SpectrumAnalysis:
     """Spectrum analysis class
 
@@ -39,7 +40,7 @@ class SpectrumAnalysis:
         The matrix containing the spectrum
     """
 
-    def __init__(self, wav, fft_len=512, frameshift=0.005):
+    def __init__(self, wav, fft_len=512, frameshift=0.005, window="hanning"):
         """
         Parameters
         ----------
@@ -53,27 +54,37 @@ class SpectrumAnalysis:
             The frameshift (in seconds) (default=0.005)
 
         """
-        self.wav = wav
-        self.fft_len = fft_len
-        self.frameshift = frameshift
-        self.spectrum = None
+        self._wav = wav
+        self._fft_len = fft_len
+        self._frameshift = frameshift
+        self._window = window
+        self._spectrum = None
+        self._mel_scale = False
 
         self.__process()
 
     def __process(self):
-        """Method which compute the spectrum and fill the object attributes
-
-        """
+        """Method which compute the spectrum and fill the object attributes"""
         # Compute spectrogram
-        frameshift = int(self.frameshift * self.wav[1])
-        sp = librosa.core.stft(self.wav[0],
-                               n_fft=self.fft_len*2, hop_length=frameshift,
-                               center=False, window="hamming")
+        frameshift = int(self._frameshift * self._wav[1])
 
-
-        # sp = librosa.feature.melspectrogram(self.wav[0],
-        #                                     n_fft=self.fft_len*2, n_mels=self.fft_len, hop_length=frameshift,
-        #                                     center=False, window="hamming")
+        if self._mel_scale:
+            sp = librosa.feature.melspectrogram(
+                self._wav[0],
+                n_fft=self._fft_len * 2,
+                n_mels=self._fft_len,
+                hop_length=frameshift,
+                center=False,
+                window=self._window,
+            )
+        else:
+            sp = librosa.core.stft(
+                self._wav[0],
+                n_fft=self._fft_len * 2,
+                hop_length=frameshift,
+                center=False,
+                window=self._window,
+            )
 
         # Post processing
         sp = np.abs(sp)
@@ -82,6 +93,6 @@ class SpectrumAnalysis:
 
         # tata
         sp = sp.T
-        sp = sp[:, :self.fft_len] # Get rid of of the +1 coefficient
+        sp = sp[:, : self._fft_len]  # Get rid of of the +1 coefficient
 
-        self.spectrum = sp
+        self._spectrum = sp
