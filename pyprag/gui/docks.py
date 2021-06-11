@@ -17,7 +17,7 @@ import numpy as np
 # Plotting
 import matplotlib.cm
 from pyqtgraph.dockarea import Dock
-from pyqtgraph.Qt import QtGui
+from pyqtgraph.Qt import QtGui, QtCore, QtWidgets
 import pyqtgraph as pg
 
 # Pyprag imports
@@ -314,14 +314,22 @@ class DockAnnotation(Dock):
         self.annotation = annotation
         self.wav = wav
 
+
+        # Prepare scrolling support
+        self.scroll = QtGui.QScrollArea()
+        self.widget = QtWidgets.QWidget()
+        self.vbox = QtWidgets.QVBoxLayout()
+        self.widget.setLayout(self.vbox)
+        self.addWidget(self.scroll)
+
+        self.scroll.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOn)
+        self.scroll.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+        self.scroll.setWidgetResizable(True)
+        self.scroll.setWidget(self.widget)
+
         # Render everything
         self.__plotAnnotation()
 
-        # FIXME: temporary refinement
-        for w in self.widgets:
-            w.getAxis('left').setWidth(50)
-            w.getAxis('left').setStyle(showValues=False)
-            w.autoRange()
 
     def __plotAnnotation(self):
         """Helper to render the annotations
@@ -342,16 +350,20 @@ class DockAnnotation(Dock):
             if T_max < self.annotation.segments[k][-1][1]:
                 T_max = self.annotation.segments[k][-1][1]
 
-            self.addWidget(annotation_plot)
+            self.vbox.addWidget(annotation_plot)
 
-        # Define a reference plot and lock everything for thing to it
-        self.reference_plot = self.widgets[-1]
+        # Define the last annotation as the reference one
+        index = self.vbox.count()-1
+        self.reference_plot = self.vbox.itemAt(index).widget()
         self.reference_plot.setLimits(xMax=T_max*lim_factor)
         self.reference_plot.hideAxis('bottom')
-        for i in range(len(self.widgets)-1):
-            self.widgets[i].hideAxis('bottom')
-            self.widgets[i].setXLink(self.reference_plot)
-            self.widgets[i].setLimits(xMax=T_max*lim_factor)
+
+        # Lock everything else to the reference
+        for i in range(index):
+            w = self.vbox.itemAt(i).widget()
+            w.hideAxis('bottom')
+            w.setXLink(self.reference_plot)
+            w.setLimits(xMax=T_max*lim_factor)
 
 
 
