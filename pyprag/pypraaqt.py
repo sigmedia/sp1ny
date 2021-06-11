@@ -65,53 +65,106 @@ class GUIVisu(QtGui.QMainWindow):
         self._plot_area = OneShotArea(self._wav, self._coef, frameshift, annotation)
 
         ##########################################
+        # Setup the Menubar
+        ##########################################
+        menuBar = self.menuBar()
+        file_menu = QtWidgets.QMenu("&File", self)
+
+        # Add open shortcut
+        self.openAction = QtWidgets.QAction("&Open wav...", self)
+        self.openAction.triggered.connect(self.openFile)
+        self.openAction.setShortcut("Ctrl+o")
+        file_menu.addAction(self.openAction)
+
+        # Add exit shortcut!
+        self.exitAction = QtGui.QAction(("E&xit"), self)
+        self.exitAction.setShortcut(QtGui.QKeySequence("Ctrl+Q"))
+        self.addAction(self.exitAction)
+        self.exitAction.triggered.connect(self.close)
+        file_menu.addAction(self.exitAction)
+        menuBar.addMenu(file_menu)
+
+
+        ##########################################
+        # Setup the toolbar
+        ##########################################
+        player_toolbar = self.addToolBar("Player")
+        player_widget = PlayerWidget(self._filename, self._wav)
+        player_toolbar.addWidget(player_widget)
+
+
+        ##########################################
         # Setup the status bar
         ##########################################
-        self._status = QtWidgets.QStatusBar()
-        self._status.setMaximumHeight(20)
-        self._status.showMessage(self._filename)
+        self.statusbar = self.statusBar()
+        self._filename_label = QtWidgets.QLabel(self._filename)
+        self.statusbar.addPermanentWidget(self._filename_label)
+
 
         ##########################################
         # Define the left part of the window
         ##########################################
         left_layout = QtWidgets.QVBoxLayout()
         left_layout.addWidget(self._plot_area)
-        left_layout.addWidget(self._status)
 
-        ##########################################
-        # Define the right part of the window
-        ##########################################
-        player_widget = PlayerWidget(self._filename, self._wav)
-        right_layout = QtWidgets.QVBoxLayout()
-        right_layout.addWidget(player_widget)
+        # ##########################################
+        # # Define the right part of the window
+        # ##########################################
+        # right_layout = QtWidgets.QVBoxLayout()
+        # right_layout.addWidget(player_widget)
 
-        ##########################################
-        # Finalize the main part layout
-        ##########################################
-        main_layout = QtWidgets.QHBoxLayout()
-        main_layout.addLayout(left_layout, 10)
-        main_layout.addLayout(right_layout, 1)
+        # ##########################################
+        # # Finalize the main part layout
+        # ##########################################
+        # main_layout = QtWidgets.QHBoxLayout()
+        # main_layout.addLayout(left_layout, 10)
+        # main_layout.addLayout(right_layout, 1)
 
         ##########################################
         # Set the window layout
         ##########################################
         cent_widget = QtWidgets.QWidget()
-        cent_widget.setLayout(main_layout)
+        cent_widget.setLayout(left_layout)
         self.setCentralWidget(cent_widget)
 
+    def openFile(self):
+        options = QtGui.QFileDialog.Options()
+        options |= QtGui.QFileDialog.DontUseNativeDialog
+        # NOTE: how to concatente filters: "All Files (*);;Wav Files (*.wav)"
+        filename, _ = QtGui.QFileDialog.getOpenFileName(self,"Loading wav file", "","Wav Files (*.wav)", options=options)
+        if filename:
+            self._filename_label.setText(filename)
+
+def define_palette(app):
+    app.setStyle("Fusion")
+
+    dark_palette = QtGui.QPalette()
+
+    dark_palette.setColor(QtGui.QPalette.Window, QtGui.QColor(53, 53, 53))
+    dark_palette.setColor(QtGui.QPalette.WindowText, QtCore.Qt.white)
+    dark_palette.setColor(QtGui.QPalette.Base, QtGui.QColor(25, 25, 25))
+    dark_palette.setColor(QtGui.QPalette.AlternateBase, QtGui.QColor(53, 53, 53))
+    dark_palette.setColor(QtGui.QPalette.ToolTipBase, QtCore.Qt.white)
+    dark_palette.setColor(QtGui.QPalette.ToolTipText, QtCore.Qt.white)
+    dark_palette.setColor(QtGui.QPalette.Text, QtCore.Qt.white)
+    dark_palette.setColor(QtGui.QPalette.Button, QtGui.QColor(53, 53, 53))
+    dark_palette.setColor(QtGui.QPalette.ButtonText, QtCore.Qt.white)
+    dark_palette.setColor(QtGui.QPalette.BrightText, QtCore.Qt.red)
+    dark_palette.setColor(QtGui.QPalette.Link, QtGui.QColor(42, 130, 218))
+    dark_palette.setColor(QtGui.QPalette.Highlight, QtGui.QColor(42, 130, 218))
+    dark_palette.setColor(QtGui.QPalette.HighlightedText, QtCore.Qt.black)
+
+    app.setPalette(dark_palette)
+
+    app.setStyleSheet("QToolTip { color: #ffffff; background-color: #2a82da; border: 1px solid white; }")
 
 def build_gui(infos, frameshift, annotation=None):
 
     # Generate application
-    app = QtGui.QApplication(["ok"])
+    app = QtGui.QApplication(["PyPraaQt"])
+    define_palette(app)
     win = GUIVisu(infos, frameshift, annotation)
-    win.setWindowTitle("pyqtgraph example: PlotWidget")
-
-    # Add exit shortcut!
-    win.actionExit = QtGui.QAction(("E&xit"), win)
-    win.actionExit.setShortcut(QtGui.QKeySequence("Ctrl+Q"))
-    win.addAction(win.actionExit)
-    win.actionExit.triggered.connect(win.close)
+    win.setWindowTitle("PyPraaQt")
 
     # Start the application
     win.show()
