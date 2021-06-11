@@ -232,15 +232,12 @@ class SelectableWavPlotWidget(pg.PlotWidget):
 
     """
 
-    def __init__(self, wav, max_dur, parent=None, background="default", **kwargs):
+    def __init__(self, wav, parent=None, background="default", **kwargs):
         """
         Parameters
         ----------
         wav : tuple(np.array, int)
             The signal information as loaded using librosa. The tuple contain an array of samples and the sample rate.
-        max_dur: float
-            Maximum duration considered as valid. Remaining part will be plot using a different pen (red)
-
         ticks: TODO
             color map ticks
 

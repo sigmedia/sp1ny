@@ -95,34 +95,35 @@ class OneShotArea(DockArea):
         """Helper to fill the dock area
 
         """
-        # Generate reference part
+        # Generate wav part
+        self.logger.debug("Plot waveform part")
+        dock_wav = DockWav("Signal", (950, 20), self.wav)
+
+        # Generate data part
         self.logger.debug("Plot coefficient part")
-        dock_coef = DockWithWav("Signal", (950, 200), # FIXME: deal with label name
-                                self.coef, self.wav,
-                                self.frameshift, self.ticks)
+        dock_coef = DockData("Spectrum", (950, 200), # FIXME: deal with label name
+                             self.coef,
+                             self.frameshift, self.ticks, self.wav)
 
         # Generate annotation part
         if self.annotation is not None:
             self.logger.debug("Plot annotation part")
             dock_align = DockAnnotation("Annotations", (950, 20),
                                        self.annotation, self.wav) # Size doesn't seem to affect anything
-            reference_plot = dock_align.reference_plot
-        else:
-            reference_plot = dock_coef.wav_plot
 
 
-        # Override x-axis
+        # Link X-Axis
         self.logger.debug("Link everything")
+        dock_wav.wav_plot.setLabel('bottom', 'Time', units='s')
+        dock_coef.data_plot.setXLink(dock_wav.wav_plot)
         if self.annotation is not None:
-            reference_plot.setXLink(dock_coef.wav_plot)
-
-        # Set axes labels
-        reference_plot.setLabel('bottom', 'Time', units='s')
+            dock_align.reference_plot.setXLink(dock_wav.wav_plot)
 
         # - Add docks
         self.logger.debug("Add docks to the area")
+        self.addDock(dock_wav, "left")
         if self.annotation is not None:
-            self.addDock(dock_align, "left")
+            self.addDock(dock_align, "top", dock_wav)
             self.addDock(dock_coef, "top", dock_align)
         else:
-            self.addDock(dock_coef, "left")
+            self.addDock(dock_coef, "top", dock_wav)

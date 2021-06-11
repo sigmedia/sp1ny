@@ -28,8 +28,7 @@ from pyprag.gui.widgets import *
 ###############################################################################
 # Classes
 ###############################################################################
-
-class DockWithWav(Dock):
+class DockData(Dock):
     """Dock containing a data surface plot (matrix data for now) and the corresponding waveform
 
     Attributes
@@ -46,7 +45,7 @@ class DockWithWav(Dock):
     wav_plot :
         The plot item rendering the waveform
     """
-    def __init__(self, name, size, data, wav, frameshift, ticks):
+    def __init__(self, name, size, data, frameshift, ticks, wav):
         """
         Parameters
         ----------
@@ -76,18 +75,9 @@ class DockWithWav(Dock):
         max_dur = self.data.shape[0] * frameshift
 
         self.__plotData(frameshift, ticks)
-        self.__plotWav(max_dur)
 
         # Label space
         self.data_plot.getAxis('left').setWidth(50)
-        self.wav_plot.getAxis('left').setWidth(50)
-
-        # Reactivate autorange
-        self.wav_plot.autoRange()
-
-        # Link the X-Axes
-        self.data_plot.setXLink(self.wav_plot)
-
 
     def __plotData(self, frameshift, ticks):
         """Helper to plot the data
@@ -112,10 +102,64 @@ class DockWithWav(Dock):
         self.data_plot.hideAxis('bottom')
 
         # Add plot
-        self.data_plot.disableAutoRange()
+        # self.data_plot.disableAutoRange()
         self.addWidget(self.data_plot)
 
-    def __plotWav(self, max_dur):
+
+class DockWav(Dock):
+    """Dock containing a data surface plot (matrix data for now) and the corresponding waveform
+
+    Attributes
+    ----------
+    data : np.array
+        matrix containing the data to render
+
+    wav : tuple(np.array, int)
+        The signal information as loaded using librosa. The tuple contain an array of samples and the sample rate.
+
+    data_plot :
+        The plot item rendering the data part
+
+    wav_plot :
+        The plot item rendering the waveform
+    """
+    def __init__(self, name, size, wav):
+        """
+        Parameters
+        ----------
+        name : string
+            The name of the dock
+
+        size : TODO
+            The size of the widget
+
+        data : np.array
+            The data to render
+
+        wav : tuple(np.array, int)
+            The signal information as loaded using librosa. The tuple contain an array of samples and the sample rate.
+
+        frameshift : float
+            The frameshift used to extract the data from the signal
+
+        ticks : TODO
+            The color map ticks
+
+        """
+        Dock.__init__(self, name=name, size=size)
+
+        self.wav = wav
+
+        self.__plotWav()
+
+        # Label space
+        self.wav_plot.getAxis('left').setWidth(50)
+
+        # # Reactivate autorange
+        # self.wav_plot.autoRange()
+
+
+    def __plotWav(self):
         """Helper to plot the waveform
 
         Parameters
@@ -124,10 +168,8 @@ class DockWithWav(Dock):
             The maximum duration in seconds. It is mainly used in the case that the annotations require more space than the waveform
 
         """
-        lim_factor = 1.1
-        self.wav_plot = SelectableWavPlotWidget(self.wav, max_dur, name="%s waveform" % self.name)
-        self.wav_plot.setLimits(xMax=max_dur*lim_factor)
-        self.wav_plot.setMaximumHeight(int(self.frameGeometry().height() * 20/100))
+
+        self.wav_plot = SelectableWavPlotWidget(self.wav, name="%s waveform" % self.name)
         self.addWidget(self.wav_plot)
 
 
@@ -305,6 +347,7 @@ class DockAnnotation(Dock):
         # Define a reference plot and lock everything for thing to it
         self.reference_plot = self.widgets[-1]
         self.reference_plot.setLimits(xMax=T_max*lim_factor)
+        self.reference_plot.hideAxis('bottom')
         for i in range(len(self.widgets)-1):
             self.widgets[i].hideAxis('bottom')
             self.widgets[i].setXLink(self.reference_plot)
