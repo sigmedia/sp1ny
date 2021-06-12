@@ -107,24 +107,23 @@ class GUIVisu(QtGui.QMainWindow):
         left_layout = QtWidgets.QVBoxLayout()
         left_layout.addWidget(self._plot_area)
 
-        # ##########################################
-        # # Define the right part of the window
-        # ##########################################
-        # right_layout = QtWidgets.QVBoxLayout()
-        # right_layout.addWidget(player_widget)
+        ##########################################
+        # Define the right part of the window
+        ##########################################
+        right_layout = QtWidgets.QVBoxLayout()
 
-        # ##########################################
-        # # Finalize the main part layout
-        # ##########################################
-        # main_layout = QtWidgets.QHBoxLayout()
-        # main_layout.addLayout(left_layout, 10)
-        # main_layout.addLayout(right_layout, 1)
+        ##########################################
+        # Finalize the main part layout
+        ##########################################
+        main_layout = QtWidgets.QHBoxLayout()
+        main_layout.addLayout(left_layout, 10)
+        main_layout.addLayout(right_layout, 1)
 
         ##########################################
         # Set the window layout
         ##########################################
         cent_widget = QtWidgets.QWidget()
-        cent_widget.setLayout(left_layout)
+        cent_widget.setLayout(main_layout)
         self.setCentralWidget(cent_widget)
 
     def openFile(self):
