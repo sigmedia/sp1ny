@@ -208,7 +208,10 @@ def entry_point(args, logger):
             )
 
         coef_matrix = np.fromfile(args.coefficient_file, dtype=np.float32)
-        coef_matrix = coef_matrix.reshape((args.dimension, -1)).T
+        if args.dimension < 0:
+            coef_matrix = coef_matrix.reshape((-1, -args.dimension))
+        else:
+            coef_matrix = coef_matrix.reshape((args.dimension, -1)).T
 
     # Load annotation
     logger.info("Load annotation")
@@ -250,7 +253,7 @@ def main():
         "--dimension",
         default=0,
         type=int,
-        help="The dimension of the coefficient vector",
+        help="The dimension of the coefficient vector (if negative shape is assumed to be (-1, d), if positive (d, -1))",
     )
     parser.add_argument(
         "-f", "--frameshift", default=5, type=int, help="The frameshift in milliseconds"
