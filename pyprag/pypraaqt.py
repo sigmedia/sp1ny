@@ -43,6 +43,7 @@ from pyprag.annotation.textgrid import *
 # GUI
 from pyprag.gui.one_shot import *
 from pyprag.gui.widgets import PlayerWidget
+from pyprag.gui.control_panels.signal import EqWidget
 
 ###############################################################################
 # global constants
@@ -112,12 +113,25 @@ class GUIVisu(QtGui.QMainWindow):
         ##########################################
         right_layout = QtWidgets.QVBoxLayout()
 
+        # Initialize tab screen
+        tabs = QtWidgets.QTabWidget()
+        tab1 = QtWidgets.QWidget()
+        tabs.addTab(tab1,"Signal")
+        cur_layout = QtWidgets.QVBoxLayout(self)
+        eq_widget = EqWidget(self, self._wav)
+        cur_layout.addWidget(eq_widget)
+        tab1.setLayout(cur_layout)
+
+        tab2 = QtWidgets.QWidget()
+        tabs.addTab(tab2,"Text")
+        right_layout.addWidget(tabs)
+
         ##########################################
         # Finalize the main part layout
         ##########################################
         main_layout = QtWidgets.QHBoxLayout()
         main_layout.addLayout(left_layout, 10)
-        main_layout.addLayout(right_layout, 1)
+        main_layout.addLayout(right_layout, 2)
 
         ##########################################
         # Set the window layout
