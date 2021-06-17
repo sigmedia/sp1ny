@@ -70,4 +70,10 @@ class EqSlider(QtWidgets.QWidget):
         self._lower_freq = lower_freq
         self._upper_freq = upper_freq
 
-        self._label.setText(f"< {upper_freq}")
+        self.setLabelValue(upper_freq)
+
+    def setLabelValue(self, upper_freq):
+        if upper_freq >= 1000:
+            self._label.setText(f"< {int(upper_freq/1000):2d}k")
+        else:
+            self._label.setText(f"< {upper_freq}")
