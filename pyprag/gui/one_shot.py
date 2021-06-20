@@ -25,8 +25,9 @@ import pyqtgraph as pg
 
 # pyprag internal packages
 from pyprag.gui.utils import *
-from pyprag.gui.docks import *
+from pyprag.gui.docks import DockAnnotation
 from pyprag.components.wav.visualisation import WavDock
+from pyprag.components.data.visualisation import DataDock
 
 #####################################################################################################
 # Classes
@@ -102,7 +103,7 @@ class OneShotArea(DockArea):
 
         # Generate data part
         self.logger.debug("Plot coefficient part")
-        dock_coef = DockData("Spectrum", (950, 200), # FIXME: deal with label name
+        dock_coef = DataDock("Spectrum", (950, 200), # FIXME: deal with label name
                              self.coef,
                              self.frameshift, self.ticks, self.wav)
 

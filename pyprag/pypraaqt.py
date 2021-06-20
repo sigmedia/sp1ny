@@ -34,7 +34,7 @@ from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 import pyqtgraph as pg
 
 # Signal processing helpers
-from pyprag.sig_proc.spectrum import *
+from pyprag.components.spectrum.core import SpectrumAnalysis
 
 # Annotation
 from pyprag.annotation.htk_lab import *
