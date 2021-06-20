@@ -18,7 +18,7 @@ import re
 import tgt
 
 # Import abstract class
-from pyprag.annotation import AnnotationLoader
+from . import AnnotationLoader
 
 ###############################################################################
 # Classes

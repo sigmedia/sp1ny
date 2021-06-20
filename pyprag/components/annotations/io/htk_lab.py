@@ -19,7 +19,7 @@ import numpy as np
 import re
 
 # Import abstract class
-from pyprag.annotation import AnnotationLoader
+from . import AnnotationLoader
 
 ###############################################################################
 # global constants

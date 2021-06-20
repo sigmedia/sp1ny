@@ -162,65 +162,6 @@ class SegmentItem(pg.LinearRegionItem):
                 self.parentWidget().setXRange(self.start, self.end)
 
 
-class AnnotationItem(SegmentItem):
-    """Item to visualize an annotation.
-
-    An annotation is a segment with a label
-
-    Attributes
-    ----------
-    label : str
-        The label of the annotation
-
-    """
-
-    def __init__(self, seg_infos, wav=None, showLabel=True):
-        """
-        Parameters
-        ----------
-        seg_infos : tuple(float, float, str)
-            the segment information (start, end, label)
-
-        wav : tuple(np.array, int), optional
-            The signal information as loaded using librosa. The tuple contain an array of samples and the sample rate. (default: None)
-
-        showLabel : bool, optional
-            Show the label (or not). (default: True)
-        """
-        super().__init__(seg_infos[0], seg_infos[1], movable=False)
-
-        self.label = seg_infos[2]
-
-        # Some adaptations
-        brush = QtGui.QBrush(QtGui.QColor(0, 0, 0, 0))
-        self.setBrush(brush)
-        hover_brush = QtGui.QBrush(QtGui.QColor(0, 0, 255, 100))
-        self.setHoverBrush(hover_brush)
-
-        # Save wav for playback!
-        self.wav = wav
-
-        # Add label
-        if showLabel:
-            text = pg.TextItem(text=self.label,anchor=(0.5,0.5))
-            text.setPos((self.end+self.start)/2, 0.5)
-            text.setParentItem(self)
-
-    def hoverEvent(self, ev):
-        """Override hoverEvent to relax some conditions
-
-        Parameters
-        ----------
-        ev : MouseHoverEvent
-            the mouse hover event
-        """
-
-        if (not ev.isExit()) and ev.acceptDrags(QtCore.Qt.LeftButton):
-            self.setMouseHover(True)
-        else:
-            self.setMouseHover(False)
-
-
 class SelectableViewBox(pg.ViewBox):
     """Viewbox with region selection support (for playback and zoom)
 

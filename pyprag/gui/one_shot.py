@@ -20,14 +20,13 @@ import numpy as np
 # Plotting
 import matplotlib.cm
 from pyqtgraph.dockarea import *
-from pyqtgraph.Qt import QtCore, QtGui
 import pyqtgraph as pg
 
 # pyprag internal packages
 from pyprag.gui.utils import *
-from pyprag.gui.docks import DockAnnotation
 from pyprag.components.wav.visualisation import WavDock
 from pyprag.components.data.visualisation import DataDock
+from pyprag.components.annotations.visualisation import AnnotationDock
 
 #####################################################################################################
 # Classes
@@ -110,7 +109,7 @@ class OneShotArea(DockArea):
         # Generate annotation part
         if self.annotation is not None:
             self.logger.debug("Plot annotation part")
-            dock_align = DockAnnotation("Annotations", (950, 20),
+            dock_align = AnnotationDock("Annotations", (950, 20),
                                        self.annotation, self.wav) # Size doesn't seem to affect anything
 
 

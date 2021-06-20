@@ -37,8 +37,7 @@ import pyqtgraph as pg
 from pyprag.components.spectrum.core import SpectrumAnalysis
 
 # Annotation
-from pyprag.annotation.htk_lab import *
-from pyprag.annotation.textgrid import *
+from pyprag.components.annotations import HTKAnnotation, TGTAnnotation
 
 # GUI
 from pyprag.gui.one_shot import *
