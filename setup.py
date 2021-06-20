@@ -23,7 +23,7 @@ REQUIREMENTS = [
     "matplotlib", "numpy", "scipy",
 
     # Audio/speech
-    "librosa", "tgt", "pyworld", "sounddevice",
+    "librosa", "tgt", "pyworld", "pygame",
 
     # Rendering
     "pyqtgraph==0.12.1", "pyside6"

@@ -12,18 +12,36 @@ DESCRIPTION
 LICENSE
 """
 
-import sounddevice as sd
+import pygame
+import numpy as np
 
 ###############################################################################
 # Classes
 ###############################################################################
-
 class Player:
-    """Class encapsulating an audio player.
+    """Class encapsulating an audio player."""
 
-    """
+    def __init__(self, wav_data, sr):
+        self.loadNewWav(wav_data, sr)
 
-    def play(self, sig_array, sr, viewBox=None):
+    def setWavData(self, wav_data):
+        self._wav_data =(wav_data*np.iinfo(np.int16).max).astype(np.int16)
+        self._sound = pygame.sndarray.make_sound(self._wav_data)
+
+    def loadNewWav(self, wav_data, sr):
+        self._sr = sr
+
+        # Reinit the mixer
+        pygame.mixer.quit()
+        pygame.mixer.pre_init(self._sr, size=-16, channels=1)
+        pygame.mixer.init(self._sr, size=-16, channels=1)
+
+        # Load the wav data
+        self.setWavData(wav_data)
+
+        self._is_paused = False
+
+    def play(self):
         """Play the signal given in parameters
 
         Parameters
@@ -37,13 +55,19 @@ class Player:
         viewBox: pg.pyqtgraph.ViewBox
            The view box currently active
         """
-        sd.play(sig_array, sr)
-        status = sd.wait()
+        self._sound.play()
 
 
-###############################################################################
-# Shared variables
-###############################################################################
+    def pauseResume(self):
+        if self._is_paused:
+            pygame.mixer.unpause()
+        else:
+            pygame.mixer.pause()
 
-# The actual player
-player = Player()
+        self._is_paused = not self._is_paused
+
+    def stop(self):
+        self._sound.stop()
+
+    def loop(self):
+        self._sound.play(-1)
