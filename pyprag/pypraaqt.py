@@ -42,7 +42,7 @@ from pyprag.annotation.textgrid import *
 
 # GUI
 from pyprag.gui.one_shot import *
-from pyprag.gui.widgets import PlayerWidget
+from pyprag.components.wav.control import PlayerWidget
 from pyprag.gui.control_panels.signal import EqWidget
 
 ###############################################################################

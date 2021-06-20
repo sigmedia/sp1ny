@@ -26,6 +26,7 @@ import pyqtgraph as pg
 # pyprag internal packages
 from pyprag.gui.utils import *
 from pyprag.gui.docks import *
+from pyprag.components.wav.visualisation import WavDock
 
 #####################################################################################################
 # Classes
@@ -97,7 +98,7 @@ class OneShotArea(DockArea):
         """
         # Generate wav part
         self.logger.debug("Plot waveform part")
-        dock_wav = DockWav("Signal", (950, 20), self.wav)
+        dock_wav = WavDock("Signal", (950, 20), self.wav)
 
         # Generate data part
         self.logger.debug("Plot coefficient part")

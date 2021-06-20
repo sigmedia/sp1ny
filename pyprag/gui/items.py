@@ -15,8 +15,6 @@ LICENSE
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui
 
-from pyprag.audio.player import *
-
 ###############################################################################
 # Classes
 ###############################################################################
@@ -155,8 +153,8 @@ class SegmentItem(pg.LinearRegionItem):
                 start = int(self.start * self.wav[1])
                 end = int(self.end * self.wav[1])
 
-                # Play subpart
-                player.play(self.wav[0][start:end], self.wav[1])
+                # # Play subpart
+                # player.play(self.wav[0][start:end], self.wav[1])
 
             elif (modifierPressed & QtCore.Qt.ShiftModifier) == QtCore.Qt.ShiftModifier:
                 self.parentWidget().setXRange(0, self.parentWidget().state["limits"]["xLimits"][1])
