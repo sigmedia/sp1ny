@@ -5,7 +5,7 @@ import numpy as np
 
 # PyPrag
 from pyqtgraph.Qt import QtWidgets
-from .player import Player
+from .player import player
 
 class PlayerWidget(QtWidgets.QWidget):
     """ """
@@ -49,20 +49,20 @@ class PlayerWidget(QtWidgets.QWidget):
         player_layout.addWidget(bLoop)
         self.setLayout(player_layout)
 
-        self._player = Player(
+        player.loadNewWav(
             self._wav[0], self._wav[1]
         )  # FIXME: we should find a way to get rid of the filename
 
     def play(self):
         # Play subpart
-        self._player.play()
+        player.play()
 
     def pause(self):
         # Play subpart
-        self._player.pauseResume()
+        player.pauseResume()
 
     def stop(self):
-        self._player.stop()
+        player.stop()
 
     def loop(self):
-        self._player.loop()
+        player.loop()

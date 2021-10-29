@@ -116,7 +116,7 @@ class AnnotationItem(SegmentItem):
         showLabel : bool, optional
             Show the label (or not). (default: True)
         """
-        super().__init__(seg_infos[0], seg_infos[1], movable=False)
+        super().__init__(seg_infos[0], seg_infos[1], wav=wav, movable=False)
 
         self.label = seg_infos[2]
 
@@ -126,8 +126,6 @@ class AnnotationItem(SegmentItem):
         hover_brush = QtGui.QBrush(QtGui.QColor(0, 0, 255, 100))
         self.setHoverBrush(hover_brush)
 
-        # Save wav for playback!
-        self.wav = wav
 
         # Add label
         if showLabel:

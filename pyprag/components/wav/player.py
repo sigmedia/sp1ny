@@ -18,17 +18,33 @@ import numpy as np
 ###############################################################################
 # Classes
 ###############################################################################
-class Player:
+class Singleton(type):
+    _instances = {}
+    def __call__(cls, *args, **kwargs):
+        if cls not in cls._instances:
+            cls._instances[cls] = super(Singleton, cls).__call__(*args, **kwargs)
+        return cls._instances[cls]
+
+class Player(metaclass=Singleton):
     """Class encapsulating an audio player."""
 
-    def __init__(self, wav_data, sr):
-        self.loadNewWav(wav_data, sr)
+    def __init__(self):
+        self._is_playing = False
+        self._is_paused = True
 
     def setWavData(self, wav_data):
+        # First be sure everything is stopped
+        if self._is_playing:
+            self.stop()
+
         self._wav_data =(wav_data*np.iinfo(np.int16).max).astype(np.int16)
         self._sound = pygame.sndarray.make_sound(self._wav_data)
 
     def loadNewWav(self, wav_data, sr):
+        # First be sure everything is stopped
+        if self._is_playing:
+            self.stop()
+
         self._sr = sr
 
         # Reinit the mixer
@@ -39,9 +55,8 @@ class Player:
         # Load the wav data
         self.setWavData(wav_data)
 
-        self._is_paused = False
 
-    def play(self):
+    def play(self, wav_data=None):
         """Play the signal given in parameters
 
         Parameters
@@ -55,7 +70,15 @@ class Player:
         viewBox: pg.pyqtgraph.ViewBox
            The view box currently active
         """
+
+        if wav_data is not None:
+            self.setWavData(wav_data)
+
+        if self._is_playing:
+            return
+
         self._sound.play()
+        self._is_playing = True
 
 
     def pauseResume(self):
@@ -68,6 +91,14 @@ class Player:
 
     def stop(self):
         self._sound.stop()
+        self._is_playing = False
+        self._is_paused = False
 
     def loop(self):
+        if self._is_playing:
+            return
+
         self._sound.play(-1)
+        self._is_playing = True
+
+player = Player()

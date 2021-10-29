@@ -68,6 +68,7 @@ class SelectableWavPlotWidget(pg.PlotWidget):
         self.plotItem = SelectablePlotItem(**kwargs)
         self.setCentralItem(self.plotItem)
         self.plotItem.plot(x, self._wav[0])
+        self.plotItem.setXRange(0, self._wav[0].shape[0] / self._wav[1], padding=0)
 
 class WavDock(Dock):
     """Dock containing a data surface plot (matrix data for now) and the corresponding waveform
@@ -117,9 +118,6 @@ class WavDock(Dock):
 
         # Label space
         self.wav_plot.getAxis('left').setWidth(50)
-
-        # # Reactivate autorange
-        # self.wav_plot.autoRange()
 
 
     def __plotWav(self):
