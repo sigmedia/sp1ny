@@ -82,6 +82,7 @@ class OneShotArea(DockArea):
             self.wav = (np.zeros((self.coef.shape[0])), 1/frameshift)
         self.frameshift = frameshift
 
+
         # - Generate color map
         self.logger.debug("Generate ticks for data plotting")
         pos, rgba_colors = zip(*cmapToColormap(color_map))
@@ -110,7 +111,7 @@ class OneShotArea(DockArea):
         if self.annotation is not None:
             self.logger.debug("Plot annotation part")
             dock_align = AnnotationDock("Annotations", (950, 20),
-                                       self.annotation, self.wav) # Size doesn't seem to affect anything
+                                        self.annotation, self.wav) # Size doesn't seem to affect anything
 
 
         # Link X-Axis

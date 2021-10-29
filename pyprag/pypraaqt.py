@@ -62,7 +62,6 @@ class GUIVisu(QtGui.QMainWindow):
         self._wav = infos[0]
         self._coef = infos[1]
         self._filename = infos[2]
-        self._plot_area = OneShotArea(self._wav, self._coef, frameshift, annotation)
 
         ##########################################
         # Setup the Menubar
@@ -104,6 +103,7 @@ class GUIVisu(QtGui.QMainWindow):
         ##########################################
         # Define the left part of the window
         ##########################################
+        self._plot_area = OneShotArea(self._wav, self._coef, frameshift, annotation)
         left_layout = QtWidgets.QVBoxLayout()
         left_layout.addWidget(self._plot_area)
 
