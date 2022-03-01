@@ -54,7 +54,7 @@ def cmapToColormap(cmap, nTicks=16, alpha=255):
     # The parameter 'cmap' is a 'matplotlib.colors.LinearSegmentedColormap' instance ...
     if hasattr(cmap, '_segmentdata'):
         colordata = getattr(cmap, '_segmentdata')
-        if ('red' in colordata) and isinstance(colordata['red'], collections.Sequence):
+        if ('red' in colordata) and isinstance(colordata['red'], collections.abc.Sequence):
 
             # collect the color ranges from all channels into one dict to get unique indices
             posDict = {}

@@ -26,7 +26,7 @@ REQUIREMENTS = [
     "librosa", "tgt", "pyworld", "pygame",
 
     # Rendering
-    "pyqtgraph==0.12.1", "pyside6"
+    "pyqtgraph>=0.12.1"
 ]
 
 EXTRA_REQUIREMENTS = {
