@@ -41,7 +41,7 @@ EXTRA_REQUIREMENTS = {
     # ]
 }
 
-NAME = "pypraaqt"
+NAME = "PyPraG"
 VERSION = "0.0.1"
 AUTHOR = "Sébastien Le Maguer"
 DESCRIPTION = ""
@@ -84,5 +84,5 @@ setup(
         "Programming Language :: Python :: 3.7",
     ],
     # "Executable" to link
-    entry_points={"console_scripts": [], "gui_scripts": ["pypraaqt = pyprag.pypraaqt:main"]},
+    entry_points={"console_scripts": [], "gui_scripts": ["pyprag = pyprag.pyprag:main"]},
 )

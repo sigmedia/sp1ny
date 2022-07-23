@@ -175,10 +175,10 @@ def define_palette(app):
 def build_gui(infos, frameshift, annotation=None):
 
     # Generate application
-    app = QtGui.QApplication(["PyPraaQt"])
+    app = QtGui.QApplication(["PyPraG"])
     define_palette(app)
     win = GUIVisu(infos, frameshift, annotation)
-    win.setWindowTitle("PyPraaQt")
+    win.setWindowTitle("PyPraG")
 
     # Start the application
     win.show()

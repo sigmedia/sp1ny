@@ -1,8 +1,8 @@
-# PyPraaQt
+# PyPraG
 
 ## Environment installation
 
-In order to configure the environment for PyPraaQt, it is advised to use conda.
+In order to configure the environment for PyPraG, it is advised to use conda.
 In order to learn about conda, please refer to the following introduction: https://docs.conda.io/projects/conda/en/latest/user-guide/getting-started.html
 
 To create the conda environment, you can use the following command:
