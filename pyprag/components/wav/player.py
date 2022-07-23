@@ -16,17 +16,20 @@ LICENSE
 import threading
 import pyaudio
 import numpy as np
-import time # NOTE: for active monitoring
+import time  # NOTE: for active monitoring
+
 
 ###############################################################################
 # Classes
 ###############################################################################
 class Singleton(type):
     _instances = {}
+
     def __call__(cls, *args, **kwargs):
         if cls not in cls._instances:
             cls._instances[cls] = super(Singleton, cls).__call__(*args, **kwargs)
         return cls._instances[cls]
+
 
 class Player(metaclass=Singleton):
     """Class encapsulating an audio player.
@@ -59,7 +62,6 @@ class Player(metaclass=Singleton):
         self._sr = sr
         self.setWavData(wav_data)
 
-
     def play(self, wav_data=None):
         """Play the signal given in parameters
 
@@ -85,25 +87,22 @@ class Player(metaclass=Singleton):
 
         # And now play!
         self._is_playing = True
-        print("ok, ready?")
-        x = threading.Thread(target=self.play_handler(), args=())
-        x.start()
-        print("Thread has been started")
+        new_thread = threading.Thread(target=self.play_handler, args=())
+        new_thread.start()
 
     def pauseResume(self):
         # Update the pause status
         self._is_paused = not self._is_paused
 
-        # Fix the stream
-        if self._is_paused:
-            self._stream.stop_stream()
-        else:
-            self._stream.start_stream()
+        # # Fix the stream
+        # if self._is_paused:
+        #     self._stream.stop_stream()
+        # else:
+        #     self._stream.start_stream()
 
     def stop(self):
         self._is_playing = False
         self._position = 0
-        print("Stopping required!")
 
     def toggleLoop(self):
         self._loop_activated = not self._loop_activated
@@ -114,10 +113,10 @@ class Player(metaclass=Singleton):
     def _callback(self, in_data, frame_count, time_info, status):
         # Execute the position handler function if defined
         if self._position_handler is not None:
-            self._position_handler(frame_count*self._position)
+            self._position_handler(frame_count * self._position)
 
         # Prepare buffer
-        cur_buffer = self._data[frame_count*self._position : frame_count*(self._position+1)]
+        cur_buffer = self._data[frame_count * self._position : frame_count * (self._position + 1)]
         cur_buffer = cur_buffer.astype(np.float32).tobytes()
 
         # Prepare next position and move on
@@ -128,16 +127,13 @@ class Player(metaclass=Singleton):
 
         # Initialize the player, the stream and the position
         self._player = pyaudio.PyAudio()
-        self._stream = self._player.open(format=pyaudio.paFloat32,
-                                         channels=1,
-                                         rate=self._sr,
-                                         output=True,
-                                         stream_callback=self._callback)
+        self._stream = self._player.open(
+            format=pyaudio.paFloat32, channels=1, rate=self._sr, output=True, stream_callback=self._callback
+        )
         self._position = 0
 
         # Play
         while self._position == 0:
-            print("start to play")
             # Start the playing
             self._stream.start_stream()
 
@@ -153,9 +149,9 @@ class Player(metaclass=Singleton):
                 self._position = 0
 
         # Stop and clean everything
-        print("ok I am over")
         self._stream.close()
         self._player.terminate()
         self._is_playing = False
+
 
 player = Player()

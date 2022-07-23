@@ -1,11 +1,11 @@
-
 # PyQTGraph
 import pyqtgraph as pg
 from pyqtgraph.dockarea import Dock
-from pyqtgraph.Qt import QtWidgets, QtGui
+from pyqtgraph.Qt import QtGui
 
 # PyPrag
 from pyprag.gui.items import SelectablePlotItem
+
 
 class SelectableImagePlotWidget(pg.PlotWidget):
     """Image plot widget allowing to highlight some regions
@@ -22,16 +22,7 @@ class SelectableImagePlotWidget(pg.PlotWidget):
         The histogram widget to control the image colorimetrie
     """
 
-    def __init__(
-        self,
-        data,
-        frameshift,
-        ticks,
-        y_scale,
-        parent=None,
-        background="default",
-        **kwargs
-    ):
+    def __init__(self, data, frameshift, ticks, max_y, parent=None, background="default", **kwargs):
         """
         Parameters
         ----------
@@ -60,16 +51,12 @@ class SelectableImagePlotWidget(pg.PlotWidget):
 
         # Save reference to data
         self._data = data
-        self._y_scale = y_scale
+        self._max_y = max_y
 
         # Generate image data
         img = pg.ImageItem()
         img.setImage(self._data.T)
-        img.setTransform(
-            QtGui.QTransform.fromScale(
-                frameshift, 1.0 / (self._data.shape[1] / self._y_scale)
-            )
-        )
+        img.setTransform(QtGui.QTransform.fromScale(frameshift, 1.0 / (self._data.shape[1] / self._max_y)))
 
         # Define and assign histogram
         self.hist = pg.HistogramLUTWidget()
@@ -80,6 +67,7 @@ class SelectableImagePlotWidget(pg.PlotWidget):
         self.plotItem = SelectablePlotItem(**kwargs)
         self.plotItem.getViewBox().addItem(img)
         self.setCentralItem(self.plotItem)
+
 
 class DataDock(Dock):
     """Dock containing a data surface plot (matrix data for now) and the corresponding waveform
@@ -98,6 +86,7 @@ class DataDock(Dock):
     wav_plot :
         The plot item rendering the waveform
     """
+
     def __init__(self, name, size, data, frameshift, ticks, wav):
         """
         Parameters
@@ -125,12 +114,12 @@ class DataDock(Dock):
 
         self.data = data
         self.wav = wav
-        max_dur = self.data.shape[0] * frameshift
+        # max_dur = self.data.shape[0] * frameshift
 
         self.__plotData(frameshift, ticks)
 
         # Label space
-        self.data_plot.getAxis('left').setWidth(50)
+        self.data_plot.getAxis("left").setWidth(50)
 
     def __plotData(self, frameshift, ticks):
         """Helper to plot the data
@@ -148,11 +137,16 @@ class DataDock(Dock):
 
         """
         lim_factor = 1.1
-        self.data_plot = SelectableImagePlotWidget(self.data, frameshift, ticks, self.wav[1] / 2.0,
-                                                   name="%s coef" % self.name,
-                                                   wav=self.wav)
-        self.data_plot.setLimits(xMax=self.data.shape[0]*frameshift*lim_factor)
-        self.data_plot.hideAxis('bottom')
+        self.data_plot = SelectableImagePlotWidget(
+            self.data,
+            frameshift,
+            ticks,
+            self.wav[1] / 2.0,  # NOTE: max_y is imposed to be nyquist!
+            name="%s coef" % self.name,
+            wav=self.wav,
+        )
+        self.data_plot.setLimits(xMax=self.data.shape[0] * frameshift * lim_factor)
+        self.data_plot.hideAxis("bottom")
 
         # Add plot
         # self.data_plot.disableAutoRange()

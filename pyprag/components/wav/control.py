@@ -1,11 +1,10 @@
 # Python
 from platform import system
-import numpy as np
-
 
 # PyPrag
 from pyqtgraph.Qt import QtWidgets
 from .player import player
+
 
 class PlayerWidget(QtWidgets.QWidget):
     """ """
@@ -49,9 +48,13 @@ class PlayerWidget(QtWidgets.QWidget):
         player_layout.addWidget(bLoop)
         self.setLayout(player_layout)
 
-        player.loadNewWav(
-            self._wav[0], self._wav[1]
-        )  # FIXME: we should find a way to get rid of the filename
+        player.loadNewWav(self._wav[0], self._wav[1])  # FIXME: we should find a way to get rid of the filename
+
+        player.set_position_handler(self.update_position)
+
+    def update_position(self, position):
+        print(f"{position} / {self._wav[0].shape[0]}", end="\r")
+        print(position)
 
     def play(self):
         # Play subpart
@@ -65,4 +68,4 @@ class PlayerWidget(QtWidgets.QWidget):
         player.stop()
 
     def loop(self):
-        player.loop()
+        player.toggleLoop()

@@ -29,7 +29,6 @@ import numpy as np
 import librosa
 
 # Plotting & rendering
-from pyqtgraph.dockarea import *
 from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 import pyqtgraph as pg
 
@@ -40,9 +39,10 @@ from pyprag.components.spectrum.core import SpectrumAnalysis
 from pyprag.components.annotations import HTKAnnotation, TGTAnnotation
 
 # GUI
-from pyprag.gui.one_shot import *
+from pyprag.gui.one_shot import OneShotArea
 from pyprag.components.wav.control import PlayerWidget
 from pyprag.gui.control_panels.signal import EqWidget
+
 
 ###############################################################################
 # global constants
@@ -51,6 +51,7 @@ LEVEL = [logging.WARNING, logging.INFO, logging.DEBUG]
 
 # Interpret image data as row-major instead of col-major
 pg.setConfigOptions(imageAxisOrder="row-major")
+
 
 ###############################################################################
 # Functions
@@ -83,7 +84,6 @@ class GUIVisu(QtGui.QMainWindow):
         file_menu.addAction(self.exitAction)
         menuBar.addMenu(file_menu)
 
-
         ##########################################
         # Setup the toolbar
         ##########################################
@@ -91,14 +91,12 @@ class GUIVisu(QtGui.QMainWindow):
         player_widget = PlayerWidget(self._filename, self._wav)
         player_toolbar.addWidget(player_widget)
 
-
         ##########################################
         # Setup the status bar
         ##########################################
         self.statusbar = self.statusBar()
         self._filename_label = QtWidgets.QLabel(self._filename)
         self.statusbar.addPermanentWidget(self._filename_label)
-
 
         ##########################################
         # Define the left part of the window
@@ -115,14 +113,14 @@ class GUIVisu(QtGui.QMainWindow):
         # Initialize tab screen
         tabs = QtWidgets.QTabWidget()
         tab1 = QtWidgets.QWidget()
-        tabs.addTab(tab1,"Signal")
+        tabs.addTab(tab1, "Signal")
         cur_layout = QtWidgets.QVBoxLayout(self)
         eq_widget = EqWidget(self, self._wav)
         cur_layout.addWidget(eq_widget)
         tab1.setLayout(cur_layout)
 
         tab2 = QtWidgets.QWidget()
-        tabs.addTab(tab2,"Text")
+        tabs.addTab(tab2, "Text")
         right_layout.addWidget(tabs)
 
         ##########################################
@@ -143,9 +141,12 @@ class GUIVisu(QtGui.QMainWindow):
         options = QtGui.QFileDialog.Options()
         options |= QtGui.QFileDialog.DontUseNativeDialog
         # NOTE: how to concatente filters: "All Files (*);;Wav Files (*.wav)"
-        filename, _ = QtGui.QFileDialog.getOpenFileName(self,"Loading wav file", "","Wav Files (*.wav)", options=options)
+        filename, _ = QtGui.QFileDialog.getOpenFileName(
+            self, "Loading wav file", "", "Wav Files (*.wav)", options=options
+        )
         if filename:
             self._filename_label.setText(filename)
+
 
 def define_palette(app):
     app.setStyle("Fusion")
@@ -170,6 +171,7 @@ def define_palette(app):
 
     app.setStyleSheet("QToolTip { color: #ffffff; background-color: #2a82da; border: 1px solid white; }")
 
+
 def build_gui(infos, frameshift, annotation=None):
 
     # Generate application
@@ -187,13 +189,10 @@ def build_gui(infos, frameshift, annotation=None):
 def entry_point(args, logger):
     """Main entry function"""
 
-    if (
-        (args.annotation_file == "")
-        and (args.wav_file == "")
-        and (args.coefficient_file == "")
-    ):
+    if (args.annotation_file == "") and (args.wav_file == "") and (args.coefficient_file == ""):
         logger.error(
-            "You need to give an annotation file (-a, --annotation-file), a coefficient file (-c, --coefficient-file) and/or a wav file (-w, --wav-file)"
+            "You need to give an annotation file (-a, --annotation-file), "
+            + "a coefficient file (-c, --coefficient-file) and/or a wav file (-w, --wav-file)"
         )
         sys.exit(-1)
 
@@ -206,19 +205,48 @@ def entry_point(args, logger):
     # Convert frameshift from ms to s
     frameshift = args.frameshift / 1000
 
+    # ##############################################################################
+    # ### [ Equalizer ]
+    # ##############################################################################
+
+    # from scipy.signal import butter, sosfilt, sosfreqz
+
+    # def butter_bandpass(lowcut, highcut, fs, order=5):
+    #     nyq = 0.5 * fs
+    #     low = lowcut / nyq
+    #     high = (highcut - 1) / nyq
+    #     sos = butter(order, [low, high], analog=False, btype="band", output="sos")
+    #     return sos
+
+    # def butter_bandpass_filter(data, lowcut, highcut, fs, order=5):
+    #     sos = butter_bandpass(lowcut, highcut, fs, order=order)
+    #     y = sosfilt(sos, data)
+    #     return y
+
+    # # band_0 = butter_bandpass_filter(wav[0], 20, 50, wav[1])
+    # # band_1 = butter_bandpass_filter(wav[0], 50, 200, wav[1]) * 0
+    # # band_2 = butter_bandpass_filter(wav[0], 200, 1000, wav[1]) * 0 # * 0.001
+    # # band_3 = butter_bandpass_filter(wav[0], 1000, 2000, wav[1]) * 0
+    # # band_4 = butter_bandpass_filter(wav[0], 2000, 4000, wav[1]) # * 0.00
+    # # band_5 = butter_bandpass_filter(wav[0], 6000, 8000, wav[1])
+    # # tmp = band_0 + band_1 + band_2 + band_3 + band_4 + band_5
+    # # wav = [tmp, wav[1]]
+
+    # ##############################################################################
+    # ### [/ Equalizer]
+    # ##############################################################################
+
     # Compute spectrum
     coef_matrix = None
     if args.coefficient_file == "":
         if wav is not None:
             logger.info("Compute spectrogram")
-            sp_analyzer = SpectrumAnalysis(wav, frameshift=frameshift)
+            sp_analyzer = SpectrumAnalysis(wav, frameshift=frameshift, mel_scale=False)
             coef_matrix = sp_analyzer._spectrum
     else:
         logger.info("Loading coefficient file")
         if args.dimension is None:
-            raise Exception(
-                "The coefficient file is given but not the dimension of the coefficient vector"
-            )
+            raise Exception("The coefficient file is given but not the dimension of the coefficient vector")
 
         coef_matrix = np.fromfile(args.coefficient_file, dtype=np.float32)
         if args.dimension < 0:
@@ -255,22 +283,16 @@ def main():
         help="The annotation file (HTK label or TextGrid)",
     )
     parser.add_argument("-l", "--log-file", default="", help="Logger file")
-    parser.add_argument(
-        "-v", "--verbosity", action="count", default=0, help="increase output verbosity"
-    )
-    parser.add_argument(
-        "-c", "--coefficient-file", default="", type=str, help="The coefficient file"
-    )
+    parser.add_argument("-v", "--verbosity", action="count", default=0, help="increase output verbosity")
+    parser.add_argument("-c", "--coefficient-file", default="", type=str, help="The coefficient file")
     parser.add_argument(
         "-d",
         "--dimension",
         default=0,
         type=int,
-        help="The dimension of the coefficient vector (if negative shape is assumed to be (-1, d), if positive (d, -1))",
+        help="The dimension of the coefficient vector (negative shape is assumed to be (-1, d), positive (d, -1))",
     )
-    parser.add_argument(
-        "-f", "--frameshift", default=5, type=int, help="The frameshift in milliseconds"
-    )
+    parser.add_argument("-f", "--frameshift", default=5, type=int, help="The frameshift in milliseconds")
     parser.add_argument("-w", "--wav_file", default="", type=str, help="The wave file")
 
     # Parsing arguments
@@ -278,19 +300,14 @@ def main():
 
     # create logger and formatter
     logger = logging.getLogger()
-    formatter = logging.Formatter(
-        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    )
+    formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 
     # Verbose level => logging level
     log_level = args.verbosity
     if args.verbosity >= len(LEVEL):
         log_level = len(LEVEL) - 1
         logger.setLevel(log_level)
-        logging.warning(
-            "verbosity level is too high, I'm gonna assume you're taking the highest (%d)"
-            % log_level
-        )
+        logging.warning("verbosity level is too high, I'm gonna assume you're taking the highest (%d)" % log_level)
     else:
         logger.setLevel(LEVEL[log_level])
 
