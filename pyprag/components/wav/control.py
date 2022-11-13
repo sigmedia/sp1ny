@@ -50,11 +50,10 @@ class PlayerWidget(QtWidgets.QWidget):
 
         player.loadNewWav(self._wav[0], self._wav[1])  # FIXME: we should find a way to get rid of the filename
 
-        player.set_position_handler(self.update_position)
+        # player.add_position_handler(self.update_position)
 
     def update_position(self, position):
-        print(f"{position} / {self._wav[0].shape[0]}", end="\r")
-        print(position)
+        print(f"{float(position) / self._wav[1]}", end="\r")
 
     def play(self):
         # Play subpart

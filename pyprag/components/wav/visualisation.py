@@ -20,11 +20,12 @@ from pyqtgraph.dockarea import Dock
 
 # PyPrag
 from pyprag.gui.items import SelectablePlotItem
-
+from .player import player
 
 ###############################################################################
 # Classes
-###############################################################################SelectablePlotItem
+###############################################################################
+
 
 class SelectableWavPlotWidget(pg.PlotWidget):
     """Image plot widget allowing to highlight some regions
@@ -65,10 +66,18 @@ class SelectableWavPlotWidget(pg.PlotWidget):
         x = np.arange(self._wav[0].shape[0]) / self._wav[1]
 
         # Prepare plot item
-        self.plotItem = SelectablePlotItem(**kwargs)
+        self.plotItem = SelectablePlotItem(lock_y_axis=True, **kwargs)
         self.setCentralItem(self.plotItem)
         self.plotItem.plot(x, self._wav[0])
         self.plotItem.setXRange(0, self._wav[0].shape[0] / self._wav[1], padding=0)
+        v_bar = pg.InfiniteLine(pos=0, movable=False, angle=90, pen=pg.mkPen({"color": "#F00", "width": 2}))
+
+        def _update_position_handler(position):
+            v_bar.setValue(position)
+
+        player.add_position_handler(_update_position_handler)
+        self.plotItem.addItem(v_bar)
+
 
 class WavDock(Dock):
     """Dock containing a data surface plot (matrix data for now) and the corresponding waveform
@@ -87,6 +96,7 @@ class WavDock(Dock):
     wav_plot :
         The plot item rendering the waveform
     """
+
     def __init__(self, name, size, wav):
         """
         Parameters
@@ -117,8 +127,7 @@ class WavDock(Dock):
         self.__plotWav()
 
         # Label space
-        self.wav_plot.getAxis('left').setWidth(50)
-
+        self.wav_plot.getAxis("left").setWidth(50)
 
     def __plotWav(self):
         """Helper to plot the waveform
@@ -126,8 +135,8 @@ class WavDock(Dock):
         Parameters
         ----------
         max_dur : float
-            The maximum duration in seconds. It is mainly used in the case that the annotations require more space than the waveform
-
+          The maximum duration in seconds. It is mainly used in the case
+          that the annotations require more space than the waveform
         """
 
         self.wav_plot = SelectableWavPlotWidget(self.wav, name="%s waveform" % self.name)

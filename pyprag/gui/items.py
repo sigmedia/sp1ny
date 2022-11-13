@@ -14,30 +14,30 @@ LICENSE
 
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui
-
 from pyprag.components.wav.player import player
+
 
 ###############################################################################
 # Classes
 ###############################################################################
-
 class SelectablePlotItem(pg.PlotItem):
-    """PlotItem using a SelectableViewBox instead of a standard pg.ViewBox
+    """PlotItem using a SelectableViewBox instead of a standard pg.ViewBox"""
 
-    """
-    def __init__(self, wav=None, **kwargs):
+    def __init__(self, lock_y_axis=False, **kwargs):
         """
         Parameters
         ----------
 
         wav : tuple(np.array, int), optional
-            The signal information as loaded using librosa. The tuple contain an array of samples and the sample rate. (default: None)
+            The signal information as loaded using librosa.
+            The tuple contain an array of samples and the sample rate.
+            (default: None)
 
         kwargs : keyword arguments
             Used to transmit values to pg.plotItem. *The keyword viewBox is ignored*
 
         """
-        vb = SelectableViewBox(wav)
+        vb = SelectableViewBox(lock_y_axis)
         kwargs["viewBox"] = vb
         super().__init__(**kwargs)
         vb.setParentItem(self)
@@ -76,10 +76,13 @@ class SegmentItem(pg.LinearRegionItem):
             The end position (in seconds)
 
         wav : tuple(np.array, int), optional
-            The signal information as loaded using librosa. The tuple contain an array of samples and the sample rate. (default: None)
+            The signal information as loaded using librosa.
+            The tuple contain an array of samples and the sample rate.
+           (default: None)
 
         movable : bool
-            Indicate if the segment can be moved (start and end are changing). (default: False)
+            Indicate if the segment can be moved (start and end are changing).
+            (default: False)
 
         related : list
             List of related segments (instances of SegmentItem). (default: [])
@@ -87,7 +90,7 @@ class SegmentItem(pg.LinearRegionItem):
         super().__init__()
 
         self._wav = wav
-        self._related =related
+        self._related = related
 
         # Some adaptations
         brush = QtGui.QBrush(QtGui.QColor(255, 0, 0, 50))
@@ -95,6 +98,8 @@ class SegmentItem(pg.LinearRegionItem):
 
         # Set the bounds
         self.setRegion((start, end))
+
+        self.sigRegionChangeFinished.connect(self._update_bounds)
 
     def setRegion(self, bounds):
         """Set the values for the edges of the region. If related items have been specified, they are
@@ -107,14 +112,18 @@ class SegmentItem(pg.LinearRegionItem):
 
         """
         # Get segment informations
-        self.start = bounds[0]
-        self.end = bounds[1]
-        assert self.end >= self.start
+        if bounds[1] < bounds[0]:
+            self.start = bounds[1]
+            self.end = bounds[0]
+        else:
+            self.start = bounds[0]
+            self.end = bounds[1]
+        bounds = (self.start, self.end)
+
         super().setRegion(bounds)
 
         for s in self._related:
             s.setRegion(bounds)
-
 
     def mouseDragEvent(self, ev):
         """The item dragging event handler.
@@ -146,21 +155,17 @@ class SegmentItem(pg.LinearRegionItem):
 
         if (ev.buttons() == QtCore.Qt.LeftButton) and ev.double():
             if (modifierPressed & QtCore.Qt.ControlModifier) == QtCore.Qt.ControlModifier:
-                # Potentially, there is nothing to play !
-                if self._wav is None:
-                    return
-
-                # Extract position
-                start = int(self.start * self._wav[1])
-                end = int(self.end * self._wav[1])
-
                 # Play subpart
-                player.play(self._wav[0][start:end])
+                player.play(start=self.start, end=self.end)
 
             elif (modifierPressed & QtCore.Qt.ShiftModifier) == QtCore.Qt.ShiftModifier:
                 self.parentWidget().setXRange(0, self.parentWidget().state["limits"]["xLimits"][1])
-            elif (not modifierPressed):
+            elif not modifierPressed:
                 self.parentWidget().setXRange(self.start, self.end)
+
+    def _update_bounds(self, ev):
+        self.start = self.lines[0].getXPos()
+        self.end = self.lines[1].getXPos()
 
 
 class SelectableViewBox(pg.ViewBox):
@@ -178,12 +183,14 @@ class SelectableViewBox(pg.ViewBox):
         Handle to save the highlighted region
     """
 
-    def __init__(self, wav=None, *args, **kwargs):
+    def __init__(self, lock_y_axis=False, *args, **kwargs):
         """
         Parameters
         ----------
         wav : tuple(np.array, int), optional
-            The signal information as loaded using librosa. The tuple contain an array of samples and the sample rate. (default: None)
+            The signal information as loaded using librosa.
+            The tuple contain an array of samples and the sample rate.
+            (default: None)
 
         args : TODO
             remaining arguments
@@ -191,10 +198,11 @@ class SelectableViewBox(pg.ViewBox):
         kwargs : keyword arguments
             Used to transmit values to pg.plotItem. *The keyword viewBox is ignored*
         """
+
         super().__init__(*args, **kwargs)
         self._dragPoint = None
         self._select = False
-        self.wav = wav
+        self._lock_y_axis = lock_y_axis
 
     def mouseDragEvent(self, ev):
         """The item dragging event handler.
@@ -211,8 +219,9 @@ class SelectableViewBox(pg.ViewBox):
 
         # Ignore any event while selecting the region
         if not self._select:
-            if (ev.buttons() != QtCore.Qt.LeftButton) or \
-               ((modifierPressed & QtCore.Qt.ShiftModifier) != QtCore.Qt.ShiftModifier):
+            if (ev.buttons() != QtCore.Qt.LeftButton) or (
+                (modifierPressed & QtCore.Qt.ShiftModifier) != QtCore.Qt.ShiftModifier
+            ):
                 super().mouseDragEvent(ev)
                 return
 
@@ -226,12 +235,11 @@ class SelectableViewBox(pg.ViewBox):
             end_pos = ev.pos()
             end = self.mapSceneToView(end_pos).x()
 
-            #
             # Check
             if self._dragPoint is not None:
                 self._dragPoint.setRegion((start, end))
             else:
-                self._dragPoint = SegmentItem(start, end, wav=self.wav)
+                self._dragPoint = SegmentItem(start, end)
                 self.parentWidget().addItem(self._dragPoint)
 
             self._select = True
@@ -259,3 +267,44 @@ class SelectableViewBox(pg.ViewBox):
 
         # Indicate that the event has been accepted and everything has been done
         ev.accept()
+
+    def scaleBy(self, s=None, center=None, x=None, y=None):
+        """
+        Scale by *s* around given center point (or center of view).
+        *s* may be a pg.Point or tuple (x, y).
+
+        Optionally, x or y may be specified individually. This allows the other
+        axis to be left unaffected (note that using a scale factor of 1.0 may
+        cause slight changes due to floating-point error).
+        """
+
+        if s is not None:
+            x, y = s[0], s[1]
+
+        if self._lock_y_axis:
+            y = None
+
+        affect = [x is not None, y is not None]
+        if not any(affect):
+            return
+
+        scale = pg.Point([1.0 if x is None else x, 1.0 if y is None else y])
+
+        if self.state["aspectLocked"] is not False:
+            scale[0] = scale[1]
+
+        vr = self.targetRect()
+        if center is None:
+            center = pg.Point(vr.center())
+        else:
+            center = pg.Point(center)
+
+        tl = center + (vr.topLeft() - center) * scale
+        br = center + (vr.bottomRight() - center) * scale
+
+        if not affect[0]:
+            self.setYRange(tl.y(), br.y(), padding=0)
+        elif not affect[1]:
+            self.setXRange(tl.x(), br.x(), padding=0)
+        else:
+            self.setRange(QtCore.QRectF(tl, br), padding=0)

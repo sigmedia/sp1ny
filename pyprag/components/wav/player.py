@@ -14,9 +14,10 @@ LICENSE
 """
 
 import threading
-import pyaudio
+
+import sounddevice as sd
+
 import numpy as np
-import time  # NOTE: for active monitoring
 
 
 ###############################################################################
@@ -43,8 +44,8 @@ class Player(metaclass=Singleton):
         self._loop_activated = False
         self._position_handler = None
         self._chunk_size = chunk_size
-        self._player = pyaudio.PyAudio()
         self._position = 0
+        self._position_handlers = []
 
     def setWavData(self, wav_data):
         # First be sure everything is stopped
@@ -52,6 +53,8 @@ class Player(metaclass=Singleton):
             self.stop()
 
         self._data = wav_data
+        if len(self._data.shape) < 2:
+            self._data = np.expand_dims(self._data, axis=1)
 
     def loadNewWav(self, wav_data, sr):
         # First be sure everything is stopped
@@ -62,7 +65,7 @@ class Player(metaclass=Singleton):
         self._sr = sr
         self.setWavData(wav_data)
 
-    def play(self, wav_data=None):
+    def play(self, wav_data=None, start=0, end=-1):
         """Play the signal given in parameters
 
         Parameters
@@ -87,18 +90,24 @@ class Player(metaclass=Singleton):
 
         # And now play!
         self._is_playing = True
-        new_thread = threading.Thread(target=self.play_handler, args=())
+        if end == -1:
+            end = self._data.shape[0]
+        else:
+            start = int(start * self._sr)
+            end = int(end * self._sr)
+
+        new_thread = threading.Thread(target=self.play_handler, args=(start, end))
         new_thread.start()
 
     def pauseResume(self):
         # Update the pause status
         self._is_paused = not self._is_paused
 
-        # # Fix the stream
-        # if self._is_paused:
-        #     self._stream.stop_stream()
-        # else:
-        #     self._stream.start_stream()
+        # Fix the stream
+        if self._is_paused:
+            self._stream.stop_stream()
+        else:
+            self._stream.start_stream()
 
     def stop(self):
         self._is_playing = False
@@ -107,51 +116,34 @@ class Player(metaclass=Singleton):
     def toggleLoop(self):
         self._loop_activated = not self._loop_activated
 
-    def set_position_handler(self, function):
-        self._position_handler = function
+    def add_position_handler(self, function):
+        self._position_handlers.append(function)
 
-    def _callback(self, in_data, frame_count, time_info, status):
-        # Execute the position handler function if defined
-        if self._position_handler is not None:
-            self._position_handler(frame_count * self._position)
+    def play_handler(self, start, end):
+        event = threading.Event()
+        data = self._data[start:end, :]
 
-        # Prepare buffer
-        cur_buffer = self._data[frame_count * self._position : frame_count * (self._position + 1)]
-        cur_buffer = cur_buffer.astype(np.float32).tobytes()
+        def callback(outdata, frames, time, status):
+            if status:
+                print(status)
+            chunksize = min(len(data) - self._position, frames)
+            outdata[:chunksize] = data[self._position : self._position + chunksize]
+            if chunksize < frames:
+                outdata[chunksize:] = 0
+                raise sd.CallbackStop()
+            self._position += chunksize
 
-        # Prepare next position and move on
-        self._position += 1
-        return (cur_buffer, pyaudio.paContinue)
+            # pos = self._position / self._sr
+            # for f in self._position_handlers:
+            #     f(pos)
 
-    def play_handler(self):
-
-        # Initialize the player, the stream and the position
-        self._player = pyaudio.PyAudio()
-        self._stream = self._player.open(
-            format=pyaudio.paFloat32, channels=1, rate=self._sr, output=True, stream_callback=self._callback
+        stream = sd.OutputStream(
+            samplerate=self._sr, device=None, channels=data.shape[1], callback=callback, finished_callback=event.set
         )
-        self._position = 0
-
-        # Play
-        while self._position == 0:
-            # Start the playing
-            self._stream.start_stream()
-
-            # NOTE: active wait
-            while self._stream.is_active():
-                if not self._is_playing:
-                    break
-                time.sleep(0.1)
-
-            # Dealing with the end: stop and reloop?
-            self._stream.stop_stream()
-            if self._loop_activated and self._is_playing:
-                self._position = 0
-
-        # Stop and clean everything
-        self._stream.close()
-        self._player.terminate()
-        self._is_playing = False
+        with stream:
+            event.wait()  # Wait until playback is finished
+            self._position = 0
+            self._is_playing = 0
 
 
 player = Player()
