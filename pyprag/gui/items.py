@@ -174,7 +174,8 @@ class SelectableViewBox(pg.ViewBox):
     Attributes
     ----------
     wav : tuple(np.array, int)
-        The signal information as loaded using librosa. The tuple contain an array of samples and the sample rate.
+        The signal information as loaded using librosa.
+        The tuple contain an array of samples and the sample rate.
 
     _select : bool
         flag to indicate used to avoid conflicts between region selection and other mouse events
@@ -229,11 +230,11 @@ class SelectableViewBox(pg.ViewBox):
         if ev.isStart():
             # Compute start position
             start_pos = ev.buttonDownPos()
-            start = self.mapSceneToView(start_pos).x()
+            start = self.mapToView(start_pos).x()
 
             # Compute end position
             end_pos = ev.pos()
-            end = self.mapSceneToView(end_pos).x()
+            end = self.mapToView(end_pos).x()
 
             # Check
             if self._dragPoint is not None:
@@ -253,11 +254,11 @@ class SelectableViewBox(pg.ViewBox):
             if self._dragPoint is not None:
                 # Compute start position
                 start_pos = ev.buttonDownPos()
-                start = self.mapSceneToView(start_pos).x()
+                start = self.mapToView(start_pos).x()
 
                 # Compute end position
                 end_pos = ev.pos()
-                end = self.mapSceneToView(end_pos).x()
+                end = self.mapToView(end_pos).x()
 
                 # Update region
                 self._dragPoint.setRegion((start, end))
