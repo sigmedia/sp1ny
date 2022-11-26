@@ -78,7 +78,8 @@ class DataDock(Dock):
         matrix containing the data to render
 
     wav : tuple(np.array, int)
-        The signal information as loaded using librosa. The tuple contain an array of samples and the sample rate.
+        The signal information as loaded using librosa.
+        The tuple contain an array of samples and the sample rate.
 
     data_plot :
         The plot item rendering the data part

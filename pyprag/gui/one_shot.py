@@ -19,11 +19,11 @@ import numpy as np
 
 # Plotting
 import matplotlib.cm
-from pyqtgraph.dockarea import *
+from pyqtgraph.dockarea import DockArea
 import pyqtgraph as pg
 
 # pyprag internal packages
-from pyprag.gui.utils import *
+from pyprag.gui.utils import cmapToColormap
 from pyprag.components.wav.visualisation import WavDock
 from pyprag.components.data.visualisation import DataDock
 from pyprag.components.annotations.visualisation import AnnotationDock
@@ -31,6 +31,7 @@ from pyprag.components.annotations.visualisation import AnnotationDock
 #####################################################################################################
 # Classes
 #####################################################################################################
+
 
 class OneShotArea(DockArea):
     """DockArea filled with a plot containing a waveform and a give data (matrix only for now) as well
@@ -50,6 +51,7 @@ class OneShotArea(DockArea):
     ticks : TODO
         The color map ticks
     """
+
     def __init__(self, wav, coef, frameshift, annotation=None, color_map=matplotlib.cm.bone):
         """
         Parameters
@@ -79,44 +81,41 @@ class OneShotArea(DockArea):
         if wav is not None:
             self.wav = wav
         else:
-            self.wav = (np.zeros((self.coef.shape[0])), 1/frameshift)
+            self.wav = (np.zeros((self.coef.shape[0])), 1 / frameshift)
         self.frameshift = frameshift
-
 
         # - Generate color map
         self.logger.debug("Generate ticks for data plotting")
         pos, rgba_colors = zip(*cmapToColormap(color_map))
-        cmap =  pg.ColorMap(pos, rgba_colors)
+        cmap = pg.ColorMap(pos, rgba_colors)
         lut = cmap.getLookupTable(0.0, 1.0, 10)
         ticks = list(enumerate(lut))
-        self.ticks = [(ticks[i][0]/ticks[-1][0], ticks[i][1]) for i in range(len(ticks))]
+        self.ticks = [(ticks[i][0] / ticks[-1][0], ticks[i][1]) for i in range(len(ticks))]
 
         self.__fill()
 
     def __fill(self):
-        """Helper to fill the dock area
-
-        """
+        """Helper to fill the dock area"""
         # Generate wav part
         self.logger.debug("Plot waveform part")
         dock_wav = WavDock("Signal", (950, 20), self.wav)
 
         # Generate data part
         self.logger.debug("Plot coefficient part")
-        dock_coef = DataDock("Spectrum", (950, 200), # FIXME: deal with label name
-                             self.coef,
-                             self.frameshift, self.ticks, self.wav)
+        dock_coef = DataDock(
+            "Spectrum", (950, 200), self.coef, self.frameshift, self.ticks, self.wav  # FIXME: deal with label name
+        )
 
         # Generate annotation part
         if self.annotation is not None:
             self.logger.debug("Plot annotation part")
-            dock_align = AnnotationDock("Annotations", (950, 20),
-                                        self.annotation, self.wav) # Size doesn't seem to affect anything
-
+            dock_align = AnnotationDock(
+                "Annotations", (950, 20), self.annotation, self.wav
+            )  # Size doesn't seem to affect anything
 
         # Link X-Axis
         self.logger.debug("Link everything")
-        dock_wav.wav_plot.setLabel('bottom', 'Time', units='s')
+        dock_wav.wav_plot.setLabel("bottom", "Time", units="s")
         dock_coef.data_plot.setXLink(dock_wav.wav_plot)
         if self.annotation is not None:
             dock_align.reference_plot.setXLink(dock_wav.wav_plot)

@@ -35,7 +35,7 @@ class SpectrumAnalysis:
         The matrix containing the spectrum
     """
 
-    def __init__(self, wav, fft_len=512, frameshift=0.05, window="blackman", mel_scale=False):
+    def __init__(self, wav, fft_len=512, frameshift=0.05, window="hanning", mel_scale=False):
         """
         Parameters
         ----------
@@ -62,14 +62,14 @@ class SpectrumAnalysis:
         """Method which compute the spectrum and fill the object attributes"""
         # Compute spectrogram
         frameshift = int(self._frameshift * self._wav[1])
-        framelength = int(0.045 * self._wav[1])
-        self._fft_len = 1024
+        # framelength = frameshift
+        framelength = self._fft_len
 
         if self._mel_scale:
             sp = librosa.feature.melspectrogram(
                 self._wav[0],
                 n_fft=self._fft_len * 2,
-                n_mels=self._fft_len,
+                n_mels=80,
                 hop_length=frameshift,
                 center=False,
                 window=self._window,
@@ -87,7 +87,6 @@ class SpectrumAnalysis:
         # Post processing
         sp = np.abs(sp)
         sp = sp / np.max(sp)
-        # sp = np.log2(abs(sp))
         sp = librosa.amplitude_to_db(abs(sp))
 
         # tata
