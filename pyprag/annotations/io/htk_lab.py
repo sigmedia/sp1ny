@@ -12,9 +12,6 @@ DESCRIPTION
 LICENSE
 """
 
-# Linear algebra
-import numpy as np
-
 # Regular expression
 import re
 
@@ -31,13 +28,15 @@ HTK_UNIT = 10000000
 # Classes
 ###############################################################################
 
+
 class HTKAnnotation(AnnotationLoader):
     """Class to load annotations from HTK Label files
 
     Attributes
     ----------
     segments : dict
-        A dictionary (containing only one key: "default") whose values are list of segments. Each segment is represented by a tuple (start, end, label)
+        A dictionary (containing only one key: "default") whose values are list of segments.
+        Each segment is represented by a tuple (start, end, label)
 
     reference : list
         The default tier (so a list of segments!)
@@ -65,10 +64,10 @@ class HTKAnnotation(AnnotationLoader):
         self.segments = dict()
         self.segments["default"] = []
         with open(htk_file) as f:
-            for l in f:
+            for line in f:
                 # Preprocess
-                l = l.strip()
-                elts = l.split()
+                line = line.strip()
+                elts = line.split()
                 assert len(elts) == 3
 
                 # Convert to seconds
@@ -76,11 +75,11 @@ class HTKAnnotation(AnnotationLoader):
                 elts[1] = int(elts[1]) / HTK_UNIT
 
                 # Extract monophone label
-                m = re.search('-(.+?)\+', elts[2])
+                m = re.search("-(.+?)\\+", elts[2])
                 if m:
                     elts[2] = m.group(1)
                 else:
-                    m = re.search('([a-zA-Z][a-zA-Z0-9]*)$', elts[2])
+                    m = re.search("([a-zA-Z][a-zA-Z0-9]*)$", elts[2])
                     if m:
                         elts[2] = m.group(1)
                     else:

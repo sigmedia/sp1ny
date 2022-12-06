@@ -111,7 +111,8 @@ class WavDock(Dock):
             The data to render
 
         wav : tuple(np.array, int)
-            The signal information as loaded using librosa. The tuple contain an array of samples and the sample rate.
+            The signal information as loaded using librosa.
+            The tuple contain an array of samples and the sample rate.
 
         frameshift : float
             The frameshift used to extract the data from the signal

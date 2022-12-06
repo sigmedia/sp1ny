@@ -11,9 +11,6 @@ DESCRIPTION
 
 LICENSE
 """
-# Regular expression
-import re
-
 # Textgrid utilities
 import tgt
 
@@ -23,6 +20,7 @@ from . import AnnotationLoader
 ###############################################################################
 # Classes
 ###############################################################################
+
 
 class TGTAnnotation(AnnotationLoader):
     """Class to load annotations from TextGrid files

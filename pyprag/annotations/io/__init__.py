@@ -46,4 +46,4 @@ class AnnotationLoader:
             reference = list(self.segments.keys())[0]
 
         self.reference = self.segments[reference]
-        self.logger.debug("The reference tier is \"%s\"" % reference)
+        self.logger.debug('The reference tier is "%s"' % reference)

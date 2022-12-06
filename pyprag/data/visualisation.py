@@ -113,6 +113,9 @@ class DataDock(Dock):
         """
         Dock.__init__(self, name=name, size=size)
 
+        # Override the label
+        self.label.sigClicked.connect(self.mouseClicked)
+
         self.data = data
         self.wav = wav
         # max_dur = self.data.shape[0] * frameshift
@@ -142,7 +145,7 @@ class DataDock(Dock):
             self.data,
             frameshift,
             ticks,
-            self.wav[1] / 2.0,  # NOTE: max_y is imposed to be nyquist!
+            self.wav[1] / 2.0,  # FIXME: max_y is imposed to be nyquist!
             name="%s coef" % self.name,
             wav=self.wav,
         )
@@ -152,3 +155,6 @@ class DataDock(Dock):
         # Add plot
         # self.data_plot.disableAutoRange()
         self.addWidget(self.data_plot)
+
+    def mouseClicked(self):
+        pass

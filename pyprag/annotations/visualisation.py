@@ -4,6 +4,7 @@ from pyqtgraph.dockarea import Dock
 
 from pyprag.gui.items import SegmentItem
 
+
 class AnnotationDock(Dock):
     """Dock containing annotation informations
 
@@ -13,12 +14,14 @@ class AnnotationDock(Dock):
         The annotation loader object
 
     wav : tuple(np.array, int)
-        The signal information as loaded using librosa. The tuple contain an array of samples and the sample rate.
+        The signal information as loaded using librosa.
+        The tuple contain an array of samples and the sample rate.
 
     reference_plot : pg.PlotWidget
         The reference annotation tier rendering as we have a plot per tier
 
     """
+
     def __init__(self, name, size, annotation, wav):
         """
         Parameters
@@ -30,7 +33,8 @@ class AnnotationDock(Dock):
             The annotation loader object
 
         wav : tuple(np.array, int)
-            The signal information as loaded using librosa. The tuple contain an array of samples and the sample rate
+            The signal information as loaded using librosa.
+            The tuple contain an array of samples and the sample rate
 
         """
         Dock.__init__(self, name=name, size=size)
@@ -38,7 +42,6 @@ class AnnotationDock(Dock):
         # Define some attributes
         self.annotation = annotation
         self.wav = wav
-
 
         # Prepare scrolling support
         self.scroll = QtGui.QScrollArea()
@@ -55,12 +58,10 @@ class AnnotationDock(Dock):
         # Render everything
         self.__plotAnnotation()
 
-
     def __plotAnnotation(self):
-        """Helper to render the annotations
-        """
+        """Helper to render the annotations"""
         lim_factor = 1.1
-        T_max = self.wav[0].shape[0]/self.wav[1]
+        T_max = self.wav[0].shape[0] / self.wav[1]
         for k in self.annotation.segments:
             annotation_plot = pg.PlotWidget(name="%s_%s" % (self.name(), k))
             annotation_plot.disableAutoRange()
@@ -71,24 +72,23 @@ class AnnotationDock(Dock):
                 seg = AnnotationItem(elt, self.wav)
                 annotation_plot.addItem(seg)
 
-
             if T_max < self.annotation.segments[k][-1][1]:
                 T_max = self.annotation.segments[k][-1][1]
 
             self.vbox.addWidget(annotation_plot)
 
         # Define the last annotation as the reference one
-        index = self.vbox.count()-1
+        index = self.vbox.count() - 1
         self.reference_plot = self.vbox.itemAt(index).widget()
-        self.reference_plot.setLimits(xMax=T_max*lim_factor)
-        self.reference_plot.hideAxis('bottom')
+        self.reference_plot.setLimits(xMax=T_max * lim_factor)
+        self.reference_plot.hideAxis("bottom")
 
         # Lock everything else to the reference
         for i in range(index):
             w = self.vbox.itemAt(i).widget()
-            w.hideAxis('bottom')
+            w.hideAxis("bottom")
             w.setXLink(self.reference_plot)
-            w.setLimits(xMax=T_max*lim_factor)
+            w.setLimits(xMax=T_max * lim_factor)
 
 
 class AnnotationItem(SegmentItem):
@@ -111,7 +111,8 @@ class AnnotationItem(SegmentItem):
             the segment information (start, end, label)
 
         wav : tuple(np.array, int), optional
-            The signal information as loaded using librosa. The tuple contain an array of samples and the sample rate. (default: None)
+            The signal information as loaded using librosa.
+            The tuple contain an array of samples and the sample rate. (default: None)
 
         showLabel : bool, optional
             Show the label (or not). (default: True)
@@ -126,11 +127,10 @@ class AnnotationItem(SegmentItem):
         hover_brush = QtGui.QBrush(QtGui.QColor(0, 0, 255, 100))
         self.setHoverBrush(hover_brush)
 
-
         # Add label
         if showLabel:
-            text = pg.TextItem(text=self.label,anchor=(0.5,0.5))
-            text.setPos((self.end+self.start)/2, 0.5)
+            text = pg.TextItem(text=self.label, anchor=(0.5, 0.5))
+            text.setPos((self.end + self.start) / 2, 0.5)
             text.setParentItem(self)
 
     def hoverEvent(self, ev):

@@ -28,164 +28,26 @@ import numpy as np
 # Audio, dsp
 import librosa
 
-# Plotting & rendering
-from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
-import pyqtgraph as pg
+from pyqtgraph.Qt import QtGui
 
 # Signal processing helpers
-from pyprag.components.spectrum.core import SpectrumAnalysis
+from pyprag.plugins.spectrum import SpectrumExtractor
+from pyprag.plugins.spectrum import SpectrogramPlotWidget
 
 # Annotation
-from pyprag.components.annotations import HTKAnnotation, TGTAnnotation
+from pyprag.annotations import HTKAnnotation, TGTAnnotation
 
-# GUI
-from pyprag.gui.one_shot import OneShotArea
-from pyprag.components.wav.control import PlayerWidget
-from pyprag.gui.control_panels.signal import EqWidget
-
+from pyprag.gui import build_gui
 
 ###############################################################################
 # global constants
 ###############################################################################
 LEVEL = [logging.WARNING, logging.INFO, logging.DEBUG]
 
-# Interpret image data as row-major instead of col-major
-pg.setConfigOptions(imageAxisOrder="row-major")
-
 
 ###############################################################################
 # Functions
 ###############################################################################
-class GUIVisu(QtGui.QMainWindow):
-    def __init__(self, infos, frameshift, annotation):
-        super().__init__()
-
-        self._wav = infos[0]
-        self._coef = infos[1]
-        self._filename = infos[2]
-
-        ##########################################
-        # Setup the Menubar
-        ##########################################
-        menuBar = self.menuBar()
-        file_menu = QtWidgets.QMenu("&File", self)
-
-        # Add open shortcut
-        self.openAction = QtWidgets.QAction("&Open wav...", self)
-        self.openAction.triggered.connect(self.openFile)
-        self.openAction.setShortcut("Ctrl+o")
-        file_menu.addAction(self.openAction)
-
-        # Add exit shortcut!
-        self.exitAction = QtGui.QAction(("E&xit"), self)
-        self.exitAction.setShortcut(QtGui.QKeySequence("Ctrl+Q"))
-        self.addAction(self.exitAction)
-        self.exitAction.triggered.connect(self.close)
-        file_menu.addAction(self.exitAction)
-        menuBar.addMenu(file_menu)
-
-        ##########################################
-        # Setup the toolbar
-        ##########################################
-        player_toolbar = self.addToolBar("Player")
-        player_widget = PlayerWidget(self._filename, self._wav)
-        player_toolbar.addWidget(player_widget)
-
-        ##########################################
-        # Setup the status bar
-        ##########################################
-        self.statusbar = self.statusBar()
-        self._filename_label = QtWidgets.QLabel(self._filename)
-        self.statusbar.addPermanentWidget(self._filename_label)
-
-        ##########################################
-        # Define the left part of the window
-        ##########################################
-        self._plot_area = OneShotArea(self._wav, self._coef, frameshift, annotation)
-        left_layout = QtWidgets.QVBoxLayout()
-        left_layout.addWidget(self._plot_area)
-
-        ##########################################
-        # Define the right part of the window
-        ##########################################
-        right_layout = QtWidgets.QVBoxLayout()
-
-        # Initialize tab screen
-        tabs = QtWidgets.QTabWidget()
-        tab1 = QtWidgets.QWidget()
-        tabs.addTab(tab1, "Signal")
-        cur_layout = QtWidgets.QVBoxLayout(self)
-        eq_widget = EqWidget(self, self._wav)
-        cur_layout.addWidget(eq_widget)
-        tab1.setLayout(cur_layout)
-
-        tab2 = QtWidgets.QWidget()
-        tabs.addTab(tab2, "Text")
-        right_layout.addWidget(tabs)
-
-        ##########################################
-        # Finalize the main part layout
-        ##########################################
-        main_layout = QtWidgets.QHBoxLayout()
-        main_layout.addLayout(left_layout, 10)
-        main_layout.addLayout(right_layout, 2)
-
-        ##########################################
-        # Set the window layout
-        ##########################################
-        cent_widget = QtWidgets.QWidget()
-        cent_widget.setLayout(main_layout)
-        self.setCentralWidget(cent_widget)
-
-    def openFile(self):
-        options = QtGui.QFileDialog.Options()
-        options |= QtGui.QFileDialog.DontUseNativeDialog
-        # NOTE: how to concatente filters: "All Files (*);;Wav Files (*.wav)"
-        filename, _ = QtGui.QFileDialog.getOpenFileName(
-            self, "Loading wav file", "", "Wav Files (*.wav)", options=options
-        )
-        if filename:
-            self._filename_label.setText(filename)
-
-
-def define_palette(app):
-    app.setStyle("Fusion")
-
-    dark_palette = QtGui.QPalette()
-
-    dark_palette.setColor(QtGui.QPalette.Window, QtGui.QColor(53, 53, 53))
-    dark_palette.setColor(QtGui.QPalette.WindowText, QtCore.Qt.white)
-    dark_palette.setColor(QtGui.QPalette.Base, QtGui.QColor(25, 25, 25))
-    dark_palette.setColor(QtGui.QPalette.AlternateBase, QtGui.QColor(53, 53, 53))
-    dark_palette.setColor(QtGui.QPalette.ToolTipBase, QtCore.Qt.white)
-    dark_palette.setColor(QtGui.QPalette.ToolTipText, QtCore.Qt.white)
-    dark_palette.setColor(QtGui.QPalette.Text, QtCore.Qt.white)
-    dark_palette.setColor(QtGui.QPalette.Button, QtGui.QColor(53, 53, 53))
-    dark_palette.setColor(QtGui.QPalette.ButtonText, QtCore.Qt.white)
-    dark_palette.setColor(QtGui.QPalette.BrightText, QtCore.Qt.red)
-    dark_palette.setColor(QtGui.QPalette.Link, QtGui.QColor(42, 130, 218))
-    dark_palette.setColor(QtGui.QPalette.Highlight, QtGui.QColor(42, 130, 218))
-    dark_palette.setColor(QtGui.QPalette.HighlightedText, QtCore.Qt.black)
-
-    app.setPalette(dark_palette)
-
-    app.setStyleSheet("QToolTip { color: #ffffff; background-color: #2a82da; border: 1px solid white; }")
-
-
-def build_gui(infos, frameshift, annotation=None):
-
-    # Generate application
-    app = QtGui.QApplication(["PyPraG"])
-    define_palette(app)
-    win = GUIVisu(infos, frameshift, annotation)
-    win.setWindowTitle("PyPraG")
-
-    # Start the application
-    win.show()
-    if (sys.flags.interactive != 1) or not hasattr(QtCore, "PYQT_VERSION"):
-        app.exec()
-
-
 def entry_point(args, logger):
     """Main entry function"""
 
@@ -236,13 +98,15 @@ def entry_point(args, logger):
     # ### [/ Equalizer]
     # ##############################################################################
 
+    app = QtGui.QApplication(["PyPraG"])
+
     # Compute spectrum
     coef_matrix = None
     if args.coefficient_file == "":
         if wav is not None:
             logger.info("Compute spectrogram")
-            sp_analyzer = SpectrumAnalysis(wav, frameshift=frameshift, mel_scale=False)
-            coef_matrix = sp_analyzer._spectrum
+            sp_analyzer = SpectrumExtractor(wav[0], wav[1], frameshift=frameshift)
+            sp_widget = SpectrogramPlotWidget(sp_analyzer)
     else:
         logger.info("Loading coefficient file")
         if args.dimension is None:
@@ -267,8 +131,8 @@ def entry_point(args, logger):
 
     # Generate window
     logger.info("Rendering")
-    infos = (wav, coef_matrix, args.wav_file)
-    build_gui(infos, frameshift, annotation)
+    infos = (wav, sp_widget, args.wav_file)
+    build_gui(app, infos, frameshift, annotation)
 
 
 def main():
@@ -292,7 +156,7 @@ def main():
         type=int,
         help="The dimension of the coefficient vector (negative shape is assumed to be (-1, d), positive (d, -1))",
     )
-    parser.add_argument("-f", "--frameshift", default=5, type=int, help="The frameshift in milliseconds")
+    parser.add_argument("-f", "--frameshift", default=5, type=float, help="The frameshift in milliseconds")
     parser.add_argument("-w", "--wav_file", default="", type=str, help="The wave file")
 
     # Parsing arguments
