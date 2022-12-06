@@ -32,6 +32,7 @@ from pyqtgraph.Qt import QtGui
 
 # Signal processing helpers
 from pyprag.plugins.spectrum import SpectrumExtractor
+from pyprag.plugins.spectrum import SpectrumController
 from pyprag.plugins.spectrum import SpectrogramPlotWidget
 
 # Annotation
@@ -105,8 +106,9 @@ def entry_point(args, logger):
     if args.coefficient_file == "":
         if wav is not None:
             logger.info("Compute spectrogram")
-            sp_analyzer = SpectrumExtractor(wav[0], wav[1], frameshift=frameshift)
-            sp_widget = SpectrogramPlotWidget(sp_analyzer)
+            sp_extractor = SpectrumExtractor(wav[0], wav[1], frameshift=frameshift)
+            sp_widget = SpectrogramPlotWidget(sp_extractor)
+            sp_controller = SpectrumController(sp_extractor, sp_widget)
     else:
         logger.info("Loading coefficient file")
         if args.dimension is None:
@@ -131,7 +133,7 @@ def entry_point(args, logger):
 
     # Generate window
     logger.info("Rendering")
-    infos = (wav, sp_widget, args.wav_file)
+    infos = (wav, sp_controller, args.wav_file)
     build_gui(app, infos, frameshift, annotation)
 
 

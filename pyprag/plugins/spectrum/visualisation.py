@@ -49,8 +49,9 @@ class SpectrogramPlotWidget(pg.PlotWidget):
         self.enableMouse(False)
 
         self._spectrum_extractor = spectrum_extractor
+        self.refresh()
 
-        # Generate image data
+    def refresh(self):
         self._img = pg.ImageItem()
         self._img.setImage(self._spectrum_extractor._spectrum.T)
 
@@ -64,7 +65,7 @@ class SpectrogramPlotWidget(pg.PlotWidget):
         self._img.scale(self._spectrum_extractor._frameshift, y_scale)
 
         # Generate plot
-        self.plotItem = SelectablePlotItem(**kwargs)
+        self.plotItem = SelectablePlotItem()
         self.plotItem.getViewBox().addItem(self._img)
         self.setCentralItem(self.plotItem)
 

@@ -32,7 +32,7 @@ class GUIVisu(QtGui.QMainWindow):
         super().__init__()
 
         self._wav = infos[0]
-        self._coef = infos[1]
+        self._controller = infos[1]
         self._filename = infos[2]
 
         ##########################################
@@ -72,7 +72,7 @@ class GUIVisu(QtGui.QMainWindow):
         ##########################################
         # Define the left part of the window
         ##########################################
-        self._plot_area = OneShotArea(self._wav, self._coef, frameshift, annotation)
+        self._plot_area = OneShotArea(self._wav, self._controller, frameshift, annotation)
         left_layout = QtWidgets.QVBoxLayout()
         left_layout.addWidget(self._plot_area)
 
@@ -86,6 +86,7 @@ class GUIVisu(QtGui.QMainWindow):
         tab1 = QtWidgets.QWidget()
         tabs.addTab(tab1, "Data/Visualization")
         cur_layout = QtWidgets.QVBoxLayout(self)
+        self._controller.addLayoutToPanel(cur_layout)
         # eq_widget = EqWidget(self, self._wav)
         # cur_layout.addWidget(eq_widget)
         tab1.setLayout(cur_layout)

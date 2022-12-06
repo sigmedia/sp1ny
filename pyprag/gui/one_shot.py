@@ -89,7 +89,7 @@ class OneShotArea(DockArea):
         The color map ticks
     """
 
-    def __init__(self, wav, data_widget, frameshift, annotation=None, color_map=matplotlib.cm.bone):
+    def __init__(self, wav, data_controller, frameshift, annotation=None, color_map=matplotlib.cm.bone):
         """
         Parameters
         ----------
@@ -127,9 +127,9 @@ class OneShotArea(DockArea):
         lut = cmap.getLookupTable(0.0, 1.0, 10)
         ticks = list(enumerate(lut))
         self.ticks = [(ticks[i][0] / ticks[-1][0], ticks[i][1]) for i in range(len(ticks))]
-        self.__fill(data_widget=data_widget)
+        self.__fill(data_controller=data_controller)
 
-    def __fill(self, data_widget):
+    def __fill(self, data_controller):
         """Helper to fill the dock area"""
         # Generate wav part
         self.logger.debug("Plot waveform part")
@@ -137,9 +137,9 @@ class OneShotArea(DockArea):
 
         # Generate data part
         self.logger.debug("Plot coefficient part")
-        data_widget.setTicks(self.ticks)
+        data_controller._widget.setTicks(self.ticks)
         dock_coef = DataDock(
-            data_widget,
+            data_controller._widget,
             "Spectrum",
             (950, 200),  # FIXME: deal with label name
         )
