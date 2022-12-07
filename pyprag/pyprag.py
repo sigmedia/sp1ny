@@ -22,9 +22,6 @@ import argparse
 # Messaging/logging
 import logging
 
-# Linear algebra
-import numpy as np
-
 # Audio, dsp
 import librosa
 
@@ -37,8 +34,8 @@ app = QtGui.QApplication(["PyPraG"])
 try:
     from pyprag.annotations import HTKAnnotation, TGTAnnotation
     from pyprag.gui import build_gui
-except Exception:
-    pass
+except Exception as ex:
+    raise ex
 
 ###############################################################################
 # global constants
@@ -68,21 +65,11 @@ def entry_point(args, logger):
     # Convert frameshift from ms to s
     frameshift = args.frameshift / 1000
 
-    # Compute spectrum
-    coef_matrix = None
-    if args.coefficient_file == "":
-        if wav is not None:
-            logger.info("Compute spectrogram")
-    else:
-        logger.info("Loading coefficient file")
-        if args.dimension is None:
-            raise Exception("The coefficient file is given but not the dimension of the coefficient vector")
+    # Check with data
+    if args.coefficient_file:
+        from pyprag.core.data import controller
 
-        coef_matrix = np.fromfile(args.coefficient_file, dtype=np.float32)
-        if args.dimension < 0:
-            coef_matrix = coef_matrix.reshape((-1, -args.dimension))
-        else:
-            coef_matrix = coef_matrix.reshape((args.dimension, -1)).T
+        controller.loadCoefficientFile(args.coefficient_file, args.dimension, frameshift)
 
     # Load annotation
     logger.info("Load annotation")

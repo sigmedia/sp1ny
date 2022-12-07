@@ -27,7 +27,7 @@ from .player import player
 ###############################################################################
 
 
-class SelectableWavPlotWidget(pg.PlotWidget):
+class WavPlotWidget(pg.PlotWidget):
     """Image plot widget allowing to highlight some regions
 
     Attributes
@@ -40,7 +40,7 @@ class SelectableWavPlotWidget(pg.PlotWidget):
 
     """
 
-    def __init__(self, wav, parent=None, background="default", **kwargs):
+    def __init__(self, parent=None, background="default", **kwargs):
         """
         Parameters
         ----------
@@ -62,14 +62,13 @@ class SelectableWavPlotWidget(pg.PlotWidget):
         super().__init__(parent=parent, background=background)
 
         # Save reference to wav
-        self._wav = wav
-        x = np.arange(self._wav[0].shape[0]) / self._wav[1]
+        x = np.arange(player._data.shape[0]) / player._sampling_rate
 
         # Prepare plot item
         self.plotItem = SelectablePlotItem(lock_y_axis=True, **kwargs)
         self.setCentralItem(self.plotItem)
-        self.plotItem.plot(x, self._wav[0])
-        self.plotItem.setXRange(0, self._wav[0].shape[0] / self._wav[1], padding=0)
+        self.plotItem.plot(x, player._data.squeeze())  # FIXME: duplicate things, find a way to get rid of this!
+        self.plotItem.setXRange(0, player._data.shape[0] / player._sampling_rate, padding=0)
         v_bar = pg.InfiniteLine(pos=0, movable=False, angle=90, pen=pg.mkPen({"color": "#F00", "width": 2}))
 
         def _update_position_handler(position):
@@ -122,9 +121,6 @@ class WavDock(Dock):
 
         """
         Dock.__init__(self, name=name, size=size)
-
-        self.wav = wav
-
         self.__plotWav()
 
         # Label space
@@ -140,5 +136,5 @@ class WavDock(Dock):
           that the annotations require more space than the waveform
         """
 
-        self.wav_plot = SelectableWavPlotWidget(self.wav, name="%s waveform" % self.name)
+        self.wav_plot = WavPlotWidget(name="%s waveform" % self.name)
         self.addWidget(self.wav_plot)

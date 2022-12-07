@@ -1,5 +1,5 @@
 from pyqtgraph.Qt import QtWidgets
-from pyprag.gui.core import DataController
+from pyprag.core import DataController
 
 
 class SpectrumController(DataController):
@@ -8,9 +8,10 @@ class SpectrumController(DataController):
         self._extractor = extractor
         self._widget = widget
 
-    def setWav(self, wav, sampling_rate):
+    def setWav(self, wav, sampling_rate, wav_plot):
         assert wav is not None
         self._extractor.setWav(wav, sampling_rate)
+        self._wav_plot = wav_plot
 
     def extract(self):
         self._extractor._cutoff = (int(self._wMinFreq.text()), int(self._wMaxFreq.text()))

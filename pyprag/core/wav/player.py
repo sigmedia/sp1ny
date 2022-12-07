@@ -56,13 +56,13 @@ class Player(metaclass=Singleton):
         if len(self._data.shape) < 2:
             self._data = np.expand_dims(self._data, axis=1)
 
-    def loadNewWav(self, wav_data, sr):
+    def loadNewWav(self, wav_data, sampling_rate):
         # First be sure everything is stopped
         if self._is_playing:
             self.stop()
 
         # Load the wav data
-        self._sr = sr
+        self._sampling_rate = sampling_rate
         self.setWavData(wav_data)
 
     def play(self, wav_data=None, start=0, end=-1):
@@ -73,7 +73,7 @@ class Player(metaclass=Singleton):
         sig_array : np.array
            The signal samples
 
-        sr : int
+        sampling_rate : int
            The sample rate
 
         viewBox: pg.pyqtgraph.ViewBox
@@ -93,8 +93,8 @@ class Player(metaclass=Singleton):
         if end == -1:
             end = self._data.shape[0]
         else:
-            start = int(start * self._sr)
-            end = int(end * self._sr)
+            start = int(start * self._sampling_rate)
+            end = int(end * self._sampling_rate)
 
         new_thread = threading.Thread(target=self.play_handler, args=(start, end))
         new_thread.start()
@@ -138,7 +138,11 @@ class Player(metaclass=Singleton):
             #     f(pos)
 
         stream = sd.OutputStream(
-            samplerate=self._sr, device=None, channels=data.shape[1], callback=callback, finished_callback=event.set
+            samplerate=self._sampling_rate,
+            device=None,
+            channels=data.shape[1],
+            callback=callback,
+            finished_callback=event.set,
         )
         with stream:
             event.wait()  # Wait until playback is finished

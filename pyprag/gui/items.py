@@ -14,7 +14,7 @@ LICENSE
 
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui
-from pyprag.wav import player
+from pyprag.core import player
 
 
 ###############################################################################

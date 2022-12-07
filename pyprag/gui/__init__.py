@@ -20,11 +20,9 @@ import pyqtgraph as pg
 
 # GUI
 from .one_shot import OneShotArea
-from ..wav.control import PlayerWidget
+from ..core.wav import PlayerControllerWidget
 from ..core import plugin_entry_list
 
-
-from pyprag.plugins.spectrum import controller as sp_controller
 
 # Interpret image data as row-major instead of col-major
 pg.setConfigOptions(imageAxisOrder="row-major")
@@ -61,7 +59,7 @@ class GUIVisu(QtGui.QMainWindow):
         # Setup the toolbar
         ##########################################
         player_toolbar = self.addToolBar("Player")
-        player_widget = PlayerWidget(self._filename, self._wav)
+        player_widget = PlayerControllerWidget(self._filename, self._wav)
         player_toolbar.addWidget(player_widget)
 
         ##########################################
@@ -70,13 +68,6 @@ class GUIVisu(QtGui.QMainWindow):
         self.statusbar = self.statusBar()
         self._filename_label = QtWidgets.QLabel(self._filename)
         self.statusbar.addPermanentWidget(self._filename_label)
-
-        ##########################################
-        # Define the left part of the window
-        ##########################################
-        self._plot_area = OneShotArea(self._wav, frameshift, annotation)
-        left_layout = QtWidgets.QVBoxLayout()
-        left_layout.addWidget(self._plot_area)
 
         ##########################################
         # Define the right part of the window
@@ -88,11 +79,12 @@ class GUIVisu(QtGui.QMainWindow):
         tab1 = QtWidgets.QWidget()
         tabs.addTab(tab1, "Data/Visualization")
         cur_layout = QtWidgets.QVBoxLayout(self)
-        sp_controller.addLayoutToPanel(cur_layout)
+
+        controller = plugin_entry_list[0]
+        controller.addLayoutToPanel(cur_layout)
         self._plugin_list = QtWidgets.QListWidget(self)
         for elt in plugin_entry_list:
             self._plugin_list.addItem(QtWidgets.QListWidgetItem(elt._name))
-        sp_controller.extract()
         cur_layout.addWidget(self._plugin_list)
 
         tab1.setLayout(cur_layout)
@@ -104,6 +96,14 @@ class GUIVisu(QtGui.QMainWindow):
         tabs.addTab(tab2, "Wav/Signal")
 
         right_layout.addWidget(tabs)
+
+        ##########################################
+        # Define the left part of the window
+        ##########################################
+        self._plot_area = OneShotArea(self._wav, frameshift, annotation)
+        left_layout = QtWidgets.QVBoxLayout()
+        left_layout.addWidget(self._plot_area)
+        controller.extract()
 
         ##########################################
         # Finalize the main part layout

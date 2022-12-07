@@ -6,7 +6,7 @@ from pyqtgraph.Qt import QtGui
 from pyprag.gui.items import SelectablePlotItem
 
 
-class SpectrogramPlotWidget(pg.PlotWidget):
+class RawDataPlotWidget(pg.PlotWidget):
     """Image plot widget allowing to highlight some regions
 
     Attributes
@@ -21,7 +21,7 @@ class SpectrogramPlotWidget(pg.PlotWidget):
         The histogram widget to control the image colorimetrie
     """
 
-    def __init__(self, spectrum_extractor, parent=None, background="default", **kwargs):
+    def __init__(self, data_extractor, parent=None, background="default", **kwargs):
         """
         Parameters
         ----------
@@ -48,20 +48,14 @@ class SpectrogramPlotWidget(pg.PlotWidget):
         self.setSizePolicy(QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Expanding)
         self.enableMouse(False)
 
-        self._spectrum_extractor = spectrum_extractor
+        # Save reference to data
+        self._data_extractor = data_extractor
 
     def refresh(self):
         self._img = pg.ImageItem()
-        self._img.setImage(self._spectrum_extractor._spectrum.T)
+        self._img.setImage(self._data_extractor._data.T)
 
-        # 1. translate to the minimal frequency
-        min_y = self._spectrum_extractor._cutoff[0]
-        self._img.translate(0, min_y)
-
-        # 2. scale
-        y_scale = self._spectrum_extractor._cutoff[1] - self._spectrum_extractor._cutoff[0]
-        y_scale /= self._spectrum_extractor._spectrum.shape[1]
-        self._img.scale(self._spectrum_extractor._frameshift, y_scale)
+        self._img.scale(self._data_extractor._frameshift, 1)
 
         # Generate plot
         self.plotItem = SelectablePlotItem()

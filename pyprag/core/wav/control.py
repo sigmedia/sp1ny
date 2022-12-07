@@ -6,7 +6,7 @@ from pyqtgraph.Qt import QtWidgets
 from .player import player
 
 
-class PlayerWidget(QtWidgets.QWidget):
+class PlayerControllerWidget(QtWidgets.QWidget):
     """ """
 
     BUTTON_GLYPHS = ("▶", "⏯", "⏹", "Loop") if system() != "Windows" else ("▶️", "⏯️", "⏹️", "Loop️")
@@ -15,28 +15,28 @@ class PlayerWidget(QtWidgets.QWidget):
         super().__init__(parent, **kwargs)
 
         self._filename = filename
-        self._wav = wav
+        player.loadNewWav(wav[0], wav[1])
 
         # Define play button
-        bPlay = QtWidgets.QPushButton(PlayerWidget.BUTTON_GLYPHS[0], self)
+        bPlay = QtWidgets.QPushButton(PlayerControllerWidget.BUTTON_GLYPHS[0], self)
         bPlay.clicked.connect(self.play)
         bPlay.setDefault(False)
         bPlay.setAutoDefault(False)
 
         # Define stop button
-        bPause = QtWidgets.QPushButton(PlayerWidget.BUTTON_GLYPHS[1], self)
+        bPause = QtWidgets.QPushButton(PlayerControllerWidget.BUTTON_GLYPHS[1], self)
         bPause.clicked.connect(self.pause)
         bPause.setDefault(False)
         bPause.setAutoDefault(False)
 
         # Define stop button
-        bStop = QtWidgets.QPushButton(PlayerWidget.BUTTON_GLYPHS[2], self)
+        bStop = QtWidgets.QPushButton(PlayerControllerWidget.BUTTON_GLYPHS[2], self)
         bStop.clicked.connect(self.stop)
         bStop.setDefault(False)
         bStop.setAutoDefault(False)
 
         # Define loop button
-        bLoop = QtWidgets.QPushButton(PlayerWidget.BUTTON_GLYPHS[3], self)
+        bLoop = QtWidgets.QPushButton(PlayerControllerWidget.BUTTON_GLYPHS[3], self)
         bLoop.clicked.connect(self.loop)
         bLoop.setDefault(False)
         bLoop.setAutoDefault(False)
@@ -48,12 +48,10 @@ class PlayerWidget(QtWidgets.QWidget):
         player_layout.addWidget(bLoop)
         self.setLayout(player_layout)
 
-        player.loadNewWav(self._wav[0], self._wav[1])  # FIXME: we should find a way to get rid of the filename
-
         # player.add_position_handler(self.update_position)
 
     def update_position(self, position):
-        print(f"{float(position) / self._wav[1]}", end="\r")
+        print(f"{float(position) / player._sampling_rate}", end="\r")
 
     def play(self):
         # Play subpart
