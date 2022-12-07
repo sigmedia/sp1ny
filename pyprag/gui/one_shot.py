@@ -27,7 +27,6 @@ from pyprag.gui.utils import cmapToColormap
 from pyprag.core.wav.visualisation import WavDock
 from pyprag.annotations.visualisation import AnnotationDock
 from pyprag.core import DataDock
-from pyprag.core import plugin_entry_list
 
 #####################################################################################################
 # Classes
@@ -97,19 +96,17 @@ class OneShotArea(DockArea):
         """Helper to fill the dock area"""
         # Generate wav part
         self.logger.debug("Plot waveform part")
-        dock_wav = WavDock("Signal", (950, 20), self.wav)
+        self._dock_wav = WavDock("Signal", (950, 20), self.wav)
 
         # Generate data part
         self.logger.debug("Plot coefficient part")
 
-        controller = plugin_entry_list[0]
-        controller.setWav(self.wav[0], self.wav[1], dock_wav.wav_plot)
-        controller.extract()
-        controller._widget.setTicks(self.ticks)
-        dock_coef = DataDock(
-            controller._widget,
-            controller._name,
-            (950, 200),  # FIXME: deal with label name
+        # controller = plugin_entry_list[0]
+        # controller.setWav(self.wav[0], self.wav[1], dock_wav.wav_plot)
+        # controller.extract()
+        # controller._widget.setTicks(self.ticks)
+        self._dock_coef = DataDock(
+            (950, 200),
         )
 
         # Generate annotation part
@@ -121,15 +118,20 @@ class OneShotArea(DockArea):
 
         # Link X-Axis
         self.logger.debug("Link everything")
-        dock_wav.wav_plot.setLabel("bottom", "Time", units="s")
+        self._dock_wav.wav_plot.setLabel("bottom", "Time", units="s")
         if self.annotation is not None:
-            dock_align.reference_plot.setXLink(dock_wav.wav_plot)
+            dock_align.reference_plot.setXLink(self._dock_wav.wav_plot)
 
         # - Add docks
         self.logger.debug("Add docks to the area")
-        self.addDock(dock_wav, "left")
+        self.addDock(self._dock_wav, "left")
         if self.annotation is not None:
-            self.addDock(dock_align, "top", dock_wav)
-            self.addDock(dock_coef, "top", dock_align)
+            self.addDock(dock_align, "top", self._dock_wav)
+            self.addDock(self._dock_coef, "top", dock_align)
         else:
-            self.addDock(dock_coef, "top", dock_wav)
+            self.addDock(self._dock_coef, "top", self._dock_wav)
+
+    def selectPlugin(self, controller):
+        controller.setWav(self.wav[0], self.wav[1], self._dock_wav.wav_plot)
+        controller.extract()
+        self._dock_coef.setWidget(controller._widget, controller._name)

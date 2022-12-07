@@ -21,8 +21,8 @@ import pyqtgraph as pg
 # GUI
 from .one_shot import OneShotArea
 from ..core.wav import PlayerControllerWidget
-from ..core import plugin_entry_list
-
+from ..core import plugin_entry_dict
+from ..core import spectrum  # noqa: F401
 
 # Interpret image data as row-major instead of col-major
 pg.setConfigOptions(imageAxisOrder="row-major")
@@ -78,16 +78,19 @@ class GUIVisu(QtGui.QMainWindow):
         tabs = QtWidgets.QTabWidget()
         tab1 = QtWidgets.QWidget()
         tabs.addTab(tab1, "Data/Visualization")
-        cur_layout = QtWidgets.QVBoxLayout(self)
+        self._control_layout = QtWidgets.QVBoxLayout(self)
 
-        controller = plugin_entry_list[0]
-        controller.addLayoutToPanel(cur_layout)
+        # Populate the list of plugins
         self._plugin_list = QtWidgets.QListWidget(self)
-        for elt in plugin_entry_list:
-            self._plugin_list.addItem(QtWidgets.QListWidgetItem(elt._name))
-        cur_layout.addWidget(self._plugin_list)
+        for elt in plugin_entry_dict:
+            self._plugin_list.addItem(QtWidgets.QListWidgetItem(elt))
+        self._plugin_list.currentItemChanged.connect(self.selectPlugin)
+        self._control_layout.addWidget(self._plugin_list)
 
-        tab1.setLayout(cur_layout)
+        place_holder = QtWidgets.QVBoxLayout()
+        self._control_layout.addLayout(place_holder)
+
+        tab1.setLayout(self._control_layout)
 
         tab2 = QtWidgets.QWidget()
         tabs.addTab(tab2, "Annotations")
@@ -103,7 +106,6 @@ class GUIVisu(QtGui.QMainWindow):
         self._plot_area = OneShotArea(self._wav, frameshift, annotation)
         left_layout = QtWidgets.QVBoxLayout()
         left_layout.addWidget(self._plot_area)
-        controller.extract()
 
         ##########################################
         # Finalize the main part layout
@@ -128,6 +130,16 @@ class GUIVisu(QtGui.QMainWindow):
         )
         if filename:
             self._filename_label.setText(filename)
+
+    def selectPlugin(self, current, _):
+        controller = plugin_entry_dict[current.text()]
+        i = self._control_layout.count() - 1
+        cur_widget = self._control_layout.itemAt(i).widget()
+        if cur_widget is not None:
+            cur_widget.setParent(None)
+
+        controller.setControlPanel(self._control_layout)
+        self._plot_area.selectPlugin(controller)
 
 
 def define_palette(app):

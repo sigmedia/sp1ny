@@ -34,6 +34,7 @@ app = QtGui.QApplication(["PyPraG"])
 try:
     from pyprag.annotations import HTKAnnotation, TGTAnnotation
     from pyprag.gui import build_gui
+
 except Exception as ex:
     raise ex
 

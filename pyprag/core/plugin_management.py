@@ -15,26 +15,27 @@ class DataController:
 
 
 class DataDock(Dock):
-    def __init__(self, widget, name, size):
-        Dock.__init__(self, name=name, size=size)
+    def __init__(self, size):
+        Dock.__init__(self, name="Place Hold", size=size)
 
         # Override the label
         self.label.sigClicked.connect(self.mouseClicked)
         self._data_plot = None
 
-        self.setWidget(widget)
-
-    def dropWidget(self, widget):
+    def removeWidget(self, widget):
         """
         Add a new widget to the interior of this Dock.
         Each Dock uses a QGridLayout to arrange widgets within.
         """
-        self.currentRow = self.currentRow - 1
         self.widgets.remove(widget)
-        self.layout.removeWidget(widget)
-        self.dockdrop.raiseOverlay()
+        i = self.layout.count() - 1
+        cur_widget = self.layout.itemAt(i).widget()
+        if cur_widget is not None:
+            cur_widget.setParent(None)
+        self.currentRow = self.currentRow - 1
+        # self.dockdrop.raiseOverlay()
 
-    def setWidget(self, widget):
+    def setWidget(self, widget, name):
         # Ensure widgets are removed
         if self._data_plot is not None:
             self.removeWidget(self._data_plot)
@@ -48,8 +49,11 @@ class DataDock(Dock):
         # self.data_plot.disableAutoRange()
         self.addWidget(self._data_plot)
 
+        # Update the name
+        self.setTitle(name)
+
     def mouseClicked(self):
         pass
 
 
-plugin_entry_list = []
+plugin_entry_dict = dict()
