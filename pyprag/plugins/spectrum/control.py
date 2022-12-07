@@ -1,18 +1,21 @@
 from pyqtgraph.Qt import QtWidgets
+from pyprag.gui.core import DataController
 
 
-class SpectrumController:
+class SpectrumController(DataController):
     def __init__(self, extractor, widget):
+        self._name = "Spectrogram"
         self._extractor = extractor
         self._widget = widget
+
+    def setWav(self, wav, sampling_rate):
+        assert wav is not None
+        self._extractor.setWav(wav, sampling_rate)
 
     def extract(self):
         self._extractor._cutoff = (int(self._wMinFreq.text()), int(self._wMaxFreq.text()))
         self._extractor.extract()
-        self._widget.refresh()
-
-    def refresh(self):
-        self._widget.refresh()
+        self.refresh()
 
     def addLayoutToPanel(self, panel):
         groupBox = QtWidgets.QGroupBox("Spectrogram configuration")
@@ -25,7 +28,7 @@ class SpectrumController:
         l2 = QtWidgets.QLabel("Max Freq.")
         self._wMaxFreq = QtWidgets.QLineEdit("5000")
 
-        # Setup the groupbox
+        # Setup the contr
         box = QtWidgets.QGridLayout()
         box.addWidget(l1, 0, 0)
         box.addWidget(l2, 1, 0)
@@ -33,6 +36,7 @@ class SpectrumController:
         box.addWidget(self._wMaxFreq, 1, 1)
         groupBox.setLayout(box)
 
+        # Don't forget to add the extract button
         bExtract = QtWidgets.QPushButton("Extract")
         bExtract.clicked.connect(self.extract)
         bExtract.setDefault(False)

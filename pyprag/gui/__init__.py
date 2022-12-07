@@ -21,7 +21,10 @@ import pyqtgraph as pg
 # GUI
 from .one_shot import OneShotArea
 from ..wav.control import PlayerWidget
+from ..core import plugin_entry_list
 
+
+from pyprag.plugins.spectrum import controller as sp_controller
 
 # Interpret image data as row-major instead of col-major
 pg.setConfigOptions(imageAxisOrder="row-major")
@@ -32,8 +35,7 @@ class GUIVisu(QtGui.QMainWindow):
         super().__init__()
 
         self._wav = infos[0]
-        self._controller = infos[1]
-        self._filename = infos[2]
+        self._filename = infos[1]
 
         ##########################################
         # Setup the Menubar
@@ -72,7 +74,7 @@ class GUIVisu(QtGui.QMainWindow):
         ##########################################
         # Define the left part of the window
         ##########################################
-        self._plot_area = OneShotArea(self._wav, self._controller, frameshift, annotation)
+        self._plot_area = OneShotArea(self._wav, frameshift, annotation)
         left_layout = QtWidgets.QVBoxLayout()
         left_layout.addWidget(self._plot_area)
 
@@ -86,9 +88,13 @@ class GUIVisu(QtGui.QMainWindow):
         tab1 = QtWidgets.QWidget()
         tabs.addTab(tab1, "Data/Visualization")
         cur_layout = QtWidgets.QVBoxLayout(self)
-        self._controller.addLayoutToPanel(cur_layout)
-        # eq_widget = EqWidget(self, self._wav)
-        # cur_layout.addWidget(eq_widget)
+        sp_controller.addLayoutToPanel(cur_layout)
+        self._plugin_list = QtWidgets.QListWidget(self)
+        for elt in plugin_entry_list:
+            self._plugin_list.addItem(QtWidgets.QListWidgetItem(elt._name))
+        sp_controller.extract()
+        cur_layout.addWidget(self._plugin_list)
+
         tab1.setLayout(cur_layout)
 
         tab2 = QtWidgets.QWidget()

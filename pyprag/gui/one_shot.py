@@ -27,6 +27,7 @@ import pyqtgraph as pg
 from pyprag.gui.utils import cmapToColormap
 from pyprag.wav.visualisation import WavDock
 from pyprag.annotations.visualisation import AnnotationDock
+from pyprag.plugins.spectrum import controller as sp_controller
 
 
 #####################################################################################################
@@ -89,7 +90,7 @@ class OneShotArea(DockArea):
         The color map ticks
     """
 
-    def __init__(self, wav, data_controller, frameshift, annotation=None, color_map=matplotlib.cm.bone):
+    def __init__(self, wav, frameshift, annotation=None, color_map=matplotlib.cm.bone):
         """
         Parameters
         ----------
@@ -127,7 +128,9 @@ class OneShotArea(DockArea):
         lut = cmap.getLookupTable(0.0, 1.0, 10)
         ticks = list(enumerate(lut))
         self.ticks = [(ticks[i][0] / ticks[-1][0], ticks[i][1]) for i in range(len(ticks))]
-        self.__fill(data_controller=data_controller)
+        sp_controller.setWav(self.wav[0], self.wav[1])
+        print("ok?!")
+        self.__fill(data_controller=sp_controller)
 
     def __fill(self, data_controller):
         """Helper to fill the dock area"""

@@ -30,15 +30,15 @@ import librosa
 
 from pyqtgraph.Qt import QtGui
 
-# Signal processing helpers
-from pyprag.plugins.spectrum import SpectrumExtractor
-from pyprag.plugins.spectrum import SpectrumController
-from pyprag.plugins.spectrum import SpectrogramPlotWidget
+app = QtGui.QApplication(["PyPraG"])
+
 
 # Annotation
-from pyprag.annotations import HTKAnnotation, TGTAnnotation
-
-from pyprag.gui import build_gui
+try:
+    from pyprag.annotations import HTKAnnotation, TGTAnnotation
+    from pyprag.gui import build_gui
+except Exception:
+    pass
 
 ###############################################################################
 # global constants
@@ -68,47 +68,11 @@ def entry_point(args, logger):
     # Convert frameshift from ms to s
     frameshift = args.frameshift / 1000
 
-    # ##############################################################################
-    # ### [ Equalizer ]
-    # ##############################################################################
-
-    # from scipy.signal import butter, sosfilt, sosfreqz
-
-    # def butter_bandpass(lowcut, highcut, fs, order=5):
-    #     nyq = 0.5 * fs
-    #     low = lowcut / nyq
-    #     high = (highcut - 1) / nyq
-    #     sos = butter(order, [low, high], analog=False, btype="band", output="sos")
-    #     return sos
-
-    # def butter_bandpass_filter(data, lowcut, highcut, fs, order=5):
-    #     sos = butter_bandpass(lowcut, highcut, fs, order=order)
-    #     y = sosfilt(sos, data)
-    #     return y
-
-    # # band_0 = butter_bandpass_filter(wav[0], 20, 50, wav[1])
-    # # band_1 = butter_bandpass_filter(wav[0], 50, 200, wav[1]) * 0
-    # # band_2 = butter_bandpass_filter(wav[0], 200, 1000, wav[1]) * 0 # * 0.001
-    # # band_3 = butter_bandpass_filter(wav[0], 1000, 2000, wav[1]) * 0
-    # # band_4 = butter_bandpass_filter(wav[0], 2000, 4000, wav[1]) # * 0.00
-    # # band_5 = butter_bandpass_filter(wav[0], 6000, 8000, wav[1])
-    # # tmp = band_0 + band_1 + band_2 + band_3 + band_4 + band_5
-    # # wav = [tmp, wav[1]]
-
-    # ##############################################################################
-    # ### [/ Equalizer]
-    # ##############################################################################
-
-    app = QtGui.QApplication(["PyPraG"])
-
     # Compute spectrum
     coef_matrix = None
     if args.coefficient_file == "":
         if wav is not None:
             logger.info("Compute spectrogram")
-            sp_extractor = SpectrumExtractor(wav[0], wav[1], frameshift=frameshift)
-            sp_widget = SpectrogramPlotWidget(sp_extractor)
-            sp_controller = SpectrumController(sp_extractor, sp_widget)
     else:
         logger.info("Loading coefficient file")
         if args.dimension is None:
@@ -133,7 +97,7 @@ def entry_point(args, logger):
 
     # Generate window
     logger.info("Rendering")
-    infos = (wav, sp_controller, args.wav_file)
+    infos = (wav, args.wav_file)
     build_gui(app, infos, frameshift, annotation)
 
 

@@ -5,8 +5,8 @@ import librosa
 class SpectrumExtractor:
     def __init__(
         self,
-        wav_array,
-        sampling_rate,
+        wav_array=None,
+        sampling_rate=None,
         fft_len=2048,
         frameshift=0.005,
         framelength=0.005,
@@ -16,6 +16,7 @@ class SpectrumExtractor:
     ):
         self._wav_array = wav_array
         self._sampling_rate = sampling_rate
+        self._spectrum = np.zeros((10, 10))
 
         # Define default parameters
         self._fft_len = fft_len
@@ -25,8 +26,10 @@ class SpectrumExtractor:
         self._cutoff = cutoff
         self._threshold_amp = threshold_amp
 
-        # Extract Default
-        self.extract()
+    def setWav(self, wav, sampling_rate):
+        assert wav is not None
+        self._wav_array = wav
+        self._sampling_rate = sampling_rate
 
     def extract(self):
         frameshift = int(self._frameshift * self._sampling_rate)
