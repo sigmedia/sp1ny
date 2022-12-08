@@ -22,7 +22,23 @@ import pyqtgraph as pg
 from .one_shot import OneShotArea
 from ..core.wav import PlayerControllerWidget
 from ..core import plugin_entry_dict
-from ..core import spectrum  # noqa: F401
+
+import importlib
+import pkgutil
+
+import pyprag.plugins
+
+
+# Discover plugins
+def iter_namespace(ns_pkg):
+    # Specifying the second argument (prefix) to iter_modules makes the
+    # returned name an absolute name instead of a relative one. This allows
+    # import_module to work without having to do additional modification to
+    # the name.
+    return pkgutil.iter_modules(ns_pkg.__path__, ns_pkg.__name__ + ".")
+
+
+discovered_plugins = {name: importlib.import_module(name) for finder, name, ispkg in iter_namespace(pyprag.plugins)}
 
 # Interpret image data as row-major instead of col-major
 pg.setConfigOptions(imageAxisOrder="row-major")
