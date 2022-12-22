@@ -97,11 +97,35 @@ class GUIVisu(QtGui.QMainWindow):
         self._control_layout = QtWidgets.QVBoxLayout(self)
 
         # Populate the list of plugins
-        self._plugin_list = QtWidgets.QListWidget(self)
+        self._plugin_list = QtWidgets.QComboBox(self)
         for elt in plugin_entry_dict:
-            self._plugin_list.addItem(QtWidgets.QListWidgetItem(elt))
-        self._plugin_list.currentItemChanged.connect(self.selectPlugin)
+            self._plugin_list.addItem(elt)
+        # NOTE: Raw DATA is a joker
+        if "Raw DATA" in plugin_entry_dict:
+            self._plugin_list.setCurrentText("Raw DATA")
+        self._plugin_list.currentTextChanged.connect(self.selectPlugin)
         self._control_layout.addWidget(self._plugin_list)
+
+        # Populate the list of plugins
+        self._cmap_list = QtWidgets.QComboBox(self)
+        cmaps = [
+            # Uniform
+            "viridis",
+            "plasma",
+            "inferno",
+            "magma",
+            "cividis",
+            # Sequential
+            "binary",
+            "gray",
+            "bone",
+            "hot",
+            "copper",
+        ]
+        for elt in cmaps:
+            self._cmap_list.addItem(elt)
+        self._cmap_list.currentTextChanged.connect(self.selectColorMap)
+        self._control_layout.addWidget(self._cmap_list)
 
         place_holder = QtWidgets.QVBoxLayout()
         self._control_layout.addLayout(place_holder)
@@ -137,6 +161,11 @@ class GUIVisu(QtGui.QMainWindow):
         cent_widget.setLayout(main_layout)
         self.setCentralWidget(cent_widget)
 
+        # Show the default plugin and the default colormap
+        # NOTE: think about a configuration bit?
+        self.selectPlugin(self._plugin_list.currentText())
+        self.selectColorMap(self._cmap_list.currentText())
+
     def openFile(self):
         options = QtGui.QFileDialog.Options()
         options |= QtGui.QFileDialog.DontUseNativeDialog
@@ -147,8 +176,8 @@ class GUIVisu(QtGui.QMainWindow):
         if filename:
             self._filename_label.setText(filename)
 
-    def selectPlugin(self, current, _):
-        controller = plugin_entry_dict[current.text()]
+    def selectPlugin(self, current):
+        controller = plugin_entry_dict[current]
         i = self._control_layout.count() - 1
         cur_widget = self._control_layout.itemAt(i).widget()
         if cur_widget is not None:
@@ -156,6 +185,10 @@ class GUIVisu(QtGui.QMainWindow):
 
         controller.setControlPanel(self._control_layout)
         self._plot_area.selectPlugin(controller)
+        self.selectColorMap(self._cmap_list.currentText())
+
+    def selectColorMap(self, cmap_name):
+        self._plot_area.updateColorMap(cmap_name)
 
 
 def define_palette(app):

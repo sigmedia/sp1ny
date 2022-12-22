@@ -50,6 +50,9 @@ class SpectrogramPlotWidget(pg.PlotWidget):
 
         self._spectrum_extractor = spectrum_extractor
 
+        # NOTE: needed to conserve the colormap
+        self._ticks = None
+
     def refresh(self):
         self._img = pg.ImageItem()
         self._img.setImage(self._spectrum_extractor._spectrum.T)
@@ -68,7 +71,11 @@ class SpectrogramPlotWidget(pg.PlotWidget):
         self.plotItem.getViewBox().addItem(self._img)
         self.setCentralItem(self.plotItem)
 
+        if self._ticks is not None:
+            self.setTicks(self._ticks)
+
     def setTicks(self, ticks):
+        self._ticks = ticks
         # Define and assign histogram
         self.hist = pg.HistogramLUTWidget()
         self.hist.setImageItem(self._img)

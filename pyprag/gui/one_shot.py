@@ -18,7 +18,7 @@ import logging
 import numpy as np
 
 # Plotting
-import matplotlib.cm
+import matplotlib as mpl
 from pyqtgraph.dockarea import DockArea
 import pyqtgraph as pg
 
@@ -52,7 +52,7 @@ class OneShotArea(DockArea):
         The color map ticks
     """
 
-    def __init__(self, wav, frameshift, annotation=None, color_map=matplotlib.cm.bone):
+    def __init__(self, wav, frameshift, annotation=None):
         """
         Parameters
         ----------
@@ -84,13 +84,18 @@ class OneShotArea(DockArea):
         self.frameshift = frameshift
 
         # - Generate color map
+        self.__fill()
+
+    def updateColorMap(self, cmap_name):
         self.logger.debug("Generate ticks for data plotting")
-        pos, rgba_colors = zip(*cmapToColormap(color_map))
+        cmap_cls = mpl.colormaps[cmap_name]
+        pos, rgba_colors = zip(*cmapToColormap(cmap_cls))
         cmap = pg.ColorMap(pos, rgba_colors)
         lut = cmap.getLookupTable(0.0, 1.0, 10)
         ticks = list(enumerate(lut))
         self.ticks = [(ticks[i][0] / ticks[-1][0], ticks[i][1]) for i in range(len(ticks))]
-        self.__fill()
+        if self._dock_coef._data_plot is not None:
+            self._dock_coef._data_plot.setTicks(self.ticks)
 
     def __fill(self):
         """Helper to fill the dock area"""
