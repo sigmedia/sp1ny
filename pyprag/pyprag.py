@@ -7,10 +7,9 @@ AUTHOR
 
 DESCRIPTION
 
-
 LICENSE
     This script is in the public domain, free from copyrights or restrictions.
-    Created: 24 October 2019
+    Created: 17 January 2023
 """
 
 # System/default
@@ -21,34 +20,140 @@ import argparse
 
 # Messaging/logging
 import logging
+from logging.config import dictConfig
 
 # Audio, dsp
 import librosa
 
+# PyQtGraph & create application
 from pyqtgraph.Qt import QtWidgets
 
-app = QtWidgets.QApplication(["PyPraG"])
+# PyPrag dedicated imports
+from pyprag.core.data import controller
 
-
-# Annotation
 try:
     from pyprag.annotations import HTKAnnotation, TGTAnnotation
     from pyprag.gui import build_gui
-
 except Exception as ex:
     raise ex
+
 
 ###############################################################################
 # global constants
 ###############################################################################
 LEVEL = [logging.WARNING, logging.INFO, logging.DEBUG]
+APP = QtWidgets.QApplication(["PyPraG"])
 
 
 ###############################################################################
 # Functions
 ###############################################################################
-def entry_point(args, logger):
-    """Main entry function"""
+def configure_logger(args) -> logging.Logger:
+    """Setup the global logging configurations and instanciate a specific logger for the current script
+
+    Parameters
+    ----------
+    args : dict
+        The arguments given to the script
+
+    Returns
+    --------
+    the logger: logger.Logger
+    """
+    # create logger and formatter
+    logger = logging.getLogger()
+
+    # Verbose level => logging level
+    log_level = args.verbosity
+    if args.verbosity >= len(LEVEL):
+        log_level = len(LEVEL) - 1
+        # logging.warning("verbosity level is too high, I'm gonna assume you're taking the highest (%d)" % log_level)
+
+    # Define the default logger configuration
+    logging_config = dict(
+        version=1,
+        disable_existing_logger=True,
+        formatters={
+            "f": {
+                "format": "[%(asctime)s] [%(levelname)s] — [%(name)s — %(funcName)s:%(lineno)d] %(message)s",
+                "datefmt": "%d/%b/%Y: %H:%M:%S ",
+            }
+        },
+        handlers={
+            "h": {
+                "class": "logging.StreamHandler",
+                "formatter": "f",
+                "level": LEVEL[log_level],
+            }
+        },
+        root={"handlers": ["h"], "level": LEVEL[log_level]},
+    )
+
+    # Add file handler if file logging required
+    if args.log_file is not None:
+        logging_config["handlers"]["f"] = {
+            "class": "logging.FileHandler",
+            "formatter": "f",
+            "level": LEVEL[log_level],
+            "filename": args.log_file,
+        }
+        logging_config["root"]["handlers"] = ["h", "f"]
+
+    # Setup logging configuration
+    dictConfig(logging_config)
+
+    # Retrieve and return the logger dedicated to the script
+    logger = logging.getLogger(__name__)
+    return logger
+
+
+def define_argument_parser() -> argparse.ArgumentParser:
+    """Defines the argument parser
+
+    Returns
+    --------
+    The argument parser: argparse.ArgumentParser
+    """
+    parser = argparse.ArgumentParser(description="")
+
+    # Add Logging dedicated options
+    parser.add_argument("-l", "--log_file", default=None, help="Logger file")
+    parser.add_argument(
+        "-v",
+        "--verbosity",
+        action="count",
+        default=0,
+        help="increase output verbosity",
+    )
+
+    # Add tool options
+    parser.add_argument(
+        "-a",
+        "--annotation-file",
+        default="",
+        type=str,
+        help="The annotation file (HTK label or TextGrid)",
+    )
+    parser.add_argument("-c", "--coefficient-file", default="", type=str, help="The coefficient file")
+    parser.add_argument(
+        "-d",
+        "--dimension",
+        default=0,
+        type=int,
+        help="The dimension of the coefficient vector (negative shape is assumed to be (-1, d), positive (d, -1))",
+    )
+    parser.add_argument("-f", "--frameshift", default=5, type=float, help="The frameshift in milliseconds")
+    parser.add_argument("-w", "--wav_file", default="", type=str, help="The wave file")
+
+    # Return parser
+    return parser
+
+
+def main():
+    # Initialization
+    arg_parser = define_argument_parser()
+    args = arg_parser.parse_args()
+    logger = configure_logger(args)
 
     if (args.annotation_file == "") and (args.wav_file == "") and (args.coefficient_file == ""):
         logger.error(
@@ -68,8 +173,6 @@ def entry_point(args, logger):
 
     # Check with data
     if args.coefficient_file:
-        from pyprag.core.data import controller
-
         controller.loadCoefficientFile(args.coefficient_file, args.dimension, frameshift)
 
     # Load annotation
@@ -86,61 +189,7 @@ def entry_point(args, logger):
     # Generate window
     logger.info("Rendering")
     infos = (wav, args.wav_file)
-    build_gui(app, infos, frameshift, annotation)
-
-
-def main():
-    parser = argparse.ArgumentParser(description="")
-
-    # Add options
-    parser.add_argument(
-        "-a",
-        "--annotation-file",
-        default="",
-        type=str,
-        help="The annotation file (HTK label or TextGrid)",
-    )
-    parser.add_argument("-l", "--log-file", default="", help="Logger file")
-    parser.add_argument("-v", "--verbosity", action="count", default=0, help="increase output verbosity")
-    parser.add_argument("-c", "--coefficient-file", default="", type=str, help="The coefficient file")
-    parser.add_argument(
-        "-d",
-        "--dimension",
-        default=0,
-        type=int,
-        help="The dimension of the coefficient vector (negative shape is assumed to be (-1, d), positive (d, -1))",
-    )
-    parser.add_argument("-f", "--frameshift", default=5, type=float, help="The frameshift in milliseconds")
-    parser.add_argument("-w", "--wav_file", default="", type=str, help="The wave file")
-
-    # Parsing arguments
-    args = parser.parse_args()
-
-    # create logger and formatter
-    logger = logging.getLogger()
-    formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-
-    # Verbose level => logging level
-    log_level = args.verbosity
-    if args.verbosity >= len(LEVEL):
-        log_level = len(LEVEL) - 1
-        logger.setLevel(log_level)
-        logging.warning("verbosity level is too high, I'm gonna assume you're taking the highest (%d)" % log_level)
-    else:
-        logger.setLevel(LEVEL[log_level])
-
-    # create console handler
-    ch = logging.StreamHandler()
-    ch.setFormatter(formatter)
-    logger.addHandler(ch)
-
-    # create file handler
-    if args.log_file != "":
-        fh = logging.FileHandler(args.log_file)
-        logger.addHandler(fh)
-
-    # Running main function <=> run application
-    entry_point(args, logger)
+    build_gui(APP, infos, frameshift, annotation)
 
 
 ###############################################################################
