@@ -25,9 +25,9 @@ import logging
 # Audio, dsp
 import librosa
 
-from pyqtgraph.Qt import QtGui
+from pyqtgraph.Qt import QtWidgets
 
-app = QtGui.QApplication(["PyPraG"])
+app = QtWidgets.QApplication(["PyPraG"])
 
 
 # Annotation

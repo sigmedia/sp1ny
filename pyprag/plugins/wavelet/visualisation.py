@@ -1,6 +1,6 @@
 # PyQTGraph
 import pyqtgraph as pg
-from pyqtgraph.Qt import QtGui
+from pyqtgraph.Qt import QtGui, QtWidgets
 
 # PyPrag
 from pyprag.gui.items import SelectablePlotItem
@@ -45,7 +45,7 @@ class WaveletPlotWidget(pg.PlotWidget):
 
         """
         pg.GraphicsView.__init__(self, parent, background)
-        self.setSizePolicy(QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Expanding)
+        self.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
         self.enableMouse(False)
 
         self._wavelet_extractor = wavelet_extractor
@@ -57,10 +57,12 @@ class WaveletPlotWidget(pg.PlotWidget):
         self._img = pg.ImageItem()
         self._img.setImage(self._wavelet_extractor._wavelet.T)
 
+        tr = QtGui.QTransform()
         # 2. scale
         y_scale = self._wavelet_extractor._num_scales * self._wavelet_extractor._scale_distance
         y_scale /= self._wavelet_extractor._wavelet.shape[1]
-        self._img.scale(self._wavelet_extractor._frameshift, y_scale)
+        tr.scale(self._wavelet_extractor._frameshift, y_scale)
+        self._img.setTransform(tr)
 
         # Generate plot
         self.plotItem = SelectablePlotItem()

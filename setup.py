@@ -3,7 +3,6 @@
 
 """
 AUTHOR
-    - Antti Suni <antti.suni@helsinki.fi>
     - Sébastien Le Maguer <lemagues@tcd.ie>
 
 DESCRIPTION
@@ -29,7 +28,7 @@ REQUIREMENTS = [
     "pyworld",
     "pyaudio",
     # Rendering
-    "pyqtgraph>=0.12.1",
+    "pyqtgraph>=0.13.1",
 ]
 
 EXTRA_REQUIREMENTS = {

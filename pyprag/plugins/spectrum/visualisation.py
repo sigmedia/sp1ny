@@ -1,6 +1,6 @@
 # PyQTGraph
 import pyqtgraph as pg
-from pyqtgraph.Qt import QtGui
+from pyqtgraph.Qt import QtGui, QtWidgets
 
 # PyPrag
 from pyprag.gui.items import SelectablePlotItem
@@ -45,7 +45,7 @@ class SpectrogramPlotWidget(pg.PlotWidget):
 
         """
         pg.GraphicsView.__init__(self, parent, background)
-        self.setSizePolicy(QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Expanding)
+        self.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
         self.enableMouse(False)
 
         self._spectrum_extractor = spectrum_extractor
@@ -58,13 +58,16 @@ class SpectrogramPlotWidget(pg.PlotWidget):
         self._img.setImage(self._spectrum_extractor._spectrum.T)
 
         # 1. translate to the minimal frequency
+        tr = QtGui.QTransform()
         min_y = self._spectrum_extractor._cutoff[0]
-        self._img.translate(0, min_y)
+        tr.translate(0, min_y)
 
         # 2. scale
         y_scale = self._spectrum_extractor._cutoff[1] - self._spectrum_extractor._cutoff[0]
         y_scale /= self._spectrum_extractor._spectrum.shape[1]
-        self._img.scale(self._spectrum_extractor._frameshift, y_scale)
+        tr.scale(self._spectrum_extractor._frameshift, y_scale)
+
+        self._img.setTransform(tr)
 
         # Generate plot
         self.plotItem = SelectablePlotItem()

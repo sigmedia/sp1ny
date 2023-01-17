@@ -1,6 +1,6 @@
 # PyQTGraph
 import pyqtgraph as pg
-from pyqtgraph.Qt import QtGui
+from pyqtgraph.Qt import QtGui, QtWidgets
 
 # PyPrag
 from pyprag.gui.items import SelectablePlotItem
@@ -45,7 +45,7 @@ class RawDataPlotWidget(pg.PlotWidget):
 
         """
         pg.GraphicsView.__init__(self, parent, background)
-        self.setSizePolicy(QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Expanding)
+        self.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
         self.enableMouse(False)
 
         # Save reference to data
@@ -55,7 +55,9 @@ class RawDataPlotWidget(pg.PlotWidget):
         self._img = pg.ImageItem()
         self._img.setImage(self._data_extractor._data.T)
 
-        self._img.scale(self._data_extractor._frameshift, 1)
+        tr = QtGui.QTransform()
+        tr.scale(self._data_extractor._frameshift, 1)
+        self._img.setTransform(tr)
 
         # Generate plot
         self.plotItem = SelectablePlotItem()

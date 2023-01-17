@@ -44,7 +44,7 @@ discovered_plugins = {name: importlib.import_module(name) for finder, name, ispk
 pg.setConfigOptions(imageAxisOrder="row-major")
 
 
-class GUIVisu(QtGui.QMainWindow):
+class GUIVisu(QtWidgets.QMainWindow):
     def __init__(self, infos, frameshift, annotation):
         super().__init__()
 
