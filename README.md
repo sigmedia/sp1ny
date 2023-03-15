@@ -11,16 +11,26 @@ To create the conda environment, you can use the following command:
 conda env create -f environment.yml
 ```
 
-## How to run
+## Running examples
 
-Once the environment is installed and activated (still see the conda tutorial), you can run the following command:
-
-```sh
-python visualize.py <wav_file>
-```
-
-On order to have more informations on the command `visualize.py`, just write:
+### Basic
 
 ```sh
-python visualize.py -h
+pyprag -w examples/arctic_a0002.wav
 ```
+
+### With annotations
+
+
+```sh
+pyprag -w examples/arctic_a0002.wav -a examples/arctic_a0002.lab
+```
+
+### With raw coefficients
+
+```sh
+pyprag -w examples/arctic_as.wav -c examples/arctic_as.neur -d -50 -f 6.4
+```
+
+- the option `-d` indicates the dimension of the raw data; "-50" indicates a shape of (-1, 50)
+- the option `-f` indicates the frameshift in milliseconds
