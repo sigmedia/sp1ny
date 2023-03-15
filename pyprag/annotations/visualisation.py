@@ -44,7 +44,7 @@ class AnnotationDock(Dock):
         self.wav = wav
 
         # Prepare scrolling support
-        self.scroll = QtGui.QScrollArea()
+        self.scroll = QtWidgets.QScrollArea()
         self.widget = QtWidgets.QWidget()
         self.vbox = QtWidgets.QVBoxLayout()
         self.widget.setLayout(self.vbox)
