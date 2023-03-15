@@ -58,7 +58,7 @@ class GUIVisu(QtWidgets.QMainWindow):
         file_menu = QtWidgets.QMenu("&File", self)
 
         # Add open shortcut
-        self.openAction = QtWidgets.QAction("&Open wav...", self)
+        self.openAction = QtGui.QAction("&Open wav...", self)
         self.openAction.triggered.connect(self.openFile)
         self.openAction.setShortcut("Ctrl+o")
         file_menu.addAction(self.openAction)

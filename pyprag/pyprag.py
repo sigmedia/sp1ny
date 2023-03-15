@@ -28,8 +28,7 @@ import librosa
 # PyQtGraph & create application
 from pyqtgraph.Qt import QtWidgets
 
-# PyPrag dedicated imports
-from pyprag.core.data import controller
+APP = QtWidgets.QApplication(["PyPraG"])
 
 try:
     from pyprag.annotations import HTKAnnotation, TGTAnnotation
@@ -42,7 +41,6 @@ except Exception as ex:
 # global constants
 ###############################################################################
 LEVEL = [logging.WARNING, logging.INFO, logging.DEBUG]
-APP = QtWidgets.QApplication(["PyPraG"])
 
 
 ###############################################################################
@@ -173,6 +171,8 @@ def main():
 
     # Check with data
     if args.coefficient_file:
+        from pyprag.core.data import controller
+
         controller.loadCoefficientFile(args.coefficient_file, args.dimension, frameshift)
 
     # Load annotation
