@@ -141,17 +141,21 @@ class Player(metaclass=Singleton):
             # for f in self._position_handlers:
             #     f(pos)
 
-        stream = sd.OutputStream(
+        def finished_callback():
+            pass
+            self._is_playing = False
+            self._position = 0
+
+        self._stream = sd.OutputStream(
             samplerate=self._sampling_rate,
             device=None,
             channels=data.shape[1],
             callback=callback,
             finished_callback=event.set,
         )
-        with stream:
+        with self._stream:
             event.wait()  # Wait until playback is finished
-            self._position = 0
-            self._is_playing = 0
+            self._is_playing = False
 
 
 player = Player()
