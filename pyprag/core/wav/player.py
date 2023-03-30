@@ -108,12 +108,13 @@ class Player(metaclass=Singleton):
 
         # Fix the stream
         if self._is_paused:
-            self._stream.stop_stream()
+            self._stream.stop()
         else:
-            self._stream.start_stream()
+            self._stream.start()
 
     def stop(self):
         self._is_playing = False
+        self._stream.stop()
         self._position = 0
 
     def toggleLoop(self):
