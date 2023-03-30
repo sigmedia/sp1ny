@@ -88,6 +88,9 @@ class Player(metaclass=Singleton):
         if wav_data is not None:
             self.setWavData(wav_data)
 
+        # Reset position
+        self._position = 0
+
         # And now play!
         self._is_playing = True
         if end == -1:
