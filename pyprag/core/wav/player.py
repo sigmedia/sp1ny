@@ -106,12 +106,6 @@ class Player(metaclass=Singleton):
         # Update the pause status
         self._is_paused = not self._is_paused
 
-        # Fix the stream
-        if self._is_paused:
-            self._stream.stop()
-        else:
-            self._stream.start()
-
     def stop(self):
         self._is_playing = False
         self._stream.stop()
@@ -131,18 +125,25 @@ class Player(metaclass=Singleton):
             if status:
                 print(status)
             chunksize = min(len(data) - self._position, frames)
-            outdata[:chunksize] = data[self._position : self._position + chunksize]
-            if chunksize < frames:
-                outdata[chunksize:] = 0
-                raise sd.CallbackStop()
-            self._position += chunksize
+            # If stream is paused, keep open but output zeros
+            # position is not updated so can resume from same frame
+            if self._is_paused:
+                outdata[:chunksize] = np.zeros((chunksize, 1))
+            elif self._is_playing == False:
+                 outdata[:chunksize] = np.zeros((chunksize, 1))
+                 self._position = 0
+            else:
+                outdata[:chunksize] = data[self._position : self._position + chunksize]
+                if chunksize < frames:
+                    outdata[chunksize:] = 0
+                    raise sd.CallbackStop()
+                self._position += chunksize
 
             # pos = self._position / self._sr
             # for f in self._position_handlers:
             #     f(pos)
 
         def finished_callback():
-            pass
             self._is_playing = False
             self._position = 0
 
