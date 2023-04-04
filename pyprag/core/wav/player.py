@@ -143,10 +143,6 @@ class Player(metaclass=Singleton):
             # for f in self._position_handlers:
             #     f(pos)
 
-        def finished_callback():
-            self._is_playing = False
-            self._position = 0
-
         self._stream = sd.OutputStream(
             samplerate=self._sampling_rate,
             device=None,
