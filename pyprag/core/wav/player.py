@@ -108,7 +108,6 @@ class Player(metaclass=Singleton):
 
     def stop(self):
         self._is_playing = False
-        self._stream.stop()
         self._position = 0
 
     def toggleLoop(self):
