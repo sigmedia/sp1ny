@@ -152,6 +152,7 @@ class Player(metaclass=Singleton):
         )
         with self._stream:
             event.wait()  # Wait until playback is finished
+            self._position = 0
             self._is_playing = False
 
 
