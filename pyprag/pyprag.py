@@ -28,7 +28,10 @@ import librosa
 # PyQtGraph & create application
 from pyqtgraph.Qt import QtWidgets
 
-APP = QtWidgets.QApplication(["PyPraG"])
+if not QtWidgets.QApplication.instance():
+    APP = QtWidgets.QApplication(["PyPraG"])
+else:
+    APP = QtWidgets.QApplication.instance()
 
 try:
     from pyprag.annotations import HTKAnnotation, TGTAnnotation
