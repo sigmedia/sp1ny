@@ -18,13 +18,22 @@ class WaveletController(DataController):
         self.refresh()
 
     def setControlPanel(self, panel):
+
+        # Create the groupbox
         groupBox = QtWidgets.QGroupBox("Wavelet configuration")
+
+        # Create the main layout
         box_layout = QtWidgets.QVBoxLayout()
+        box_layout.setAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
+
+        # Add different feature group part
         box_layout.addWidget(self.setF0Limits())
         box_layout.addWidget(self.prosodicFeats())
         # box_layout.addWidget(self.featureCombination())
         # box_layout.addWidget(self.weight())
         # box_layout.addWidget(self.signalTiers())
+
+        # Fnalize and add the widget to the panel
         groupBox.setLayout(box_layout)
         panel.addWidget(groupBox)
 

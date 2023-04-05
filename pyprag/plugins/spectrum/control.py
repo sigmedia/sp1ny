@@ -1,4 +1,4 @@
-from pyqtgraph.Qt import QtWidgets
+from pyqtgraph.Qt import QtWidgets, QtCore
 from pyprag.core import DataController
 
 
@@ -20,8 +20,10 @@ class SpectrumController(DataController):
         self.refresh()
 
     def setControlPanel(self, panel):
+        # Create group box widget and initialize the main layout
         groupBox = QtWidgets.QGroupBox("Spectrogram configuration")
         box = QtWidgets.QGridLayout()
+        box.setAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
 
         # Frequency widgets
         l1 = QtWidgets.QLabel("Min Freq.")
