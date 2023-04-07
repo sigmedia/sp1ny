@@ -7,9 +7,9 @@ class SpectrumExtractor:
         self,
         wav_array=None,
         sampling_rate=None,
-        fft_len=2048,
-        frameshift=0.005,
-        framelength=0.005,
+        fft_length=2048,
+        frameshift=5,
+        framelength=5,
         window="hamming",
         cutoff=(400, 5000),
         threshold_amp=(-40, 0),
@@ -19,7 +19,7 @@ class SpectrumExtractor:
         self._spectrum = np.zeros((10, 10))
 
         # Define default parameters
-        self._fft_len = fft_len
+        self._fft_length = fft_length
         self._frameshift = frameshift
         self._framelength = framelength
         self._window = window
@@ -32,15 +32,15 @@ class SpectrumExtractor:
         self._sampling_rate = sampling_rate
 
     def extract(self):
-        frameshift = int(self._frameshift * self._sampling_rate)
-        framelength = int(self._framelength * self._sampling_rate)
+        frameshift = int(0.001 * self._frameshift * self._sampling_rate)
+        framelength = int(0.001 * self._framelength * self._sampling_rate)
         assert (
-            framelength < self._fft_len
-        ), f"The framelength ({framelength} samples) has to be less than the FFT length ({self._fft_len} samples)"
+            framelength < self._fft_length
+        ), f"The framelength ({framelength} samples) has to be less than the FFT length ({self._fft_length} samples)"
 
         sp = librosa.core.stft(
             self._wav_array,
-            n_fft=self._fft_len * 2,
+            n_fft=self._fft_length * 2,
             hop_length=frameshift,
             win_length=framelength,
             center=True,
@@ -55,8 +55,8 @@ class SpectrumExtractor:
         # Transform and filter to make it ready for plotting
         sp = sp.T
         cutoff_coeff = (
-            int(self._cutoff[0] * 2 * self._fft_len / (self._sampling_rate)),
-            int(self._cutoff[1] * 2 * self._fft_len / (self._sampling_rate)),
+            int(self._cutoff[0] * 2 * self._fft_length / (self._sampling_rate)),
+            int(self._cutoff[1] * 2 * self._fft_length / (self._sampling_rate)),
         )
         sp = sp[:, cutoff_coeff[0] : cutoff_coeff[1]]
         sp[sp < self._threshold_amp[0]] = self._threshold_amp[0]
