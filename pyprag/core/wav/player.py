@@ -47,6 +47,11 @@ class Player(metaclass=Singleton):
         self._chunk_size = chunk_size
         self._position = 0
         self._position_handlers = []
+        # set default device to 'sysdefault'
+        devices = sd.query_devices()
+        device_names = [device['name'] for device in devices]
+        sysdefaultIndex = [i for i, s in enumerate(device_names) if 'sysdefault' in s][0]
+        self._device = sysdefaultIndex
 
     def setWavData(self, wav_data):
         # First be sure everything is stopped
@@ -145,7 +150,7 @@ class Player(metaclass=Singleton):
 
         self._stream = sd.OutputStream(
             samplerate=self._sampling_rate,
-            device=None,
+            device=self._device,
             channels=data.shape[1],
             callback=callback,
             finished_callback=event.set,

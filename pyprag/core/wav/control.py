@@ -1,6 +1,9 @@
 # Python
 from platform import system
 
+# Python SoundDevice
+import sounddevice as sd
+
 # PyPrag
 from pyqtgraph.Qt import QtWidgets
 from .player import player
@@ -41,11 +44,21 @@ class PlayerControllerWidget(QtWidgets.QWidget):
         bLoop.setDefault(False)
         bLoop.setAutoDefault(False)
 
+        # Define device selection box
+        devices = sd.query_devices()
+        device_names = [device['name'] for device in devices]
+        boxDevices = QtWidgets.QComboBox()
+        boxDevices.addItems(device_names)
+        sysdefaultIndex = [i for i, s in enumerate(device_names) if 'sysdefault' in s][0]
+        boxDevices.setCurrentIndex(sysdefaultIndex)
+        boxDevices.currentIndexChanged.connect(self.device_changed)
+
         player_layout = QtWidgets.QHBoxLayout()
         player_layout.addWidget(bPlay)
         player_layout.addWidget(bPause)
         player_layout.addWidget(bStop)
         player_layout.addWidget(bLoop)
+        player_layout.addWidget(boxDevices)
         self.setLayout(player_layout)
 
         # player.add_position_handler(self.update_position)
@@ -66,3 +79,6 @@ class PlayerControllerWidget(QtWidgets.QWidget):
 
     def loop(self):
         player.toggleLoop()
+
+    def device_changed(self, index):
+        player._device = index
