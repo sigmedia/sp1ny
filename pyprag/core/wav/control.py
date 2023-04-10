@@ -21,28 +21,28 @@ class PlayerControllerWidget(QtWidgets.QWidget):
         player.loadNewWav(wav[0], wav[1])
 
         # Define play button
-        bPlay = QtWidgets.QPushButton(PlayerControllerWidget.BUTTON_GLYPHS[0], self)
-        bPlay.clicked.connect(self.play)
-        bPlay.setDefault(False)
-        bPlay.setAutoDefault(False)
+        self.bPlay = QtWidgets.QPushButton(PlayerControllerWidget.BUTTON_GLYPHS[0], self)
+        self.bPlay.clicked.connect(self.play)
+        self.bPlay.setDefault(False)
+        self.bPlay.setAutoDefault(False)
 
         # Define stop button
-        bPause = QtWidgets.QPushButton(PlayerControllerWidget.BUTTON_GLYPHS[1], self)
-        bPause.clicked.connect(self.pause)
-        bPause.setDefault(False)
-        bPause.setAutoDefault(False)
+        self.bPause = QtWidgets.QPushButton(PlayerControllerWidget.BUTTON_GLYPHS[1], self)
+        self.bPause.clicked.connect(self.pause)
+        self.bPause.setDefault(False)
+        self.bPause.setAutoDefault(False)
 
         # Define stop button
-        bStop = QtWidgets.QPushButton(PlayerControllerWidget.BUTTON_GLYPHS[2], self)
-        bStop.clicked.connect(self.stop)
-        bStop.setDefault(False)
-        bStop.setAutoDefault(False)
+        self.bStop = QtWidgets.QPushButton(PlayerControllerWidget.BUTTON_GLYPHS[2], self)
+        self.bStop.clicked.connect(self.stop)
+        self.bStop.setDefault(False)
+        self.bStop.setAutoDefault(False)
 
         # Define loop button
-        bLoop = QtWidgets.QPushButton(PlayerControllerWidget.BUTTON_GLYPHS[3], self)
-        bLoop.clicked.connect(self.loop)
-        bLoop.setDefault(False)
-        bLoop.setAutoDefault(False)
+        self.bLoop = QtWidgets.QPushButton(PlayerControllerWidget.BUTTON_GLYPHS[3], self)
+        self.bLoop.clicked.connect(self.loop)
+        self.bLoop.setDefault(False)
+        self.bLoop.setAutoDefault(False)
 
         # Define device selection box
         devices = sd.query_devices()
@@ -54,10 +54,10 @@ class PlayerControllerWidget(QtWidgets.QWidget):
         boxDevices.currentIndexChanged.connect(self.device_changed)
 
         player_layout = QtWidgets.QHBoxLayout()
-        player_layout.addWidget(bPlay)
-        player_layout.addWidget(bPause)
-        player_layout.addWidget(bStop)
-        player_layout.addWidget(bLoop)
+        player_layout.addWidget(self.bPlay)
+        player_layout.addWidget(self.bPause)
+        player_layout.addWidget(self.bStop)
+        player_layout.addWidget(self.bLoop)
         player_layout.addWidget(boxDevices)
         self.setLayout(player_layout)
 
@@ -73,12 +73,20 @@ class PlayerControllerWidget(QtWidgets.QWidget):
     def pause(self):
         # Play subpart
         player.pauseResume()
+        if player._is_paused:
+            self.bPause.setFlat(True)
+        else:
+            self.bPause.setFlat(False)
 
     def stop(self):
         player.stop()
 
     def loop(self):
         player.toggleLoop()
+        if player._loop_activated:
+            self.bLoop.setFlat(True)
+        else:
+            self.bLoop.setFlat(False)
 
     def device_changed(self, index):
         player._device = index
