@@ -141,7 +141,10 @@ class Player(metaclass=Singleton):
                 outdata[:chunksize] = data[self._position : self._position + chunksize]
                 if chunksize < frames:
                     outdata[chunksize:] = 0
-                    raise sd.CallbackStop()
+                    if self._loop_activated:
+                        self._position = 0
+                    else:
+                        raise sd.CallbackStop()
                 self._position += chunksize
 
             # pos = self._position / self._sr
