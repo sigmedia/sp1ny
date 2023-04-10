@@ -145,22 +145,22 @@ class SegmentItem(pg.LinearRegionItem):
 
         Parameters
         ----------
-        ev : pg.MouseDragEvent
+        ev : pg.QMouseEvent
 
         """
         super().mouseClickEvent(ev)
 
         # Check which key is pressed
-        modifierPressed = QtGui.QApplication.keyboardModifiers()
+        modifier_pressed = ev.modifiers()
 
         if (ev.buttons() == QtCore.Qt.LeftButton) and ev.double():
-            if (modifierPressed & QtCore.Qt.ControlModifier) == QtCore.Qt.ControlModifier:
+
+            if modifier_pressed == QtCore.Qt.KeyboardModifier.ControlModifier:
                 # Play subpart
                 player.play(start=self.start, end=self.end)
-
-            elif (modifierPressed & QtCore.Qt.ShiftModifier) == QtCore.Qt.ShiftModifier:
+            elif modifier_pressed == QtCore.Qt.KeyboardModifier.ShiftModifier:
                 self.parentWidget().setXRange(0, self.parentWidget().state["limits"]["xLimits"][1])
-            elif not modifierPressed:
+            elif modifier_pressed == QtCore.Qt.KeyboardModifier.NoModifier:
                 self.parentWidget().setXRange(self.start, self.end)
 
     def _update_bounds(self, ev):
@@ -215,14 +215,12 @@ class SelectableViewBox(pg.ViewBox):
         ev : pg.MouseDragEvent
 
         """
-        # Check which key is pressed
-        modifierPressed = QtGui.QApplication.keyboardModifiers()
+        # Check which key is pressde
+        modifier_pressed = ev.modifiers()
 
         # Ignore any event while selecting the region
         if not self._select:
-            if (ev.buttons() != QtCore.Qt.LeftButton) or (
-                (modifierPressed & QtCore.Qt.ShiftModifier) != QtCore.Qt.ShiftModifier
-            ):
+            if modifier_pressed == QtCore.Qt.KeyboardModifier.ShiftModifier:
                 super().mouseDragEvent(ev)
                 return
 

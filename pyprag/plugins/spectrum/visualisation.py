@@ -65,7 +65,7 @@ class SpectrogramPlotWidget(pg.PlotWidget):
         # 2. scale
         y_scale = self._spectrum_extractor._cutoff[1] - self._spectrum_extractor._cutoff[0]
         y_scale /= self._spectrum_extractor._spectrum.shape[1]
-        tr.scale(self._spectrum_extractor._frameshift, y_scale)
+        tr.scale(self._spectrum_extractor._frameshift * 0.001, y_scale)
 
         self._img.setTransform(tr)
 
