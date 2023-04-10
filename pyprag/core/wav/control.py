@@ -21,44 +21,44 @@ class PlayerControllerWidget(QtWidgets.QWidget):
         player.loadNewWav(wav[0], wav[1])
 
         # Define play button
-        self.bPlay = QtWidgets.QPushButton(PlayerControllerWidget.BUTTON_GLYPHS[0], self)
-        self.bPlay.clicked.connect(self.play)
-        self.bPlay.setDefault(False)
-        self.bPlay.setAutoDefault(False)
+        self._bPlay = QtWidgets.QPushButton(PlayerControllerWidget.BUTTON_GLYPHS[0], self)
+        self._bPlay.clicked.connect(self.play)
+        self._bPlay.setDefault(False)
+        self._bPlay.setAutoDefault(False)
 
         # Define stop button
-        self.bPause = QtWidgets.QPushButton(PlayerControllerWidget.BUTTON_GLYPHS[1], self)
-        self.bPause.clicked.connect(self.pause)
-        self.bPause.setDefault(False)
-        self.bPause.setAutoDefault(False)
+        self._bPause = QtWidgets.QPushButton(PlayerControllerWidget.BUTTON_GLYPHS[1], self)
+        self._bPause.clicked.connect(self.pause)
+        self._bPause.setDefault(False)
+        self._bPause.setAutoDefault(False)
 
         # Define stop button
-        self.bStop = QtWidgets.QPushButton(PlayerControllerWidget.BUTTON_GLYPHS[2], self)
-        self.bStop.clicked.connect(self.stop)
-        self.bStop.setDefault(False)
-        self.bStop.setAutoDefault(False)
+        self._bStop = QtWidgets.QPushButton(PlayerControllerWidget.BUTTON_GLYPHS[2], self)
+        self._bStop.clicked.connect(self.stop)
+        self._bStop.setDefault(False)
+        self._bStop.setAutoDefault(False)
 
         # Define loop button
-        self.bLoop = QtWidgets.QPushButton(PlayerControllerWidget.BUTTON_GLYPHS[3], self)
-        self.bLoop.clicked.connect(self.loop)
-        self.bLoop.setDefault(False)
-        self.bLoop.setAutoDefault(False)
+        self._bLoop = QtWidgets.QPushButton(PlayerControllerWidget.BUTTON_GLYPHS[3], self)
+        self._bLoop.clicked.connect(self.loop)
+        self._bLoop.setDefault(False)
+        self._bLoop.setAutoDefault(False)
 
         # Define device selection box
         devices = sd.query_devices()
         device_names = [device['name'] for device in devices]
-        boxDevices = QtWidgets.QComboBox()
-        boxDevices.addItems(device_names)
+        self._boxDevices = QtWidgets.QComboBox()
+        self._boxDevices.addItems(device_names)
         sysdefaultIndex = [i for i, s in enumerate(device_names) if 'sysdefault' in s][0]
-        boxDevices.setCurrentIndex(sysdefaultIndex)
-        boxDevices.currentIndexChanged.connect(self.device_changed)
+        self._boxDevices.setCurrentIndex(sysdefaultIndex)
+        self._boxDevices.currentIndexChanged.connect(self.device_changed)
 
         player_layout = QtWidgets.QHBoxLayout()
-        player_layout.addWidget(self.bPlay)
-        player_layout.addWidget(self.bPause)
-        player_layout.addWidget(self.bStop)
-        player_layout.addWidget(self.bLoop)
-        player_layout.addWidget(boxDevices)
+        player_layout.addWidget(self._bPlay)
+        player_layout.addWidget(self._bPause)
+        player_layout.addWidget(self._bStop)
+        player_layout.addWidget(self._bLoop)
+        player_layout.addWidget(self._boxDevices)
         self.setLayout(player_layout)
 
         # player.add_position_handler(self.update_position)
@@ -74,9 +74,9 @@ class PlayerControllerWidget(QtWidgets.QWidget):
         # Play subpart
         player.pauseResume()
         if player._is_paused:
-            self.bPause.setFlat(True)
+            self._bPause.setFlat(True)
         else:
-            self.bPause.setFlat(False)
+            self._bPause.setFlat(False)
 
     def stop(self):
         player.stop()
@@ -84,9 +84,9 @@ class PlayerControllerWidget(QtWidgets.QWidget):
     def loop(self):
         player.toggleLoop()
         if player._loop_activated:
-            self.bLoop.setFlat(True)
+            self._bLoop.setFlat(True)
         else:
-            self.bLoop.setFlat(False)
+            self._bLoop.setFlat(False)
 
     def device_changed(self, index):
         player._device = index
