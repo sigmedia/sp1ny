@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-AUTHOR
+AUTHORS
 
     Sébastien Le Maguer <lemagues@tcd.ie>
+    Mark Anderson <andersm3@tcd.ie>
 
 DESCRIPTION
 
