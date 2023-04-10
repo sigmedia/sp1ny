@@ -137,6 +137,7 @@ class Player(metaclass=Singleton):
             elif self._is_playing == False:
                  outdata[:chunksize] = np.zeros((chunksize, 1))
                  self._position = 0
+                 raise sd.CallbackStop()
             else:
                 outdata[:chunksize] = data[self._position : self._position + chunksize]
                 if chunksize < frames:
