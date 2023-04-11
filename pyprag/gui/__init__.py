@@ -23,6 +23,8 @@ from .one_shot import OneShotArea
 from ..core.wav import PlayerControllerWidget
 from ..core import plugin_entry_dict
 
+from ..annotations.control import ControlLayout
+
 import importlib
 import pkgutil
 
@@ -100,11 +102,12 @@ class GUIVisu(QtWidgets.QMainWindow):
         self._plugin_list = QtWidgets.QComboBox(self)
         for elt in plugin_entry_dict:
             self._plugin_list.addItem(elt)
+
         # NOTE: Raw DATA is a joker
         if "Raw DATA" in plugin_entry_dict:
             self._plugin_list.setCurrentText("Raw DATA")
+
         self._plugin_list.currentTextChanged.connect(self.selectPlugin)
-        self._control_layout.addWidget(self._plugin_list)
 
         # Populate the list of plugins
         self._cmap_list = QtWidgets.QComboBox(self)
@@ -125,15 +128,28 @@ class GUIVisu(QtWidgets.QMainWindow):
         for elt in cmaps:
             self._cmap_list.addItem(elt)
         self._cmap_list.currentTextChanged.connect(self.selectColorMap)
-        self._control_layout.addWidget(self._cmap_list)
+
+        general_box_layout = QtWidgets.QGridLayout()
+        general_box_layout.setAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
+        l1 = QtWidgets.QLabel("Plugin")
+        l2 = QtWidgets.QLabel("Colormap")
+        general_box_layout.addWidget(l1, 0, 0)
+        general_box_layout.addWidget(l2, 1, 0)
+        general_box_layout.addWidget(self._plugin_list, 0, 1)
+        general_box_layout.addWidget(self._cmap_list, 1, 1)
+
+        general_box = QtWidgets.QGroupBox("General Data Visualization")
+        general_box.setLayout(general_box_layout)
+        self._control_layout.addWidget(general_box)
 
         place_holder = QtWidgets.QVBoxLayout()
         self._control_layout.addLayout(place_holder)
-
         tab1.setLayout(self._control_layout)
 
+        self._annotation_layout = ControlLayout(self)
         tab2 = QtWidgets.QWidget()
         tabs.addTab(tab2, "Annotations")
+        tab2.setLayout(self._annotation_layout)
 
         tab2 = QtWidgets.QWidget()
         tabs.addTab(tab2, "Wav/Signal")

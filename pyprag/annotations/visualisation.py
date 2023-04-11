@@ -120,6 +120,7 @@ class AnnotationItem(SegmentItem):
         super().__init__(seg_infos[0], seg_infos[1], wav=wav, movable=False)
 
         self.label = seg_infos[2]
+        self._selected = False
 
         # Some adaptations
         brush = QtGui.QBrush(QtGui.QColor(0, 0, 0, 0))
@@ -129,9 +130,9 @@ class AnnotationItem(SegmentItem):
 
         # Add label
         if showLabel:
-            text = pg.TextItem(text=self.label, anchor=(0.5, 0.5))
-            text.setPos((self.end + self.start) / 2, 0.5)
-            text.setParentItem(self)
+            self._text = pg.TextItem(text=self.label, anchor=(0.5, 0.5))
+            self._text.setPos((self.end + self.start) / 2, 0.5)
+            self._text.setParentItem(self)
 
     def hoverEvent(self, ev):
         """Override hoverEvent to relax some conditions
@@ -146,3 +147,39 @@ class AnnotationItem(SegmentItem):
             self.setMouseHover(True)
         else:
             self.setMouseHover(False)
+
+    def _update_bounds(self, ev):
+        super()._update_bounds(ev)
+        self._text.setPos((self.end + self.start) / 2, 0.5)
+
+    def mouseClickEvent(self, ev):
+        """The click event handler.
+
+        Additionnal operations are available:
+           - C-<double click> = play if wav is not None
+           - S-<double click> = unzoom
+           - <double click> = zoom
+
+        Parameters
+        ----------
+        ev : pg.QMouseEvent
+
+        """
+        super().mouseClickEvent(ev)
+
+        # # Check which key is pressed
+        # modifier_pressed = ev.modifiers()
+
+        if (ev.buttons() == QtCore.Qt.LeftButton) and (not ev.double()):
+            print("wait what?")
+            self.select()
+
+    def select(self):
+        self._selected = not self._selected
+
+        # Indicate that the segment is selected by changing the background brush
+        if self._selected:
+            brush = QtGui.QBrush(QtGui.QColor(255, 0, 0, 50))
+        else:
+            brush = QtGui.QBrush(QtGui.QColor(0, 0, 0, 50))
+        self.setBrush(brush)

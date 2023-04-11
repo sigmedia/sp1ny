@@ -65,7 +65,7 @@ class SpectrumController(DataController):
         extract_box_layout.addWidget(self._wFrameshift, 5, 1)
 
         l1 = QtWidgets.QLabel("Frame length (ms)")
-        self._wFramelength = QtWidgets.QLineEdit("80")
+        self._wFramelength = QtWidgets.QLineEdit("5")
         extract_box_layout.addWidget(l1, 6, 0)
         extract_box_layout.addWidget(self._wFramelength, 6, 1)
 
