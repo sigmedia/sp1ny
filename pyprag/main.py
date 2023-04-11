@@ -35,7 +35,7 @@ else:
 
 try:
     from pyprag.annotations import HTKAnnotation, TGTAnnotation
-    from pyprag.gui import build_gui
+    from pyprag.ui import build_gui
 except Exception as ex:
     raise ex
 
