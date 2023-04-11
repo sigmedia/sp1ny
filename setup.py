@@ -83,5 +83,5 @@ setup(
         "Programming Language :: Python :: 3.7",
     ],
     # "Executable" to link
-    entry_points={"console_scripts": [], "gui_scripts": ["pyprag = pyprag.pyprag:main"]},
+    entry_points={"console_scripts": [], "gui_scripts": ["pyprag = pyprag.main:main"]},
 )
