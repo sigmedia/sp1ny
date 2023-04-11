@@ -1,3 +1,5 @@
+from typing import Optional
+from pyprag.core.segment import Segment
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui
 from pyprag.core import player
@@ -41,15 +43,10 @@ class SegmentItem(RedefinedLinearRegionItem):
 
     """
 
-    def __init__(self, start, end, movable=False, related=[]):
+    def __init__(self, segment, movable=False, related=[]):
         """
         Parameters
         ----------
-        start : float
-            The start position (in seconds)
-
-        end : float
-            The end position (in seconds)
 
         movable : bool
             Indicate if the segment can be moved (start and end are changing).
@@ -60,15 +57,16 @@ class SegmentItem(RedefinedLinearRegionItem):
         """
         super().__init__()
 
+        self._segment = segment
         self._related = related
-        self._is_zoomed_in = True
+        self._is_zoomed_in = False
 
         # Some adaptations
         brush = QtGui.QBrush(QtGui.QColor(255, 0, 0, 50))
         self.setBrush(brush)
 
         # Set the bounds
-        self.setRegion((start, end))
+        self.setRegion((self._segment.start_time, self._segment.end_time))
 
         self.sigRegionChangeFinished.connect(self._update_bounds)
 
@@ -84,12 +82,12 @@ class SegmentItem(RedefinedLinearRegionItem):
         """
         # Get segment informations
         if bounds[1] < bounds[0]:
-            self.start = bounds[1]
-            self.end = bounds[0]
+            self._segment.start_time = bounds[1]
+            self._segment.end_time = bounds[0]
         else:
-            self.start = bounds[0]
-            self.end = bounds[1]
-        bounds = (self.start, self.end)
+            self._segment.start_time = bounds[0]
+            self._segment.end_time = bounds[1]
+        bounds = (self._segment.start_time, self._segment.end_time)
 
         super().setRegion(bounds)
 
@@ -109,10 +107,6 @@ class SegmentItem(RedefinedLinearRegionItem):
     def mouseClickEvent(self, ev):
         """The click event handler.
 
-        Additionnal operations are available:
-           - C-<double click> = play if wav is not None
-           - S-<double click> = unzoom
-           - <double click> = zoom
 
         Parameters
         ----------
@@ -125,7 +119,6 @@ class SegmentItem(RedefinedLinearRegionItem):
         modifier_pressed = ev.modifiers()
 
         if (ev.buttons() == QtCore.Qt.LeftButton) and ev.double():
-
             if modifier_pressed == QtCore.Qt.KeyboardModifier.ControlModifier:
                 player.play(start=self.start, end=self.end)
             elif modifier_pressed == QtCore.Qt.KeyboardModifier.ShiftModifier:
@@ -134,12 +127,12 @@ class SegmentItem(RedefinedLinearRegionItem):
                 self.parentWidget().setXRange(0, self.parentWidget().state["limits"]["xLimits"][1])
                 self._is_zoomed_in = not self._is_zoomed_in
             elif modifier_pressed == QtCore.Qt.KeyboardModifier.NoModifier:
-                self.parentWidget().setXRange(self.start, self.end)
+                self.parentWidget().setXRange(self._segment.start_time, self._segment.end_time)
                 self._is_zoomed_in = not self._is_zoomed_in
 
     def _update_bounds(self, ev):
-        self.start = self.lines[0].getXPos()
-        self.end = self.lines[1].getXPos()
+        self._segment.start_time = self.lines[0].getXPos()
+        self._segment.end_time = self.lines[1].getXPos()
 
 
 class SelectableViewBox(pg.ViewBox):
@@ -170,7 +163,7 @@ class SelectableViewBox(pg.ViewBox):
         """
 
         super().__init__(*args, **kwargs)
-        self._dragPoint = None
+        self._dragPoint: Optional[SegmentItem] = None
         self._select = False
         self._lock_y_axis = lock_y_axis
 
@@ -207,7 +200,8 @@ class SelectableViewBox(pg.ViewBox):
             if self._dragPoint is not None:
                 self._dragPoint.setRegion((start, end))
             else:
-                self._dragPoint = SegmentItem(start, end)
+                segment: Segment = Segment(start, end)
+                self._dragPoint = SegmentItem(segment)
                 self.parentWidget().addItem(self._dragPoint)
 
             self._select = True
@@ -217,21 +211,21 @@ class SelectableViewBox(pg.ViewBox):
             self._select = False
 
         # Definition of the region in progress
+        elif self._dragPoint is not None:
+            # Compute start position
+            start_pos = ev.buttonDownPos()
+            start = self.mapToView(start_pos).x()
+
+            # Compute end position
+            end_pos = ev.pos()
+            end = self.mapToView(end_pos).x()
+
+            # Update region
+            self._dragPoint.setRegion((start, end))
+
         else:
-            if self._dragPoint is not None:
-                # Compute start position
-                start_pos = ev.buttonDownPos()
-                start = self.mapToView(start_pos).x()
-
-                # Compute end position
-                end_pos = ev.pos()
-                end = self.mapToView(end_pos).x()
-
-                # Update region
-                self._dragPoint.setRegion((start, end))
-            else:
-                ev.ignore()
-                return
+            ev.ignore()
+            return
 
         # Indicate that the event has been accepted and everything has been done
         ev.accept()

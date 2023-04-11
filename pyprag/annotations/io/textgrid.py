@@ -1,20 +1,10 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-AUTHOR
+from typing import List
 
-    Sébastien Le Maguer <lemagues@tcd.ie>
-
-DESCRIPTION
-
-    Module which contains utils to load a TextGrid file. The entry class is TGTAnnotation.
-
-LICENSE
-"""
 # Textgrid utilities
 import tgt
 
 # Import abstract class
+from ..model import AnnotationSet, Annotation
 from . import AnnotationLoader
 
 ###############################################################################
@@ -22,7 +12,7 @@ from . import AnnotationLoader
 ###############################################################################
 
 
-class TGTAnnotation(AnnotationLoader):
+class TGTAnnotationLoader(AnnotationLoader):
     """Class to load annotations from TextGrid files
 
     Attributes
@@ -35,7 +25,7 @@ class TGTAnnotation(AnnotationLoader):
 
     """
 
-    def extract_annotation(self, input_file):
+    def load(self, input_file) -> AnnotationSet:
         """Annotation extraction method.
 
         Parameters
@@ -55,13 +45,19 @@ class TGTAnnotation(AnnotationLoader):
         except UnicodeError:
             the_tgt = tgt.io3.read_textgrid(input_file, encoding="utf-16")
 
+        an_dict = dict()
         for cur_tier in the_tgt.tiers:
-            cur_tier_segments = []
-            for an in cur_tier.annotations:
-                cur_tier_segments.append((an.start_time, an.end_time, an.text))
+            annotations: List[Annotation] = []
 
-            if cur_tier_segments:
-                self.segments[cur_tier.name] = cur_tier_segments
+            for an in cur_tier.annotations:
+                annotation: Annotation = Annotation(an.start_time, an.end_time, an.text)
+                annotations.append(annotation)
+
+            if annotations:
+                an_dict[cur_tier.name] = annotations
                 self.logger.debug("%s added" % cur_tier.name)
             else:
                 self.logger.warning("%s is empty, we ignore it!" % cur_tier.name)
+
+        annotation_set: AnnotationSet = AnnotationSet(an_dict)
+        return annotation_set

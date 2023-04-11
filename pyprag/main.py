@@ -34,7 +34,7 @@ else:
     APP = QtWidgets.QApplication.instance()
 
 try:
-    from pyprag.annotations import HTKAnnotation, TGTAnnotation
+    from pyprag.annotations import HTKAnnotationLoader, TGTAnnotationLoader
     from pyprag.ui import build_gui
 except Exception as ex:
     raise ex
@@ -174,25 +174,25 @@ def main():
 
     # Check with data
     if args.coefficient_file:
-        from pyprag.core.data import controller
+        from pyprag.raw_data import controller
 
         controller.loadCoefficientFile(args.coefficient_file, args.dimension, frameshift)
 
     # Load annotation
     logger.info("Load annotation")
-    annotation = None
+    annotation_set = None
     if args.annotation_file != "":
         if args.annotation_file.endswith(".lab"):
-            annotation = HTKAnnotation(args.annotation_file, wav)
+            an_loader = HTKAnnotationLoader()
         elif args.annotation_file.endswith(".TextGrid"):
-            annotation = TGTAnnotation(args.annotation_file, wav)
+            an_loader = TGTAnnotationLoader()
         else:
             raise Exception("The annotation cannot be parsed, format is unknown")
-
+        annotation_set = an_loader.load(args.annotation_file)
     # Generate window
     logger.info("Rendering")
     infos = (wav, args.wav_file)
-    build_gui(APP, infos, frameshift, annotation)
+    build_gui(APP, infos, frameshift, annotation_set)
 
 
 ###############################################################################

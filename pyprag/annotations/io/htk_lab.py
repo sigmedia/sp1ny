@@ -1,21 +1,9 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-AUTHOR
-
-    Sébastien Le Maguer <lemagues@tcd.ie>
-
-DESCRIPTION
-
-    Module which contains utils to load a HTK Label file. The entry class is HTKAnnotation.
-
-LICENSE
-"""
-
 # Regular expression
 import re
+from typing import List
 
 # Import abstract class
+from ..model import AnnotationSet, Annotation
 from . import AnnotationLoader
 
 ###############################################################################
@@ -29,7 +17,7 @@ HTK_UNIT = 10000000
 ###############################################################################
 
 
-class HTKAnnotation(AnnotationLoader):
+class HTKAnnotationLoader(AnnotationLoader):
     """Class to load annotations from HTK Label files
 
     Attributes
@@ -43,7 +31,7 @@ class HTKAnnotation(AnnotationLoader):
 
     """
 
-    def extract_annotation(self, htk_file):
+    def load(self, htk_file) -> AnnotationSet:
         """Annotation extraction method.
 
         Parameters
@@ -61,8 +49,8 @@ class HTKAnnotation(AnnotationLoader):
         NotImplementedError
             If the label is not correctly formatted
         """
-        self.segments = dict()
-        self.segments["default"] = []
+        annotations: List[Annotation] = []
+
         with open(htk_file) as f:
             for line in f:
                 # Preprocess
@@ -71,19 +59,25 @@ class HTKAnnotation(AnnotationLoader):
                 assert len(elts) == 3
 
                 # Convert to seconds
-                elts[0] = int(elts[0]) / HTK_UNIT
-                elts[1] = int(elts[1]) / HTK_UNIT
+                start_time = int(elts[0]) / HTK_UNIT
+                end_time = int(elts[1]) / HTK_UNIT
 
                 # Extract monophone label
                 m = re.search("-(.+?)\\+", elts[2])
                 if m:
-                    elts[2] = m.group(1)
+                    label = m.group(1)
                 else:
                     m = re.search("([a-zA-Z][a-zA-Z0-9]*)$", elts[2])
                     if m:
-                        elts[2] = m.group(1)
+                        label = m.group(1)
                     else:
                         raise NotImplementedError("label not correct : " + elts[2])
 
                 # Finalize by adding everything to the list
-                self.segments["default"].append(elts)
+                annotation: Annotation = Annotation(start_time, end_time, label)
+                annotations.append(annotation)
+
+        an_dict = dict()
+        an_dict["default"] = annotations
+        annotation_set: AnnotationSet = AnnotationSet(an_dict)
+        return annotation_set
