@@ -21,7 +21,7 @@ class SpectrogramPlotWidget(pg.PlotWidget):
         The histogram widget to control the image colorimetrie
     """
 
-    def __init__(self, spectrum_extractor, parent=None, background="default", **kwargs):
+    def __init__(self, spectrum_extractor, parent=None, **kwargs):
         """
         Parameters
         ----------
@@ -44,7 +44,9 @@ class SpectrogramPlotWidget(pg.PlotWidget):
             arguments passed to pg.PlotWidget
 
         """
-        pg.GraphicsView.__init__(self, parent, background)
+
+        color = QtWidgets.QApplication.instance().palette().color(QtGui.QPalette.Base)
+        pg.GraphicsView.__init__(self, parent, background=color)
         self.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
         self.enableMouse(False)
 
@@ -74,11 +76,22 @@ class SpectrogramPlotWidget(pg.PlotWidget):
         self.plotItem.getViewBox().addItem(self._img)
         self.setCentralItem(self.plotItem)
 
+        # # Set the limits to prevent bad (FIXME: hardcoded values)
+        # self.plotItem.setLimits(
+        #     minYRange=-100,
+        #     maxYRange=self._spectrum_extractor._spectrum.shape[1] * y_scale + 100,
+        #     yMin=-100,
+        #     yMax=self._spectrum_extractor._spectrum.shape[1] * y_scale + 100,
+        #     xMin=-1,
+        #     xMax=self._spectrum_extractor._frameshift * 0.001 * self._spectrum_extractor._spectrum.shape[0] + 1
+        # )
+
         if self._ticks is not None:
             self.setTicks(self._ticks)
 
     def setTicks(self, ticks):
         self._ticks = ticks
+
         # Define and assign histogram
         self.hist = pg.HistogramLUTWidget()
         self.hist.setImageItem(self._img)

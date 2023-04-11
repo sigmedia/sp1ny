@@ -17,6 +17,7 @@ import importlib
 import pkgutil
 
 # pyprag internal packages
+from .gui.theme import define_palette
 from .gui.utils import cmapToColormap
 from .core.wav.visualisation import WavDock
 from .annotations.visualisation import AnnotationDock
@@ -118,7 +119,7 @@ class VisualisationArea(DockArea):
         if self.annotation is not None:
             self.logger.debug("Plot annotation part")
             dock_align = AnnotationDock(
-                "Annotations", (950, 20), self.annotation, self.wav
+                "Annotations", (950, 20), self.annotation
             )  # Size doesn't seem to affect anything
 
         # Link X-Axis
@@ -316,33 +317,6 @@ class GUIVisu(QtWidgets.QMainWindow):
 
     def selectColorMap(self, cmap_name):
         self._visualisation_area.updateColorMap(cmap_name)
-
-
-def define_palette(app, dark_activated=True):
-    app.setStyle("Fusion")
-
-    # import pyqtgraph as pg
-    # pg.setConfigOption('background', 'w')
-    # pg.setConfigOption('foreground', 'k')
-    # dark_palette = QtGui.QPalette()
-
-    # dark_palette.setColor(QtGui.QPalette.Window, QtGui.QColor(53, 53, 53))
-    # dark_palette.setColor(QtGui.QPalette.WindowText, QtCore.Qt.white)
-    # dark_palette.setColor(QtGui.QPalette.Base, QtGui.QColor(25, 25, 25))
-    # dark_palette.setColor(QtGui.QPalette.AlternateBase, QtGui.QColor(53, 53, 53))
-    # dark_palette.setColor(QtGui.QPalette.ToolTipBase, QtCore.Qt.white)
-    # dark_palette.setColor(QtGui.QPalette.ToolTipText, QtCore.Qt.white)
-    # dark_palette.setColor(QtGui.QPalette.Text, QtCore.Qt.white)
-    # dark_palette.setColor(QtGui.QPalette.Button, QtGui.QColor(53, 53, 53))
-    # dark_palette.setColor(QtGui.QPalette.ButtonText, QtCore.Qt.white)
-    # dark_palette.setColor(QtGui.QPalette.BrightText, QtCore.Qt.red)
-    # dark_palette.setColor(QtGui.QPalette.Link, QtGui.QColor(42, 130, 218))
-    # dark_palette.setColor(QtGui.QPalette.Highlight, QtGui.QColor(42, 130, 218))
-    # dark_palette.setColor(QtGui.QPalette.HighlightedText, QtCore.Qt.black)
-
-    # app.setPalette(dark_palette)
-
-    # app.setStyleSheet("QToolTip { color: #ffffff; background-color: #2a82da; border: 1px solid white; }")
 
 
 def build_gui(app, infos, frameshift, annotation=None):

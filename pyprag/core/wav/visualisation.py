@@ -1,21 +1,9 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-AUTHOR
-
-    Sébastien Le Maguer <lemagues@tcd.ie>
-
-DESCRIPTION
-
-    Module providing some specific items for annotation and highlight purpose.
-
-LICENSE
-"""
 # Python
 import numpy as np
 
 # PyQTGraph
 import pyqtgraph as pg
+from pyqtgraph.Qt import QtGui, QtWidgets
 from pyqtgraph.dockarea import Dock
 
 # PyPrag
@@ -64,18 +52,32 @@ class WavPlotWidget(pg.PlotWidget):
         # Save reference to wav
         x = np.arange(player._data.shape[0]) / player._sampling_rate
 
+        ylimit_padding = (player._data.max() - player._data.min()) * 0.1
+        min_y = player._data.min() - ylimit_padding
+        max_y = player._data.max() + ylimit_padding
+
         # Prepare plot item
-        self.plotItem = SelectablePlotItem(lock_y_axis=True, **kwargs)
+        self.plotItem = SelectablePlotItem(lock_y_axis=True, values=[min_y, max_y], **kwargs)
         self.setCentralItem(self.plotItem)
-        self.plotItem.plot(x, player._data.squeeze())  # FIXME: duplicate things, find a way to get rid of this!
-        self.plotItem.setXRange(0, player._data.shape[0] / player._sampling_rate, padding=0)
-        v_bar = pg.InfiniteLine(pos=0, movable=False, angle=90, pen=pg.mkPen({"color": "#F00", "width": 2}))
+        color = QtWidgets.QApplication.instance().palette().color(QtGui.QPalette.Text)
+        self.plotItem.plot(
+            x, player._data.squeeze(), pen=color
+        )  # FIXME: duplicate things, find a way to get rid of this!
+        self.plotItem.setLimits(
+            minYRange=min_y,
+            maxYRange=max_y,
+            yMin=min_y,
+            yMax=max_y,
+            minXRange=0,
+            maxXRange=player._data.shape[0] / player._sampling_rate,
+        )
+        # v_bar = pg.InfiniteLine(pos=0, movable=False, angle=90, pen=pg.mkPen({"color": "#F00", "width": 2}))
 
-        def _update_position_handler(position):
-            v_bar.setValue(position)
+        # def _update_position_handler(position):
+        #     v_bar.setValue(position)
 
-        player.add_position_handler(_update_position_handler)
-        self.plotItem.addItem(v_bar)
+        # player.add_position_handler(_update_position_handler)
+        # self.plotItem.addItem(v_bar)
 
 
 class WavDock(Dock):

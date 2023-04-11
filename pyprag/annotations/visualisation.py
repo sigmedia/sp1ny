@@ -3,6 +3,7 @@ from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 from pyqtgraph.dockarea import Dock
 
 from pyprag.gui.items import SegmentItem
+from pyprag.core import player
 
 
 class AnnotationDock(Dock):
@@ -13,16 +14,12 @@ class AnnotationDock(Dock):
     annotation: pyprag.annotation.AnnotationLoader
         The annotation loader object
 
-    wav : tuple(np.array, int)
-        The signal information as loaded using librosa.
-        The tuple contain an array of samples and the sample rate.
-
     reference_plot : pg.PlotWidget
         The reference annotation tier rendering as we have a plot per tier
 
     """
 
-    def __init__(self, name, size, annotation, wav):
+    def __init__(self, name, size, annotation):
         """
         Parameters
         ----------
@@ -32,16 +29,11 @@ class AnnotationDock(Dock):
         annotation: pyprag.annotation.AnnotationLoader
             The annotation loader object
 
-        wav : tuple(np.array, int)
-            The signal information as loaded using librosa.
-            The tuple contain an array of samples and the sample rate
-
         """
         Dock.__init__(self, name=name, size=size)
 
         # Define some attributes
         self.annotation = annotation
-        self.wav = wav
 
         # Prepare scrolling support
         self.scroll = QtWidgets.QScrollArea()
@@ -61,7 +53,9 @@ class AnnotationDock(Dock):
     def __plotAnnotation(self):
         """Helper to render the annotations"""
         lim_factor = 1.1
-        T_max = self.wav[0].shape[0] / self.wav[1]
+        wav_data = player._data
+        sr = player._sampling_rate
+        T_max = wav_data.shape[0] / sr
         for k in self.annotation.segments:
             annotation_plot = pg.PlotWidget(name="%s_%s" % (self.name(), k))
             annotation_plot.disableAutoRange()
@@ -69,7 +63,7 @@ class AnnotationDock(Dock):
             annotation_plot.setYRange(0, 1)
             for i, elt in enumerate(self.annotation.segments[k]):
                 # Generate region item
-                seg = AnnotationItem(elt, self.wav)
+                seg = AnnotationItem(elt)
                 annotation_plot.addItem(seg)
 
             if T_max < self.annotation.segments[k][-1][1]:
@@ -103,7 +97,7 @@ class AnnotationItem(SegmentItem):
 
     """
 
-    def __init__(self, seg_infos, wav=None, showLabel=True):
+    def __init__(self, seg_infos, showLabel=True):
         """
         Parameters
         ----------
@@ -117,7 +111,7 @@ class AnnotationItem(SegmentItem):
         showLabel : bool, optional
             Show the label (or not). (default: True)
         """
-        super().__init__(seg_infos[0], seg_infos[1], wav=wav, movable=False)
+        super().__init__(seg_infos[0], seg_infos[1], movable=False)
 
         self.label = seg_infos[2]
         self._selected = False
@@ -130,7 +124,11 @@ class AnnotationItem(SegmentItem):
 
         # Add label
         if showLabel:
-            self._text = pg.TextItem(text=self.label, anchor=(0.5, 0.5))
+            self._text = pg.TextItem(
+                text=self.label,
+                anchor=(0.5, 0.5),
+                color=QtWidgets.QApplication.instance().palette().color(QtGui.QPalette.Text),
+            )
             self._text.setPos((self.end + self.start) / 2, 0.5)
             self._text.setParentItem(self)
 

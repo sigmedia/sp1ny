@@ -21,7 +21,7 @@ class WaveletPlotWidget(pg.PlotWidget):
         The histogram widget to control the image colorimetrie
     """
 
-    def __init__(self, wavelet_extractor, parent=None, background="default", **kwargs):
+    def __init__(self, wavelet_extractor, parent=None, **kwargs):
         """
         Parameters
         ----------
@@ -44,7 +44,8 @@ class WaveletPlotWidget(pg.PlotWidget):
             arguments passed to pg.PlotWidget
 
         """
-        pg.GraphicsView.__init__(self, parent, background)
+        color = QtWidgets.QApplication.instance().palette().color(QtGui.QPalette.Base)
+        pg.GraphicsView.__init__(self, parent, background=color)
         self.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
         self.enableMouse(False)
 

@@ -4,4 +4,4 @@ from .plugin_management import plugin_entry_dict
 
 from .wav import player
 
-__all__ = ["DataDock", "DataController", "plugin_entry_dict", "player"]
+__all__ = ["DataDock", "DataController", "plugin_entry_dict", "player", "segment"]

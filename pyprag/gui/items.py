@@ -1,20 +1,7 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-AUTHOR
-
-    Sébastien Le Maguer <lemagues@tcd.ie>
-
-DESCRIPTION
-
-    Module providing some specific items for annotation and highlight purpose.
-
-LICENSE
-"""
-
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui
 from pyprag.core import player
+from .tmp import RedefinedLinearRegionItem
 
 
 ###############################################################################
@@ -28,22 +15,17 @@ class SelectablePlotItem(pg.PlotItem):
         Parameters
         ----------
 
-        wav : tuple(np.array, int), optional
-            The signal information as loaded using librosa.
-            The tuple contain an array of samples and the sample rate.
-            (default: None)
-
         kwargs : keyword arguments
             Used to transmit values to pg.plotItem. *The keyword viewBox is ignored*
 
         """
-        vb = SelectableViewBox(lock_y_axis)
+        vb = SelectableViewBox(lock_y_axis=lock_y_axis)
         kwargs["viewBox"] = vb
         super().__init__(**kwargs)
         vb.setParentItem(self)
 
 
-class SegmentItem(pg.LinearRegionItem):
+class SegmentItem(RedefinedLinearRegionItem):
     """A segment item which is a specific pg.LinearRegionItem
 
     Attributes
@@ -54,18 +36,12 @@ class SegmentItem(pg.LinearRegionItem):
     end : float
         The end position (in seconds)
 
-    wav : tuple(np.array, int)
-        The signal information as loaded using librosa. The tuple contain an array of samples and the sample rate.
-
     movable : bool
         Indicate if the segment can be moved (start and end are changing)
 
-    related : list
-        List of related segments (instances of SegmentItem)
-
     """
 
-    def __init__(self, start, end, wav=None, movable=False, related=[]):
+    def __init__(self, start, end, movable=False, related=[]):
         """
         Parameters
         ----------
@@ -74,11 +50,6 @@ class SegmentItem(pg.LinearRegionItem):
 
         end : float
             The end position (in seconds)
-
-        wav : tuple(np.array, int), optional
-            The signal information as loaded using librosa.
-            The tuple contain an array of samples and the sample rate.
-           (default: None)
 
         movable : bool
             Indicate if the segment can be moved (start and end are changing).
@@ -89,8 +60,8 @@ class SegmentItem(pg.LinearRegionItem):
         """
         super().__init__()
 
-        self._wav = wav
         self._related = related
+        self._is_zoomed_in = True
 
         # Some adaptations
         brush = QtGui.QBrush(QtGui.QColor(255, 0, 0, 50))
@@ -156,12 +127,15 @@ class SegmentItem(pg.LinearRegionItem):
         if (ev.buttons() == QtCore.Qt.LeftButton) and ev.double():
 
             if modifier_pressed == QtCore.Qt.KeyboardModifier.ControlModifier:
-                # Play subpart
                 player.play(start=self.start, end=self.end)
             elif modifier_pressed == QtCore.Qt.KeyboardModifier.ShiftModifier:
+                self.parentWidget().removeSegment()
+            elif (modifier_pressed == QtCore.Qt.KeyboardModifier.NoModifier) and self._is_zoomed_in:
                 self.parentWidget().setXRange(0, self.parentWidget().state["limits"]["xLimits"][1])
+                self._is_zoomed_in = not self._is_zoomed_in
             elif modifier_pressed == QtCore.Qt.KeyboardModifier.NoModifier:
                 self.parentWidget().setXRange(self.start, self.end)
+                self._is_zoomed_in = not self._is_zoomed_in
 
     def _update_bounds(self, ev):
         self.start = self.lines[0].getXPos()
@@ -188,11 +162,6 @@ class SelectableViewBox(pg.ViewBox):
         """
         Parameters
         ----------
-        wav : tuple(np.array, int), optional
-            The signal information as loaded using librosa.
-            The tuple contain an array of samples and the sample rate.
-            (default: None)
-
         args : TODO
             remaining arguments
 
@@ -307,3 +276,7 @@ class SelectableViewBox(pg.ViewBox):
             self.setXRange(tl.x(), br.x(), padding=0)
         else:
             self.setRange(QtCore.QRectF(tl, br), padding=0)
+
+    def removeSegment(self):
+        self.parentWidget().removeItem(self._dragPoint)
+        self._dragPoint = None

@@ -6,7 +6,7 @@ from pyqtgraph.Qt import QtGui, QtWidgets
 from pyprag.gui.items import SelectablePlotItem
 
 
-class RawDataPlotWidget(pg.PlotWidget):
+class SpectrogramPraatPlotWidget(pg.PlotWidget):
     """Image plot widget allowing to highlight some regions
 
     Attributes
@@ -21,7 +21,7 @@ class RawDataPlotWidget(pg.PlotWidget):
         The histogram widget to control the image colorimetrie
     """
 
-    def __init__(self, data_extractor, parent=None, **kwargs):
+    def __init__(self, spectrum_extractor, parent=None, **kwargs):
         """
         Parameters
         ----------
@@ -44,19 +44,30 @@ class RawDataPlotWidget(pg.PlotWidget):
             arguments passed to pg.PlotWidget
 
         """
-        pg.GraphicsView.__init__(self, parent)
+        color = QtWidgets.QApplication.instance().palette().color(QtGui.QPalette.Base)
+        pg.GraphicsView.__init__(self, parent, background=color)
         self.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
         self.enableMouse(False)
 
-        # Save reference to data
-        self._data_extractor = data_extractor
+        self._spectrum_extractor = spectrum_extractor
+
+        # NOTE: needed to conserve the colormap
+        self._ticks = None
 
     def refresh(self):
         self._img = pg.ImageItem()
-        self._img.setImage(self._data_extractor._data.T)
+        self._img.setImage(self._spectrum_extractor._spectrum.T)
 
+        # 1. translate to the minimal frequency
         tr = QtGui.QTransform()
-        tr.scale(self._data_extractor._frameshift, 1)
+        min_y = self._spectrum_extractor._cutoff[0]
+        tr.translate(0, min_y)
+
+        # 2. scale
+        y_scale = self._spectrum_extractor._cutoff[1] - self._spectrum_extractor._cutoff[0]
+        y_scale /= self._spectrum_extractor._spectrum.shape[1]
+        tr.scale(self._spectrum_extractor._frameshift, y_scale)
+
         self._img.setTransform(tr)
 
         # Generate plot
@@ -64,7 +75,11 @@ class RawDataPlotWidget(pg.PlotWidget):
         self.plotItem.getViewBox().addItem(self._img)
         self.setCentralItem(self.plotItem)
 
+        if self._ticks is not None:
+            self.setTicks(self._ticks)
+
     def setTicks(self, ticks):
+        self._ticks = ticks
         # Define and assign histogram
         self.hist = pg.HistogramLUTWidget()
         self.hist.setImageItem(self._img)
