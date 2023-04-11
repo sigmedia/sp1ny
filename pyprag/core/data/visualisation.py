@@ -64,6 +64,15 @@ class RawDataPlotWidget(pg.PlotWidget):
         self.plotItem.getViewBox().addItem(self._img)
         self.setCentralItem(self.plotItem)
 
+        self.plotItem.setLimits(
+            minYRange=0,
+            maxYRange=self._data_extractor._data.shape[1],
+            yMin=0,
+            yMax=self._data_extractor._data.shape[1],
+            xMin=0,
+            xMax=self._spectrum_extractor._frameshift * 0.001 * self._spectrum_extractor._spectrum.shape[0],
+        )
+
     def setTicks(self, ticks):
         # Define and assign histogram
         self.hist = pg.HistogramLUTWidget()

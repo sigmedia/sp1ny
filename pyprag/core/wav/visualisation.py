@@ -52,25 +52,30 @@ class WavPlotWidget(pg.PlotWidget):
         # Save reference to wav
         x = np.arange(player._data.shape[0]) / player._sampling_rate
 
-        ylimit_padding = (player._data.max() - player._data.min()) * 0.1
-        min_y = player._data.min() - ylimit_padding
-        max_y = player._data.max() + ylimit_padding
-
         # Prepare plot item
-        self.plotItem = SelectablePlotItem(lock_y_axis=True, values=[min_y, max_y], **kwargs)
+        self.plotItem = SelectablePlotItem(
+            lock_y_axis=True,
+            # values=[min_y, max_y],
+            default_padding=0,
+            **kwargs,
+        )
         self.setCentralItem(self.plotItem)
         color = QtWidgets.QApplication.instance().palette().color(QtGui.QPalette.Text)
         self.plotItem.plot(
             x, player._data.squeeze(), pen=color
         )  # FIXME: duplicate things, find a way to get rid of this!
+
+        # Define the limits to constraint the zoom
+        T = player._data.shape[0] / player._sampling_rate
         self.plotItem.setLimits(
-            minYRange=min_y,
-            maxYRange=max_y,
-            yMin=min_y,
-            yMax=max_y,
+            yMin=-1,
+            yMax=1,
+            xMin=0,
+            xMax=T,
             minXRange=0,
-            maxXRange=player._data.shape[0] / player._sampling_rate,
+            maxXRange=T,
         )
+
         # v_bar = pg.InfiniteLine(pos=0, movable=False, angle=90, pen=pg.mkPen({"color": "#F00", "width": 2}))
 
         # def _update_position_handler(position):

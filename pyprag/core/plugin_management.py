@@ -7,7 +7,7 @@ class DataController:
 
     def extract(self):
         self._extractor.extract()
-        self._widget.refresh()
+        self.refresh()
 
     def refresh(self):
         self._widget.refresh()
@@ -33,7 +33,6 @@ class DataDock(Dock):
         if cur_widget is not None:
             cur_widget.setParent(None)
         self.currentRow = self.currentRow - 1
-        # self.dockdrop.raiseOverlay()
 
     def setWidget(self, widget, name):
         # Ensure widgets are removed

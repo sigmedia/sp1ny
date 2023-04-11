@@ -76,15 +76,15 @@ class SpectrogramPlotWidget(pg.PlotWidget):
         self.plotItem.getViewBox().addItem(self._img)
         self.setCentralItem(self.plotItem)
 
-        # # Set the limits to prevent bad (FIXME: hardcoded values)
-        # self.plotItem.setLimits(
-        #     minYRange=-100,
-        #     maxYRange=self._spectrum_extractor._spectrum.shape[1] * y_scale + 100,
-        #     yMin=-100,
-        #     yMax=self._spectrum_extractor._spectrum.shape[1] * y_scale + 100,
-        #     xMin=-1,
-        #     xMax=self._spectrum_extractor._frameshift * 0.001 * self._spectrum_extractor._spectrum.shape[0] + 1
-        # )
+        # Set the limits to prevent bad (FIXME: hardcoded values)
+        self.plotItem.setLimits(
+            minYRange=0,
+            maxYRange=self._spectrum_extractor._spectrum.shape[1] * y_scale,
+            yMin=0,
+            yMax=self._spectrum_extractor._spectrum.shape[1] * y_scale,
+            xMin=0,
+            xMax=self._spectrum_extractor._frameshift * 0.001 * self._spectrum_extractor._spectrum.shape[0],
+        )
 
         if self._ticks is not None:
             self.setTicks(self._ticks)
