@@ -46,6 +46,7 @@ class Player(metaclass=Singleton):
         self._position_handler = None
         self._chunk_size = chunk_size
         self._position = 0
+        self._player_volume = 1.
         self._position_handlers = []
         # set default device to 'sysdefault'
         devices = sd.query_devices()
@@ -139,7 +140,7 @@ class Player(metaclass=Singleton):
                  self._position = 0
                  raise sd.CallbackStop()
             else:
-                outdata[:chunksize] = data[self._position : self._position + chunksize]
+                outdata[:chunksize] = data[self._position : self._position + chunksize] * self._player_volume
                 if chunksize < frames:
                     outdata[chunksize:] = 0
                     if self._loop_activated:

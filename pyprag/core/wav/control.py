@@ -1,11 +1,12 @@
 # Python
 from platform import system
+import math
 
 # Python SoundDevice
 import sounddevice as sd
 
 # PyPrag
-from pyqtgraph.Qt import QtWidgets
+from pyqtgraph.Qt import QtCore, QtWidgets
 from .player import player
 
 
@@ -53,12 +54,23 @@ class PlayerControllerWidget(QtWidgets.QWidget):
         self._boxDevices.setCurrentIndex(sysdefaultIndex)
         self._boxDevices.currentIndexChanged.connect(self.device_changed)
 
+        # Define volume slider
+        self._sVolume = QtWidgets.QSlider(QtCore.Qt.Horizontal)
+        self._sVolume.setRange(0., 100.)
+        self._sVolume.setValue(100.)
+        self._sVolume.setTracking(True)
+        self._sVolume.setTickPosition(QtWidgets.QSlider.TicksBelow)
+        self._sVolume.setTickInterval(5)
+        self._sVolume.valueChanged.connect(self.volume_changed)
+
+
         player_layout = QtWidgets.QHBoxLayout()
         player_layout.addWidget(self._bPlay)
         player_layout.addWidget(self._bPause)
         player_layout.addWidget(self._bStop)
         player_layout.addWidget(self._bLoop)
         player_layout.addWidget(self._boxDevices)
+        player_layout.addWidget(self._sVolume)
         self.setLayout(player_layout)
 
         # player.add_position_handler(self.update_position)
@@ -90,3 +102,6 @@ class PlayerControllerWidget(QtWidgets.QWidget):
 
     def device_changed(self, index):
         player._device = index
+
+    def volume_changed(self):
+        player._player_volume = self._sVolume.value() / 100#volume
