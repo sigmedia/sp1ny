@@ -94,6 +94,7 @@ class PlayerControllerWidget(QtWidgets.QWidget):
             self._bPause.setFlat(False)
 
     def stop(self):
+        self.pause()
         player.stop()
 
     def loop(self):
