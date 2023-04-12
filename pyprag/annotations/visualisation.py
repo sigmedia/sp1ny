@@ -16,12 +16,9 @@ class AnnotationDock(Dock):
     annotation: pyprag.annotation.AnnotationLoader
         The annotation loader object
 
-    reference_plot : pg.PlotWidget
-        The reference annotation tier rendering as we have a plot per tier
-
     """
 
-    def __init__(self, name, size, annotation_set):
+    def __init__(self, name, size, annotation_set, wav_plot):
         """
         Parameters
         ----------
@@ -36,11 +33,14 @@ class AnnotationDock(Dock):
 
         # Define some attributes
         self.annotation_set = annotation_set
+        self._wav_plot = wav_plot
 
         # Prepare scrolling support
         self.scroll = QtWidgets.QScrollArea()
         self.widget = QtWidgets.QWidget()
         self.vbox = QtWidgets.QVBoxLayout()
+        self.vbox.setContentsMargins(0, 0, 0, 0)
+
         self.widget.setLayout(self.vbox)
         self.addWidget(self.scroll)
 
@@ -74,23 +74,19 @@ class AnnotationDock(Dock):
 
             self.vbox.addWidget(annotation_plot)
 
-        # Define the last annotation as the reference one
-        index = self.vbox.count() - 1
-        self.reference_plot = self.vbox.itemAt(index).widget()
-        self.reference_plot.setLimits(xMin=0, xMax=T_max, yMin=0, yMax=1)
-        self.reference_plot.hideAxis("bottom")
-
-        # Lock everything else to the reference
-        for i in range(index):
+        # Link axes
+        for i in range(self.vbox.count()):
             w = self.vbox.itemAt(i).widget()
             w.hideAxis("bottom")
-            w.setXLink(self.reference_plot)
             w.setLimits(
                 xMin=0,
                 xMax=T_max,
                 yMin=0,
                 yMax=1,
             )
+            w.setXLink(self._wav_plot)
+            w.getAxis("left").setTicks([])
+            w.getAxis("left").setWidth(50)  # FIXME: hardcoded
 
 
 class AnnotationItem(SegmentItem):
@@ -177,7 +173,7 @@ class AnnotationItem(SegmentItem):
         if (ev.buttons() == QtCore.Qt.LeftButton) and ev.double():
             if modifier_pressed == QtCore.Qt.KeyboardModifier.ControlModifier:
                 ev.accept()
-                player.play(start=self.start, end=self.end)
+                player.play(start=self._segment.start_time, end=self._segment.end_time)
             elif (modifier_pressed == QtCore.Qt.KeyboardModifier.NoModifier) and self._is_zoomed_in:
                 ev.accept()
                 self.parentWidget().setXRange(0, self.parentWidget().state["limits"]["xLimits"][1])

@@ -119,14 +119,11 @@ class VisualisationArea(DockArea):
         if self.annotation is not None:
             self.logger.debug("Plot annotation part")
             dock_align = AnnotationDock(
-                "Annotations", (950, 20), self.annotation
+                "Annotations", (950, 20), self.annotation, self._dock_wav.wav_plot
             )  # Size doesn't seem to affect anything
 
-        # Link X-Axis
-        self.logger.debug("Link everything")
+        # Define the label on wav plots
         self._dock_wav.wav_plot.setLabel("bottom", "Time", units="s")
-        if self.annotation is not None:
-            dock_align.reference_plot.setXLink(self._dock_wav.wav_plot)
 
         # - Add docks
         self.logger.debug("Add docks to the area")

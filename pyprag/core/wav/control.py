@@ -1,6 +1,5 @@
 # Python
 from platform import system
-import math
 
 # Python SoundDevice
 import sounddevice as sd
@@ -47,20 +46,20 @@ class PlayerControllerWidget(QtWidgets.QWidget):
 
         # Define device selection box
         devices = sd.query_devices()
-        device_names = [device['name'] for device in devices]
+        device_names = [device["name"] for device in devices]
         self._boxDevices = QtWidgets.QComboBox()
         self._boxDevices.addItems(device_names)
-        sysdefaultIndex = [i for i, s in enumerate(device_names) if 'sysdefault' in s][0]
+        sysdefaultIndex = [i for i, s in enumerate(device_names) if "sysdefault" in s][0]
         self._boxDevices.setCurrentIndex(sysdefaultIndex)
         self._boxDevices.currentIndexChanged.connect(self.device_changed)
 
         # Define volume slider
-        self._lVolume = QtWidgets.QLabel('100', self)
+        self._lVolume = QtWidgets.QLabel("100%", self)
         self._lVolume.setAlignment(QtCore.Qt.AlignmentFlag.AlignVCenter)
         self._lVolume.setMinimumWidth(80)
         self._sVolume = QtWidgets.QSlider(QtCore.Qt.Horizontal)
-        self._sVolume.setRange(0., 100.)
-        self._sVolume.setValue(100.)
+        self._sVolume.setRange(0.0, 100.0)
+        self._sVolume.setValue(100.0)
         self._sVolume.setTracking(True)
         self._sVolume.valueChanged.connect(self.volume_changed)
 
@@ -70,8 +69,10 @@ class PlayerControllerWidget(QtWidgets.QWidget):
         player_layout.addWidget(self._bStop)
         player_layout.addWidget(self._bLoop)
         player_layout.addSpacing(15)
+        player_layout.addWidget(QtWidgets.QLabel("Output Device"))
         player_layout.addWidget(self._boxDevices)
         player_layout.addSpacing(15)
+        player_layout.addWidget(QtWidgets.QLabel("Volume"))
         player_layout.addWidget(self._sVolume)
         player_layout.addWidget(self._lVolume)
         self.setLayout(player_layout)
@@ -110,4 +111,4 @@ class PlayerControllerWidget(QtWidgets.QWidget):
 
     def volume_changed(self):
         player._player_volume = self._sVolume.value() / 100
-        self._lVolume.setText(str(self._sVolume.value()))
+        self._lVolume.setText(f"{self._sVolume.value()}%")

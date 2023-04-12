@@ -38,14 +38,14 @@ class ControlLayout(QtWidgets.QVBoxLayout):
         super().__init__(parent)
 
         self._current_annotation = None
-        tier_box = self._generate_tier_box()
-        self._file_box = self._generate_file_box()
+        # tier_box = self._generate_tier_box()
+        # self._file_box = self._generate_file_box()
         self._info_box = self._generate_general_box()
         ipa_box = self._generate_IPA_box()
 
         self.setAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
-        self.addWidget(self._file_box)
-        self.addWidget(tier_box)
+        # self.addWidget(self._file_box)
+        # self.addWidget(tier_box)
         self.addWidget(self._info_box)
         self.addWidget(ipa_box)
 
@@ -127,7 +127,7 @@ class ControlLayout(QtWidgets.QVBoxLayout):
         ipa_box_layout = QtWidgets.QVBoxLayout()
         ipa_box_layout.setAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
 
-        box = CollapsibleBox("Pulmonic Consonnants")
+        box = CollapsibleBox("Consonnants")
         lay = QtWidgets.QGridLayout()
 
         for j, cur_unicode in enumerate(IPA_CHARS):

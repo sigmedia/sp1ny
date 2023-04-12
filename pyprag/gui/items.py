@@ -3,7 +3,6 @@ from pyprag.core.segment import Segment
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui
 from pyprag.core import player
-from .tmp import RedefinedLinearRegionItem
 
 
 ###############################################################################
@@ -27,7 +26,30 @@ class SelectablePlotItem(pg.PlotItem):
         vb.setParentItem(self)
 
 
-class SegmentItem(RedefinedLinearRegionItem):
+class LinkedInfiniteLine(pg.InfiniteLine):
+    def __init__(
+        self,
+        linked_line=None,
+        pos=None,
+        angle=90,
+        pen=None,
+        movable=False,
+        bounds=None,
+        hoverPen=None,
+        label=None,
+        labelOpts=None,
+        span=(0, 1),
+        markers=None,
+        name=None,
+    ):
+        super().__init__(pos, angle, pen, movable, bounds, hoverPen, label, labelOpts, span, markers, name)
+
+        self._linked_line = linked_line
+        if linked_line is not None:
+            linked_line._linked_line = self
+
+
+class SegmentItem(pg.LinearRegionItem):
     """A segment item which is a specific pg.LinearRegionItem
 
     Attributes
@@ -43,7 +65,18 @@ class SegmentItem(RedefinedLinearRegionItem):
 
     """
 
-    def __init__(self, segment, movable=False, related=[]):
+    def __init__(
+        self,
+        segment,
+        movable=True,
+        related=[],
+        span=(0, 1),
+        swapMode="sort",
+        clipItem=None,
+        pen=None,
+        hoverPen=None,
+        bounds=None,
+    ):
         """
         Parameters
         ----------
@@ -55,19 +88,53 @@ class SegmentItem(RedefinedLinearRegionItem):
         related : list
             List of related segments (instances of SegmentItem). (default: [])
         """
-        super().__init__()
+
+        pg.GraphicsObject.__init__(self)
 
         self._segment = segment
         self._related = related
         self._is_zoomed_in = False
 
-        # Some adaptations
-        brush = QtGui.QBrush(QtGui.QColor(255, 0, 0, 50))
+        self.orientation = "vertical"
+        self.blockLineSignal = False
+        self.moving = False
+        self.mouseHovering = False
+        self.span = span
+        self.swapMode = swapMode
+        self.clipItem = clipItem
+
+        self._boundingRectCache = None
+        self._clipItemBoundsCache = None
+
+        # note RedefinedLinearRegionItem.Horizontal and RedefinedLinearRegionItem.Vertical
+        # are kept for backward compatibility.
+        lineKwds = dict(
+            movable=movable,
+            bounds=bounds,
+            span=span,
+            pen=pen,
+            hoverPen=hoverPen,
+        )
+
+        self.lines = [
+            LinkedInfiniteLine(pos=QtCore.QPointF(self._segment.start_time, 0), angle=90, **lineKwds),
+            LinkedInfiniteLine(pos=QtCore.QPointF(self._segment.end_time, 0), angle=90, **lineKwds),
+        ]
+
+        brush = QtGui.QBrush(QtGui.QColor(0, 0, 255, 50))
         self.setBrush(brush)
+        hover_brush = QtGui.QBrush(QtGui.QColor(255, 0, 0, 50))
+        self.setHoverBrush(hover_brush)
+
+        self.setMovable(movable)
 
         # Set the bounds
-        self.setRegion((self._segment.start_time, self._segment.end_time))
 
+        for line in self.lines:
+            line.setParentItem(self)
+            line.sigPositionChangeFinished.connect(self.lineMoveFinished)
+        self.lines[0].sigPositionChanged.connect(self._line0Moved)
+        self.lines[1].sigPositionChanged.connect(self._line1Moved)
         self.sigRegionChangeFinished.connect(self._update_bounds)
 
     def setRegion(self, bounds):
@@ -94,16 +161,6 @@ class SegmentItem(RedefinedLinearRegionItem):
         for s in self._related:
             s.setRegion(bounds)
 
-    def mouseDragEvent(self, ev):
-        """The item dragging event handler.
-
-        Parameters
-        ----------
-        ev : pg.MouseDragEvent
-
-        """
-        super().mouseDragEvent(ev)
-
     def mouseClickEvent(self, ev):
         """The click event handler.
 
@@ -120,7 +177,7 @@ class SegmentItem(RedefinedLinearRegionItem):
 
         if (ev.buttons() == QtCore.Qt.LeftButton) and ev.double():
             if modifier_pressed == QtCore.Qt.KeyboardModifier.ControlModifier:
-                player.play(start=self.start, end=self.end)
+                player.play(start=self._segment.start_time, end=self._segment.end_time)
             elif modifier_pressed == QtCore.Qt.KeyboardModifier.ShiftModifier:
                 self.parentWidget().removeSegment()
             elif (modifier_pressed == QtCore.Qt.KeyboardModifier.NoModifier) and self._is_zoomed_in:
