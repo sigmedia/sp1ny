@@ -40,7 +40,7 @@ EXTRA_REQUIREMENTS = {
     # ]
 }
 
-NAME = "PyPraG"
+NAME = "SpINY"
 VERSION = "0.0.1"
 AUTHOR = "Sébastien Le Maguer"
 DESCRIPTION = ""
@@ -83,5 +83,5 @@ setup(
         "Programming Language :: Python :: 3.7",
     ],
     # "Executable" to link
-    entry_points={"console_scripts": [], "gui_scripts": ["pyprag = pyprag.main:main"]},
+    entry_points={"console_scripts": [], "gui_scripts": ["spiny = spiny.main:main"]},
 )

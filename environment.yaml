@@ -1,4 +1,4 @@
-name: pyprag
+name: spiny
 channels:
   - conda-forge
   - defaults
