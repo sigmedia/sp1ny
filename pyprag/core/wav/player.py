@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-AUTHOR
+AUTHORS
 
     Sébastien Le Maguer <lemagues@tcd.ie>
+    Mark Anderson <andersm3@tcd.ie>
 
 DESCRIPTION
 
@@ -45,7 +46,13 @@ class Player(metaclass=Singleton):
         self._position_handler = None
         self._chunk_size = chunk_size
         self._position = 0
+        self._player_volume = 1.
         self._position_handlers = []
+        # set default device to 'sysdefault'
+        devices = sd.query_devices()
+        device_names = [device['name'] for device in devices]
+        sysdefaultIndex = [i for i, s in enumerate(device_names) if 'sysdefault' in s][0]
+        self._device = sysdefaultIndex
 
     def setWavData(self, wav_data):
         # First be sure everything is stopped
@@ -88,6 +95,9 @@ class Player(metaclass=Singleton):
         if wav_data is not None:
             self.setWavData(wav_data)
 
+        # Reset position
+        self._position = 0
+
         # And now play!
         self._is_playing = True
         if end == -1:
@@ -102,12 +112,6 @@ class Player(metaclass=Singleton):
     def pauseResume(self):
         # Update the pause status
         self._is_paused = not self._is_paused
-
-        # Fix the stream
-        if self._is_paused:
-            self._stream.stop_stream()
-        else:
-            self._stream.start_stream()
 
     def stop(self):
         self._is_playing = False
@@ -127,27 +131,39 @@ class Player(metaclass=Singleton):
             if status:
                 print(status)
             chunksize = min(len(data) - self._position, frames)
-            outdata[:chunksize] = data[self._position : self._position + chunksize]
-            if chunksize < frames:
-                outdata[chunksize:] = 0
-                raise sd.CallbackStop()
-            self._position += chunksize
+            # If stream is paused, keep open but output zeros
+            # position is not updated so can resume from same frame
+            if self._is_paused:
+                outdata[:chunksize] = np.zeros((chunksize, 1))
+            elif self._is_playing == False:
+                 outdata[:chunksize] = np.zeros((chunksize, 1))
+                 self._position = 0
+                 raise sd.CallbackStop()
+            else:
+                outdata[:chunksize] = data[self._position : self._position + chunksize] * self._player_volume
+                if chunksize < frames:
+                    outdata[chunksize:] = 0
+                    if self._loop_activated:
+                        self._position = 0
+                    else:
+                        raise sd.CallbackStop()
+                self._position += chunksize
 
             # pos = self._position / self._sr
             # for f in self._position_handlers:
             #     f(pos)
 
-        stream = sd.OutputStream(
+        self._stream = sd.OutputStream(
             samplerate=self._sampling_rate,
-            device=None,
+            device=self._device,
             channels=data.shape[1],
             callback=callback,
             finished_callback=event.set,
         )
-        with stream:
+        with self._stream:
             event.wait()  # Wait until playback is finished
             self._position = 0
-            self._is_playing = 0
+            self._is_playing = False
 
 
 player = Player()
