@@ -24,7 +24,7 @@ from .annotations.visualisation import AnnotationDock
 from .core import DataDock
 from .core.wav import PlayerControllerWidget
 from .core import plugin_entry_dict
-from .annotations.control import ControlLayout
+from .annotations import controller as annotation_controller
 
 import pyprag.plugins  # NOTE: we can't use relative import as the prefix is used to validate the plugins
 
@@ -258,7 +258,8 @@ class GUIVisu(QtWidgets.QMainWindow):
         self._control_layout.addLayout(place_holder)
         tab1.setLayout(self._control_layout)
 
-        self._annotation_layout = ControlLayout(self)
+        self._annotation_layout = annotation_controller
+        # self._annotation_layout.setParent(self)
         tab2 = QtWidgets.QWidget()
         tabs.addTab(tab2, "Annotations")
         tab2.setLayout(self._annotation_layout)

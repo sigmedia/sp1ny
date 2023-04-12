@@ -5,6 +5,8 @@ from pyqtgraph.dockarea import Dock
 from pyprag.gui.items import SegmentItem
 from pyprag.core import player
 
+from .control import controller
+
 
 class AnnotationDock(Dock):
     """Dock containing annotation informations
@@ -52,18 +54,19 @@ class AnnotationDock(Dock):
 
     def __plotAnnotation(self):
         """Helper to render the annotations"""
-        lim_factor = 1.1
         wav_data = player._data
         sr = player._sampling_rate
         T_max = wav_data.shape[0] / sr
         for k in self.annotation_set.annotations:
             annotation_plot = pg.PlotWidget(name="%s_%s" % (self.name(), k))
-            annotation_plot.disableAutoRange()
             annotation_plot.getAxis("left").setLabel(k)
-            annotation_plot.setYRange(0, 1)
+            previous_annotation = None
             for i, elt in enumerate(self.annotation_set.annotations[k]):
                 # Generate region item
                 seg = AnnotationItem(elt)
+                seg._previous_annotation_item = previous_annotation
+                if previous_annotation is not None:
+                    previous_annotation._next_annotation_item = seg
                 annotation_plot.addItem(seg)
 
             if T_max < self.annotation_set.annotations[k][-1].end_time:
@@ -74,7 +77,7 @@ class AnnotationDock(Dock):
         # Define the last annotation as the reference one
         index = self.vbox.count() - 1
         self.reference_plot = self.vbox.itemAt(index).widget()
-        self.reference_plot.setLimits(xMax=T_max * lim_factor)
+        self.reference_plot.setLimits(xMin=0, xMax=T_max, yMin=0, yMax=1)
         self.reference_plot.hideAxis("bottom")
 
         # Lock everything else to the reference
@@ -82,7 +85,12 @@ class AnnotationDock(Dock):
             w = self.vbox.itemAt(i).widget()
             w.hideAxis("bottom")
             w.setXLink(self.reference_plot)
-            w.setLimits(xMax=T_max * lim_factor)
+            w.setLimits(
+                xMin=0,
+                xMax=T_max,
+                yMin=0,
+                yMax=1,
+            )
 
 
 class AnnotationItem(SegmentItem):
@@ -111,9 +119,11 @@ class AnnotationItem(SegmentItem):
         showLabel : bool, optional
             Show the label (or not). (default: True)
         """
-        super().__init__(annotation, movable=False)
+        super().__init__(annotation, movable=True)
 
         self._selected = False
+        self._previous_annotation_item = None
+        self._next_annotation_item = None
 
         # Some adaptations
         brush = QtGui.QBrush(QtGui.QColor(0, 0, 0, 0))
@@ -166,23 +176,37 @@ class AnnotationItem(SegmentItem):
 
         if (ev.buttons() == QtCore.Qt.LeftButton) and ev.double():
             if modifier_pressed == QtCore.Qt.KeyboardModifier.ControlModifier:
+                ev.accept()
                 player.play(start=self.start, end=self.end)
             elif (modifier_pressed == QtCore.Qt.KeyboardModifier.NoModifier) and self._is_zoomed_in:
+                ev.accept()
                 self.parentWidget().setXRange(0, self.parentWidget().state["limits"]["xLimits"][1])
                 self._is_zoomed_in = not self._is_zoomed_in
             elif modifier_pressed == QtCore.Qt.KeyboardModifier.NoModifier:
+                ev.accept()
                 self.parentWidget().setXRange(self._segment.start_time, self._segment.end_time)
                 self._is_zoomed_in = not self._is_zoomed_in
 
         elif (ev.buttons() == QtCore.Qt.LeftButton) and (not ev.double()):
+            ev.accept()
             self.select()
 
     def select(self):
+
+        controller.update_current_annotation(self)
+
+        # Toggle the selected flag
         self._selected = not self._selected
 
-        # Indicate that the segment is selected by changing the background brush
+        # Update the brush
         if self._selected:
             brush = QtGui.QBrush(QtGui.QColor(255, 0, 0, 50))
         else:
             brush = self._default_brush
         self.setBrush(brush)
+        self.update()
+
+    def updateLabel(self, label):
+        self._segment.label = label
+        self._text.setText(label)
+        self._text.setPos((self._segment.start_time + self._segment.end_time) / 2, 0.5)

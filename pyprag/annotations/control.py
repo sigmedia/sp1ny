@@ -2,78 +2,55 @@ from pyqtgraph import QtCore, QtGui, QtWidgets
 from ipapy import IPA_CHARS
 from ipapy.ipachar import IPAConsonant, IPASuprasegmental, IPADiacritic, IPAVowel
 
+from ..gui.widgets import CollapsibleBox
+
 # from . import HTKAnnotation, TGTAnnotation
 
 
-class CollapsibleBox(QtWidgets.QWidget):
-    """This class has been adapted from a PyQt5 example
+class QLabelClickable(QtWidgets.QLabel):
+    clicked = QtCore.Signal(str)
 
-    The exampple is provided at this address: https://stackoverflow.com/a/52617714
-    """
+    def __init__(self, parent=None):
+        super(QLabelClickable, self).__init__(parent)
 
-    def __init__(self, title="", parent=None):
-        super(CollapsibleBox, self).__init__(parent)
+    def mousePressEvent(self, event):
+        self.ultimo = "Clic"
 
-        self.toggle_button = QtWidgets.QToolButton(text=title, checkable=True, checked=False)
-        self.toggle_button.setStyleSheet("QToolButton { border: none; }")
-        self.toggle_button.setToolButtonStyle(QtCore.Qt.ToolButtonTextBesideIcon)
-        self.toggle_button.setArrowType(QtCore.Qt.RightArrow)
-        self.toggle_button.pressed.connect(self.on_pressed)
+    def mouseReleaseEvent(self, event):
+        if self.ultimo == "Clic":
+            QtCore.QTimer.singleShot(
+                QtWidgets.QApplication.instance().doubleClickInterval(), self.performSingleClickAction
+            )
+        else:
+            # Realizar acción de doble clic.
+            self.clicked.emit(self.text())
 
-        self.toggle_animation = QtCore.QParallelAnimationGroup(self)
+    # def mouseDoubleClickEvent(self, event):
+    #     self.ultimo = "Doble Clic"
 
-        self.content_area = QtWidgets.QScrollArea(maximumHeight=0, minimumHeight=0)
-        self.content_area.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
-        self.content_area.setFrameShape(QtWidgets.QFrame.NoFrame)
-
-        lay = QtWidgets.QVBoxLayout(self)
-        lay.setSpacing(0)
-        lay.setContentsMargins(0, 0, 0, 0)
-        lay.addWidget(self.toggle_button)
-        lay.addWidget(self.content_area)
-
-        self.toggle_animation.addAnimation(QtCore.QPropertyAnimation(self, b"minimumHeight"))
-        self.toggle_animation.addAnimation(QtCore.QPropertyAnimation(self, b"maximumHeight"))
-        self.toggle_animation.addAnimation(QtCore.QPropertyAnimation(self.content_area, b"maximumHeight"))
-
-    def on_pressed(self):
-        checked = self.toggle_button.isChecked()
-        self.toggle_button.setArrowType(QtCore.Qt.DownArrow if not checked else QtCore.Qt.RightArrow)
-        self.toggle_animation.setDirection(
-            QtCore.QAbstractAnimation.Forward if not checked else QtCore.QAbstractAnimation.Backward
-        )
-        self.toggle_animation.start()
-
-    def setContentLayout(self, layout):
-        lay = self.content_area.layout()
-        del lay
-        self.content_area.setLayout(layout)
-        collapsed_height = self.sizeHint().height() - self.content_area.maximumHeight()
-        content_height = layout.sizeHint().height()
-        for i in range(self.toggle_animation.animationCount()):
-            animation = self.toggle_animation.animationAt(i)
-            animation.setDuration(500)
-            animation.setStartValue(collapsed_height)
-            animation.setEndValue(collapsed_height + content_height)
-
-        content_animation = self.toggle_animation.animationAt(self.toggle_animation.animationCount() - 1)
-        content_animation.setDuration(500)
-        content_animation.setStartValue(0)
-        content_animation.setEndValue(content_height)
+    def performSingleClickAction(self):
+        if self.ultimo == "Clic":
+            self.clicked.emit(self.text())
 
 
 class ControlLayout(QtWidgets.QVBoxLayout):
     def __init__(self, parent):
         super().__init__(parent)
 
+        self._current_annotation = None
+        tier_box = self._generate_tier_box()
         self._file_box = self._generate_file_box()
-        info_box = self._generate_general_box()
+        self._info_box = self._generate_general_box()
         ipa_box = self._generate_IPA_box()
 
         self.setAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
         self.addWidget(self._file_box)
-        self.addWidget(info_box)
+        self.addWidget(tier_box)
+        self.addWidget(self._info_box)
         self.addWidget(ipa_box)
+
+        # Nothing selected => no info to show
+        self._info_box.setVisible(False)
 
     def _generate_file_box(self):
         file_box_layout = QtWidgets.QGridLayout()
@@ -97,6 +74,24 @@ class ControlLayout(QtWidgets.QVBoxLayout):
 
         return file_box
 
+    def _generate_tier_box(self):
+        tier_box = QtWidgets.QGroupBox("List of tiers")
+        tier_box_layout = QtWidgets.QVBoxLayout()
+        tier_box_layout.setAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
+
+        # Start time
+        listWidget = QtWidgets.QListWidget(tier_box)
+        listWidget.setSelectionMode(QtWidgets.QAbstractItemView.MultiSelection)
+        for i in range(5):
+            item = QtWidgets.QListWidgetItem(listWidget)
+            item.setText("Item {0}".format(i))
+            listWidget.addItem(item)
+
+        tier_box_layout.addWidget(listWidget)
+        tier_box.setLayout(tier_box_layout)
+
+        return tier_box
+
     def _generate_general_box(self):
         annotation_info_box_layout = QtWidgets.QGridLayout()
         annotation_info_box_layout.setAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
@@ -118,6 +113,7 @@ class ControlLayout(QtWidgets.QVBoxLayout):
         # Label
         l3 = QtWidgets.QLabel("Label")
         self._wLabel = QtWidgets.QLineEdit("<unknown>")
+        self._wLabel.textEdited.connect(self.onLabelEdited)
         annotation_info_box_layout.addWidget(l3, 3, 0)
         annotation_info_box_layout.addWidget(self._wLabel, 3, 1)
 
@@ -136,7 +132,8 @@ class ControlLayout(QtWidgets.QVBoxLayout):
 
         for j, cur_unicode in enumerate(IPA_CHARS):
             if type(cur_unicode) == IPAConsonant:
-                label = QtWidgets.QLabel("{}".format(cur_unicode))
+                label = QLabelClickable("{}".format(cur_unicode))
+                label.clicked.connect(self.onIPAInsert)
                 label.setAlignment(QtCore.Qt.AlignCenter)
                 label.setToolTip(" ".join(cur_unicode.descriptors))
 
@@ -158,7 +155,8 @@ class ControlLayout(QtWidgets.QVBoxLayout):
         for cur_unicode in IPA_CHARS:
             if type(cur_unicode) == IPAVowel:
                 j += 1
-                label = QtWidgets.QLabel("{}".format(cur_unicode))
+                label = QLabelClickable("{}".format(cur_unicode))
+                label.clicked.connect(self.onIPAInsert)
                 label.setAlignment(QtCore.Qt.AlignCenter)
                 label.setToolTip(" ".join(cur_unicode.descriptors))
 
@@ -177,7 +175,9 @@ class ControlLayout(QtWidgets.QVBoxLayout):
         for cur_unicode in IPA_CHARS:
             if type(cur_unicode) == IPADiacritic:
                 j += 1
-                label = QtWidgets.QLabel("{}".format(cur_unicode))
+                label = QLabelClickable("{}".format(cur_unicode))
+                label.clicked.connect(self.onIPAInsert)
+                label.setFont(QtGui.QFont("Arial", 16))
                 label.setAlignment(QtCore.Qt.AlignCenter)
                 label.setToolTip(" ".join(cur_unicode.descriptors))
 
@@ -196,7 +196,9 @@ class ControlLayout(QtWidgets.QVBoxLayout):
         for cur_unicode in IPA_CHARS:
             if type(cur_unicode) == IPASuprasegmental:
                 j += 1
-                label = QtWidgets.QLabel("{}".format(cur_unicode))
+                label = QLabelClickable("{}".format(cur_unicode))
+                label.clicked.connect(self.onIPAInsert)
+                label.setFont(QtGui.QFont("Arial", 16))
                 label.setAlignment(QtCore.Qt.AlignCenter)
                 label.setToolTip(" ".join(cur_unicode.descriptors))
 
@@ -209,17 +211,6 @@ class ControlLayout(QtWidgets.QVBoxLayout):
         ipa_box_layout.addWidget(box)
 
         ipa_box = QtWidgets.QGroupBox("IPA Helpers")
-
-        # self.scroll = QtWidgets.QScrollArea()
-        # self.widget = QtWidgets.QWidget()
-        # self.vbox = QtWidgets.QVBoxLayout()
-        # self.widget.setLayout(self.vbox)
-        # self.addWidget(self.scroll)
-
-        # self.scroll.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOn)
-        # self.scroll.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
-        # self.scroll.setWidgetResizable(True)
-        # self.scroll.setWidget(self.widget)
 
         ipa_box.setLayout(ipa_box_layout)
 
@@ -245,3 +236,34 @@ class ControlLayout(QtWidgets.QVBoxLayout):
         #         annotation = TGTAnnotation(annotation_file)
         #     else:
         #         raise Exception("The annotation cannot be parsed, format is unknown")
+
+    def update_current_annotation(self, new_annotation=None):
+        if self._current_annotation == new_annotation:
+            self._wStartTime.setText("<Unknown>")
+            self._wEndTime.setText("<Unknown>")
+            self._wLabel.setText("<Unkown>")
+            self._current_annotation = None
+            self._info_box.setVisible(False)
+            return
+
+        if self._current_annotation is not None:
+            self._current_annotation.select()
+
+        self._current_annotation = new_annotation
+
+        if self._current_annotation is not None:
+            self._wStartTime.setText(str(self._current_annotation._segment.start_time))
+            self._wEndTime.setText(str(self._current_annotation._segment.end_time))
+            self._wLabel.setText(self._current_annotation._segment.label)
+            self._info_box.setVisible(True)
+
+    def onLabelEdited(self):
+        label = self._wLabel.text()
+        if self._current_annotation is not None:
+            self._current_annotation.updateLabel(label)
+
+    def onIPAInsert(self, ipa_symbol):
+        self._wLabel.insert(ipa_symbol)
+
+
+controller = ControlLayout(None)
