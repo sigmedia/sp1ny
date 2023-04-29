@@ -4,7 +4,7 @@ from platform import system
 # Python SoundDevice
 import sounddevice as sd
 
-# PyPrag
+# SpINY
 from pyqtgraph.Qt import QtCore, QtWidgets
 from .player import player
 

@@ -6,7 +6,7 @@ import pyqtgraph as pg
 from pyqtgraph.Qt import QtGui, QtWidgets
 from pyqtgraph.dockarea import Dock
 
-# PyPrag
+# SpINY
 from spiny.gui.items import SelectablePlotItem
 from .player import player
 

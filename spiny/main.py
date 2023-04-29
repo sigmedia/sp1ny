@@ -29,7 +29,7 @@ import librosa
 from pyqtgraph.Qt import QtWidgets
 
 if not QtWidgets.QApplication.instance():
-    APP = QtWidgets.QApplication(["PyPraG"])
+    APP = QtWidgets.QApplication(["SpINY"])
 else:
     APP = QtWidgets.QApplication.instance()
 

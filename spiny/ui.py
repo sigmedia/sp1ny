@@ -261,8 +261,8 @@ class GUIVisu(QtWidgets.QMainWindow):
         tabs.addTab(tab2, "Annotations")
         tab2.setLayout(self._annotation_layout)
 
-        tab2 = QtWidgets.QWidget()
-        tabs.addTab(tab2, "Wav/Signal")
+        # tab2 = QtWidgets.QWidget()
+        # tabs.addTab(tab2, "Wav/Signal")
 
         right_layout.addWidget(tabs)
 
@@ -322,7 +322,7 @@ def build_gui(app, infos, frameshift, annotation=None):
     # Generate application
     define_palette(app)
     win = GUIVisu(infos, frameshift, annotation)
-    win.setWindowTitle("PyPraG")
+    win.setWindowTitle("SpINY")
 
     # Start the application
     win.show()
