@@ -70,6 +70,16 @@ class WaveletPlotWidget(pg.PlotWidget):
         self.plotItem.getViewBox().addItem(self._img)
         self.setCentralItem(self.plotItem)
 
+        # Set time and frequency axes
+        self.plotItem.setLimits(
+            minYRange=0,
+            maxYRange=self._wavelet_extractor._num_scales * self._wavelet_extractor._scale_distance,
+            yMin=0,
+            yMax=self._wavelet_extractor._num_scales * self._wavelet_extractor._scale_distance,
+            xMin=0,
+            xMax=self._wavelet_extractor._frameshift * self._wavelet_extractor._wavelet.shape[0],
+        )
+
         if self._ticks is not None:
             self.setTicks(self._ticks)
 
