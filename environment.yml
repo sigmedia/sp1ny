@@ -234,6 +234,5 @@ dependencies:
   - zlib=1.2.13
   - zstd=1.5.2
   - pip:
-      - pyprag==0.0.1
       - pyworld==0.3.2
       - tgt==1.4.4

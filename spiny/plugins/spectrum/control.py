@@ -74,7 +74,7 @@ class SpectrumController(DataController):
         extract_box_layout.addWidget(l1, 7, 0)
         extract_box_layout.addWidget(self._wWindow, 7, 1)
 
-        extract_box = QtWidgets.QGroupBox("Refresh parameters")
+        extract_box = QtWidgets.QGroupBox("Extraction parameters")
         extract_box.setLayout(extract_box_layout)
 
         main_group_box = QtWidgets.QGroupBox("Spectrogram configuration")

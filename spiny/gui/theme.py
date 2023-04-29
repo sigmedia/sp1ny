@@ -42,4 +42,16 @@ def define_palette(app, dark_activated=False):
         palette = define_light_palette(app)
 
     app.setPalette(palette)
-    app.setStyleSheet("QToolTip { color: #ffffff; background-color: #2a82da; border: 1px solid white; }")
+    app.setStyleSheet(
+        """
+        QToolTip { color: #ffffff; background-color: #2a82da; border: 1px solid white; }
+        # QLabel{font-size: 18pt;}
+        # QLineEdit{font-size: 18pt;}
+        # QButton{font-size: 18pt;}
+        # QPushButton{font-size: 18pt;}
+        # QGroupBox{font-size: 18pt;}
+        # QComboBox{font-size: 18pt;}
+        # QTabWidget{font-size: 18pt;}
+        # QToolButton{font-size: 18pt;}
+        """
+    )
