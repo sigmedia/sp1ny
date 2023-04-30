@@ -28,7 +28,7 @@ class WavPlotWidget(pg.PlotWidget):
 
     """
 
-    def __init__(self, parent=None, background="default", **kwargs):
+    def __init__(self, parent=None, **kwargs):
         """
         Parameters
         ----------
@@ -47,7 +47,7 @@ class WavPlotWidget(pg.PlotWidget):
             arguments passed to pg.PlotWidget
 
         """
-        super().__init__(parent=parent, background=background)
+        super().__init__(parent=parent)
 
         # Save reference to wav
         x = np.arange(player._data.shape[0]) / player._sampling_rate

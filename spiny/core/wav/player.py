@@ -48,11 +48,9 @@ class Player(metaclass=Singleton):
         self._position = 0
         self._player_volume = 1.0
         self._position_handlers = []
-        # set default device to 'sysdefault'
-        devices = sd.query_devices()
-        device_names = [device["name"] for device in devices]
-        sysdefaultIndex = [i for i, s in enumerate(device_names) if "sysdefault" in s][0]
-        self._device = sysdefaultIndex
+
+        # Define devices and current device being the default one
+        self._device = sd.query_hostapis()[0].get("default_" + "output".lower() + "_device")
 
     def setWavData(self, wav_data):
         # First be sure everything is stopped
@@ -153,6 +151,11 @@ class Player(metaclass=Singleton):
             # for f in self._position_handlers:
             #     f(pos)
 
+        sd.check_output_settings(
+            samplerate=self._sampling_rate,
+            device=self._device,
+            channels=data.shape[1],
+        )
         self._stream = sd.OutputStream(
             samplerate=self._sampling_rate,
             device=self._device,

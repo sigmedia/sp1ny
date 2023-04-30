@@ -44,22 +44,32 @@ class PlayerControllerWidget(QtWidgets.QWidget):
         self._bLoop.setDefault(False)
         self._bLoop.setAutoDefault(False)
 
-        # Define device selection box
+        # Get devices information
         devices = sd.query_devices()
-        device_names = [device["name"] for device in devices]
+        self._devices = dict()
+        default_device_index = sd.query_hostapis()[0].get("default_" + "output".lower() + "_device")
+        default_device = None
+        for device in devices:
+            if device["max_output_channels"] <= 0:  # NOTE: only consider output devices!
+                continue
+
+            self._devices[device["name"]] = int(device["index"])
+            if int(device["index"]) == default_device_index:
+                default_device = device["name"]
+
+        # Generation Device ComboBox
         self._boxDevices = QtWidgets.QComboBox()
-        self._boxDevices.addItems(device_names)
-        sysdefaultIndex = [i for i, s in enumerate(device_names) if "sysdefault" in s][0]
-        self._boxDevices.setCurrentIndex(sysdefaultIndex)
-        self._boxDevices.currentIndexChanged.connect(self.device_changed)
+        self._boxDevices.addItems(self._devices.keys())
+        self._boxDevices.setCurrentText(default_device)
+        self._boxDevices.currentTextChanged.connect(self.device_changed)
 
         # Define volume slider
         self._lVolume = QtWidgets.QLabel("100%", self)
         self._lVolume.setAlignment(QtCore.Qt.AlignmentFlag.AlignVCenter)
         self._lVolume.setMinimumWidth(80)
         self._sVolume = QtWidgets.QSlider(QtCore.Qt.Horizontal)
-        self._sVolume.setRange(0.0, 100.0)
-        self._sVolume.setValue(100.0)
+        self._sVolume.setRange(0, 100)
+        self._sVolume.setValue(100)
         self._sVolume.setTracking(True)
         self._sVolume.valueChanged.connect(self.volume_changed)
 
@@ -106,7 +116,8 @@ class PlayerControllerWidget(QtWidgets.QWidget):
         else:
             self._bLoop.setFlat(False)
 
-    def device_changed(self, index):
+    def device_changed(self, name):
+        index = self._devices[name]
         player._device = index
 
     def volume_changed(self):
