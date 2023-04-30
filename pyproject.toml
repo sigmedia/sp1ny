@@ -58,8 +58,8 @@ plugins = ["praat-parselmouth", "wavelet_prosody_toolkit"]
 dev = ["pre-commit"]
 
 [project.urls]
-"Homepage" = "https://github.com/sigmedia/spiny"
-"Bug Tracker" = "https://github.com/sigmedia/spiny/issues"
+"Homepage" = "https://github.com/sigmedia/spiny-toolkit"
+"Bug Tracker" = "https://github.com/sigmedia/spiny-toolkit/issues"
 
 [tool.black]
 line-length = 120
