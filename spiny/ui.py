@@ -3,9 +3,6 @@ import sys
 # Logging
 import logging
 
-# Linear algebra
-import numpy as np
-
 # Plotting
 import matplotlib as mpl
 from pyqtgraph.dockarea import DockArea
@@ -22,9 +19,11 @@ from .gui.utils import cmapToColormap
 from .core.wav.visualisation import WavDock
 from .annotations.visualisation import AnnotationDock
 from .core import DataDock
+from .core import player
 from .core.wav import PlayerControllerWidget
 from .core import plugin_entry_dict
 from .annotations import controller as annotation_controller
+from .annotations import model as annotation_model
 
 import spiny.plugins  # NOTE: we can't use relative import as the prefix is used to validate the plugins
 
@@ -40,48 +39,23 @@ class VisualisationArea(DockArea):
 
     Attributes
     ----------
-    wav : tuple(np.array, int)
-        The signal information as loaded using librosa. The tuple contain an array of samples and the sample rate.
-
-    coef : np.array
-       The matrix of coefficients to render
-
-    annotation: pypgrag.annotation.AnnotationLoader
-       The annotations if available, else None
 
     ticks : TODO
         The color map ticks
     """
 
-    def __init__(self, wav, frameshift, annotation=None):
+    def __init__(self, frameshift):
         """
         Parameters
         ----------
-        wav : tuple(np.array, int)
-            The signal information as loaded using librosa. The tuple contain an array of samples and the sample rate.
-
-        coef : np.array
-           The matrix of coefficients to render
-
         frameshift : float
            The frameshift used to extract the coefficients from the waveform
-
-        annotation: pypgrag.annotation.AnnotationLoader, optional
-           The annotation of object. (Default: None)
-
-        color_map: matplotlib.cm.ColorMap, optional
-           The color map used for the data rendering. (default: matplotlib.cm.bone)
         """
         # Superclass initialisation
         DockArea.__init__(self)
 
         self.logger = logging.getLogger("VisualisationArea")
 
-        self.annotation = annotation
-        if wav is not None:
-            self.wav = wav
-        else:
-            self.wav = (np.zeros((self.coef.shape[0])), 1 / frameshift)
         self.frameshift = frameshift
 
         # - Generate color map
@@ -102,24 +76,19 @@ class VisualisationArea(DockArea):
         """Helper to fill the dock area"""
         # Generate wav part
         self.logger.debug("Plot waveform part")
-        self._dock_wav = WavDock("Signal", (950, 20), self.wav)
+        self._dock_wav = WavDock("Signal", (950, 20))
 
         # Generate data part
         self.logger.debug("Plot coefficient part")
-
-        # controller = plugin_entry_list[0]
-        # controller.setWav(self.wav[0], self.wav[1], dock_wav.wav_plot)
-        # controller.extract()
-        # controller._widget.setTicks(self.ticks)
         self._dock_coef = DataDock(
             (950, 200),
         )
 
         # Generate annotation part
-        if self.annotation is not None:
+        if annotation_model.annotation_set is not None:
             self.logger.debug("Plot annotation part")
             dock_align = AnnotationDock(
-                "Annotations", (950, 20), self.annotation, self._dock_wav.wav_plot
+                "Annotations", (950, 20), self._dock_wav.wav_plot
             )  # Size doesn't seem to affect anything
 
         # Define the label on wav plots
@@ -128,14 +97,15 @@ class VisualisationArea(DockArea):
         # - Add docks
         self.logger.debug("Add docks to the area")
         self.addDock(self._dock_wav, "left")
-        if self.annotation is not None:
+        if annotation_model.annotation_set is not None:
             self.addDock(dock_align, "top", self._dock_wav)
             self.addDock(self._dock_coef, "top", dock_align)
         else:
             self.addDock(self._dock_coef, "top", self._dock_wav)
+            raise Exception("ok?!")
 
     def selectPlugin(self, controller):
-        controller.setWav(self.wav[0], self.wav[1], self._dock_wav.wav_plot)
+        controller.setWavPlot(self._dock_wav.wav_plot)
         controller.extract()
         self._dock_coef.setWidget(controller._widget, controller._name)
 
@@ -156,11 +126,8 @@ pg.setConfigOptions(imageAxisOrder="row-major")
 
 
 class GUIVisu(QtWidgets.QMainWindow):
-    def __init__(self, infos, frameshift, annotation):
+    def __init__(self, frameshift):
         super().__init__()
-
-        self._wav = infos[0]
-        self._filename = infos[1]
 
         ##########################################
         # Setup the Menubar
@@ -186,14 +153,14 @@ class GUIVisu(QtWidgets.QMainWindow):
         # Setup the toolbar
         ##########################################
         player_toolbar = self.addToolBar("Player")
-        player_widget = PlayerControllerWidget(self._filename, self._wav)
+        player_widget = PlayerControllerWidget()
         player_toolbar.addWidget(player_widget)
 
         ##########################################
         # Setup the status bar
         ##########################################
         self.statusbar = self.statusBar()
-        self._filename_label = QtWidgets.QLabel(self._filename)
+        self._filename_label = QtWidgets.QLabel(player._filename)
         self.statusbar.addPermanentWidget(self._filename_label)
 
         ##########################################
@@ -269,7 +236,7 @@ class GUIVisu(QtWidgets.QMainWindow):
         ##########################################
         # Define the left part of the window
         ##########################################
-        self._visualisation_area = VisualisationArea(self._wav, frameshift, annotation)
+        self._visualisation_area = VisualisationArea(frameshift)
         left_layout = QtWidgets.QVBoxLayout()
         left_layout.addWidget(self._visualisation_area)
 
@@ -317,11 +284,11 @@ class GUIVisu(QtWidgets.QMainWindow):
         self._visualisation_area.updateColorMap(cmap_name)
 
 
-def build_gui(app, infos, frameshift, annotation=None):
+def build_gui(app, frameshift):
 
     # Generate application
     define_palette(app)
-    win = GUIVisu(infos, frameshift, annotation)
+    win = GUIVisu(frameshift)
     win.setWindowTitle("SpINY")
 
     # Start the application

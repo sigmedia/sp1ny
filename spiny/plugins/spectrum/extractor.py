@@ -1,12 +1,12 @@
 import numpy as np
 import librosa
 
+from spiny.core import player
+
 
 class SpectrumExtractor:
     def __init__(
         self,
-        wav_array=None,
-        sampling_rate=None,
         fft_length=2048,
         frameshift=5,
         framelength=5,
@@ -14,8 +14,6 @@ class SpectrumExtractor:
         cutoff=(400, 5000),
         threshold_amp=(-40, 0),
     ):
-        self._wav_array = wav_array
-        self._sampling_rate = sampling_rate
         self._spectrum = np.zeros((10, 10))
 
         # Define default parameters
@@ -26,20 +24,15 @@ class SpectrumExtractor:
         self._cutoff = cutoff
         self._threshold_amp = threshold_amp
 
-    def setWav(self, wav, sampling_rate):
-        assert wav is not None
-        self._wav_array = wav
-        self._sampling_rate = sampling_rate
-
     def extract(self):
-        frameshift = int(0.001 * self._frameshift * self._sampling_rate)
-        framelength = int(0.001 * self._framelength * self._sampling_rate)
+        frameshift = int(0.001 * self._frameshift * player._sampling_rate)
+        framelength = int(0.001 * self._framelength * player._sampling_rate)
         assert (
             framelength < self._fft_length
         ), f"The framelength ({framelength} samples) has to be less than the FFT length ({self._fft_length} samples)"
 
         sp = librosa.core.stft(
-            self._wav_array,
+            player._wav[:, 0],
             n_fft=self._fft_length * 2,
             hop_length=frameshift,
             win_length=framelength,
@@ -55,8 +48,8 @@ class SpectrumExtractor:
         # Transform and filter to make it ready for plotting
         sp = sp.T
         cutoff_coeff = (
-            int(self._cutoff[0] * 2 * self._fft_length / (self._sampling_rate)),
-            int(self._cutoff[1] * 2 * self._fft_length / (self._sampling_rate)),
+            int(self._cutoff[0] * 2 * self._fft_length / (player._sampling_rate)),
+            int(self._cutoff[1] * 2 * self._fft_length / (player._sampling_rate)),
         )
         sp = sp[:, cutoff_coeff[0] : cutoff_coeff[1]]
         sp[sp < self._threshold_amp[0]] = self._threshold_amp[0]

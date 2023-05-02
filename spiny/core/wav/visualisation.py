@@ -50,7 +50,7 @@ class WavPlotWidget(pg.PlotWidget):
         super().__init__(parent=parent)
 
         # Save reference to wav
-        x = np.arange(player._data.shape[0]) / player._sampling_rate
+        x = np.arange(player._wav.shape[0]) / player._sampling_rate
 
         # Prepare plot item
         self.plotItem = SelectablePlotItem(
@@ -62,11 +62,11 @@ class WavPlotWidget(pg.PlotWidget):
         self.setCentralItem(self.plotItem)
         color = QtWidgets.QApplication.instance().palette().color(QtGui.QPalette.Text)
         self.plotItem.plot(
-            x, player._data.squeeze(), pen=color
+            x, player._wav.squeeze(), pen=color
         )  # FIXME: duplicate things, find a way to get rid of this!
 
         # Define the limits to constraint the zoom
-        T = player._data.shape[0] / player._sampling_rate
+        T = player._wav.shape[0] / player._sampling_rate
         self.plotItem.setLimits(
             yMin=-1,
             yMax=1,
@@ -103,7 +103,7 @@ class WavDock(Dock):
         The plot item rendering the waveform
     """
 
-    def __init__(self, name, size, wav):
+    def __init__(self, name, size):
         """
         Parameters
         ----------

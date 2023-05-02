@@ -22,9 +22,6 @@ import argparse
 import logging
 from logging.config import dictConfig
 
-# Audio, dsp
-import librosa
-
 # PyQtGraph & create application
 from pyqtgraph.Qt import QtWidgets
 
@@ -34,8 +31,9 @@ else:
     APP = QtWidgets.QApplication.instance()
 
 try:
-    from spiny.annotations import HTKAnnotationLoader, TGTAnnotationLoader
+    from spiny.annotations import load_annotations
     from spiny.ui import build_gui
+    from spiny.core import player
 except Exception as ex:
     raise ex
 
@@ -144,7 +142,7 @@ def define_argument_parser() -> argparse.ArgumentParser:
         help="The dimension of the coefficient vector (negative shape is assumed to be (-1, d), positive (d, -1))",
     )
     parser.add_argument("-f", "--frameshift", default=5, type=float, help="The frameshift in milliseconds")
-    parser.add_argument("-w", "--wav_file", default="", type=str, help="The wave file")
+    parser.add_argument("-w", "--wav_file", default="", required=True, type=str, help="The wave file")
 
     # Return parser
     return parser
@@ -164,10 +162,8 @@ def main():
         sys.exit(-1)
 
     # Load waves
-    wav = None
-    if args.wav_file != "":
-        logger.info("Loading wav")
-        wav = librosa.core.load(args.wav_file, sr=None)
+    logger.info("Loading wav")
+    player.loadNewWav(args.wav_file)
 
     # Convert frameshift from ms to s
     frameshift = args.frameshift / 1000
@@ -180,19 +176,12 @@ def main():
 
     # Load annotation
     logger.info("Load annotation")
-    annotation_set = None
     if args.annotation_file != "":
-        if args.annotation_file.endswith(".lab"):
-            an_loader = HTKAnnotationLoader()
-        elif args.annotation_file.endswith(".TextGrid"):
-            an_loader = TGTAnnotationLoader()
-        else:
-            raise Exception("The annotation cannot be parsed, format is unknown")
-        annotation_set = an_loader.load(args.annotation_file)
+        load_annotations(args.annotation_file)
+
     # Generate window
     logger.info("Rendering")
-    infos = (wav, args.wav_file)
-    build_gui(APP, infos, frameshift, annotation_set)
+    build_gui(APP, frameshift)
 
 
 ###############################################################################

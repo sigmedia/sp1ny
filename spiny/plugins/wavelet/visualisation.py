@@ -58,9 +58,10 @@ class WaveletPlotWidget(pg.PlotWidget):
         self._img = pg.ImageItem()
         self._img.setImage(self._wavelet_extractor._wavelet.T)
 
+        scale_distance_hz = self._wavelet_extractor._scale_distance * 1000
         tr = QtGui.QTransform()
         # 2. scale
-        y_scale = self._wavelet_extractor._num_scales * self._wavelet_extractor._scale_distance
+        y_scale = self._wavelet_extractor._num_scales * scale_distance_hz
         y_scale /= self._wavelet_extractor._wavelet.shape[1]
         tr.scale(self._wavelet_extractor._frameshift, y_scale)
         self._img.setTransform(tr)
@@ -73,9 +74,9 @@ class WaveletPlotWidget(pg.PlotWidget):
         # Set time and frequency axes
         self.plotItem.setLimits(
             minYRange=0,
-            maxYRange=self._wavelet_extractor._num_scales * self._wavelet_extractor._scale_distance,
+            maxYRange=self._wavelet_extractor._num_scales * scale_distance_hz,
             yMin=0,
-            yMax=self._wavelet_extractor._num_scales * self._wavelet_extractor._scale_distance,
+            yMax=self._wavelet_extractor._num_scales * scale_distance_hz,
             xMin=0,
             xMax=self._wavelet_extractor._frameshift * self._wavelet_extractor._wavelet.shape[0],
         )

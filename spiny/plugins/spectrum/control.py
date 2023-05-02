@@ -8,9 +8,7 @@ class SpectrumController(DataController):
         self._extractor = extractor
         self._widget = widget
 
-    def setWav(self, wav, sampling_rate, wav_plot):
-        assert wav is not None
-        self._extractor.setWav(wav, sampling_rate)
+    def setWavPlot(self, wav_plot):
         self._wav_plot = wav_plot
 
     def extract(self):

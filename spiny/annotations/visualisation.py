@@ -6,6 +6,7 @@ from spiny.gui.items import SegmentItem
 from spiny.core import player
 
 from .control import controller
+from . import model
 
 
 class AnnotationDock(Dock):
@@ -18,7 +19,7 @@ class AnnotationDock(Dock):
 
     """
 
-    def __init__(self, name, size, annotation_set, wav_plot):
+    def __init__(self, name, size, wav_plot):
         """
         Parameters
         ----------
@@ -32,7 +33,6 @@ class AnnotationDock(Dock):
         Dock.__init__(self, name=name, size=size)
 
         # Define some attributes
-        self.annotation_set = annotation_set
         self._wav_plot = wav_plot
 
         # Prepare scrolling support
@@ -54,14 +54,12 @@ class AnnotationDock(Dock):
 
     def __plotAnnotation(self):
         """Helper to render the annotations"""
-        wav_data = player._data
-        sr = player._sampling_rate
-        T_max = wav_data.shape[0] / sr
-        for k in self.annotation_set.annotations:
+        T_max = player._wav.shape[0] / player._sampling_rate
+        for k in model.annotation_set.annotations:
             annotation_plot = pg.PlotWidget(name="%s_%s" % (self.name(), k))
             annotation_plot.getAxis("left").setLabel(k)
             previous_annotation = None
-            for i, elt in enumerate(self.annotation_set.annotations[k]):
+            for i, elt in enumerate(model.annotation_set.annotations[k]):
                 # Generate region item
                 seg = AnnotationItem(elt)
                 seg._previous_annotation_item = previous_annotation
@@ -69,8 +67,8 @@ class AnnotationDock(Dock):
                     previous_annotation._next_annotation_item = seg
                 annotation_plot.addItem(seg)
 
-            if T_max < self.annotation_set.annotations[k][-1].end_time:
-                T_max = self.annotation_set.annotations[k][-1].end_time
+            if T_max < model.annotation_set.annotations[k][-1].end_time:
+                T_max = model.annotation_set.annotations[k][-1].end_time
 
             self.vbox.addWidget(annotation_plot)
 

@@ -12,3 +12,6 @@ class Annotation(Segment):
 @dataclass
 class AnnotationSet:
     annotations: Dict[str, List[Annotation]]
+
+
+annotation_set = None

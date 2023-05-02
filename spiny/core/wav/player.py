@@ -17,7 +17,7 @@ LICENSE
 import threading
 
 import sounddevice as sd
-
+import librosa
 import numpy as np
 
 
@@ -39,7 +39,7 @@ class Player(metaclass=Singleton):
     For now it relies on pyaudio as qmultimedia is not available in the pyside package from conda
     """
 
-    def __init__(self, chunk_size=1024):
+    def __init__(self, chunk_size=1024, filename=None):
         self._is_playing = False
         self._is_paused = False
         self._loop_activated = False
@@ -48,26 +48,32 @@ class Player(metaclass=Singleton):
         self._position = 0
         self._player_volume = 1.0
         self._position_handlers = []
+        self._filename = None
 
         # Define devices and current device being the default one
         self._device = sd.query_hostapis()[0].get("default_" + "output".lower() + "_device")
+
+        if filename is not None:
+            self.loadNewWav(filename)
 
     def setWavData(self, wav_data):
         # First be sure everything is stopped
         if self._is_playing:
             self.stop()
 
-        self._data = wav_data
-        if len(self._data.shape) < 2:
-            self._data = np.expand_dims(self._data, axis=1)
+        self._wav = wav_data
+        if len(self._wav.shape) < 2:
+            self._wav = np.expand_dims(self._wav, axis=1)
 
-    def loadNewWav(self, wav_data, sampling_rate):
+    def loadNewWav(self, filename):
+
         # First be sure everything is stopped
         if self._is_playing:
             self.stop()
 
         # Load the wav data
-        self._sampling_rate = sampling_rate
+        self._filename = filename
+        wav_data, self._sampling_rate = librosa.core.load(filename, sr=None)
         self.setWavData(wav_data)
 
     def play(self, wav_data=None, start=0, end=-1):
@@ -99,7 +105,7 @@ class Player(metaclass=Singleton):
         # And now play!
         self._is_playing = True
         if end == -1:
-            end = self._data.shape[0]
+            end = self._wav.shape[0]
         else:
             start = int(start * self._sampling_rate)
             end = int(end * self._sampling_rate)
@@ -123,7 +129,7 @@ class Player(metaclass=Singleton):
 
     def play_handler(self, start, end):
         event = threading.Event()
-        data = self._data[start:end, :]
+        data = self._wav[start:end, :]
 
         def callback(outdata, frames, time, status):
             if status:

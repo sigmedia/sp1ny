@@ -8,9 +8,7 @@ class WaveletController(DataController):
         self._extractor = extractor
         self._widget = widget
 
-    def setWav(self, wav, sampling_rate, wav_plot):
-        assert wav is not None
-        self._extractor.setWav(wav, sampling_rate)
+    def setWavPlot(self, wav_plot):
         self._wav_plot = wav_plot
 
     def extract(self):
@@ -29,9 +27,10 @@ class WaveletController(DataController):
         # Add different feature group part
         box_layout.addWidget(self.setF0Limits())
         box_layout.addWidget(self.prosodicFeats())
-        # box_layout.addWidget(self.featureCombination())
+        box_layout.addWidget(self.featureCombination())
         # box_layout.addWidget(self.weight())
-        # box_layout.addWidget(self.signalTiers())
+        box_layout.addWidget(self.signalTiers())
+        box_layout.addWidget(self.createTierList())
 
         # Fnalize and add the widget to the panel
         groupBox.setLayout(box_layout)
@@ -156,12 +155,12 @@ class WaveletController(DataController):
         # Signal tier
         self.signalTiers = QtWidgets.QListWidget()
         self.signalTiers.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
-        self.signalTiers.clicked.connect(self.onSignalRate)
+        # NOTE: self.signalTiers.clicked.connect(self.onSignalRate)
 
         # Signal rate
         self.signalRate = QtWidgets.QCheckBox("Estimate speech rate from signal")
-        self.signalRate.setChecked(self.configuration["duration"]["acoustic_estimation"])
-        self.signalRate.clicked.connect(self.onSignalRate)
+        # NOTE: self.signalRate.setChecked(self.configuration["duration"]["acoustic_estimation"])
+        # NOTE: self.signalRate.clicked.connect(self.onSignalRate)
 
         # Delta
         self.diffDur = QtWidgets.QCheckBox("Use delta-duration")
@@ -169,14 +168,15 @@ class WaveletController(DataController):
             "Point-wise difference of the durations signal, "
             + "empirically found to improve boundary detection in some cases"
         )
-        self.diffDur.setChecked(self.configuration["duration"]["delta_duration"])
-        self.diffDur.clicked.connect(self.onSignalRate)
+        # NOTE: self.diffDur.setChecked(self.configuration["duration"]["delta_duration"])
+        # NOTE: self.diffDur.clicked.connect(self.onSignalRate)
 
         # Zero duration signal at unit boundaries
         self.bump = QtWidgets.QCheckBox("Emphasize differences")
         self.bump.setToolTip("duration signal with valleys relative to adjacent unit duration differences")
-        self.bump.setChecked(self.configuration["duration"]["bump"])
-        self.bump.clicked.connect(self.onSignalRate)
+        # NOTE: self.bump.setChecked(self.configuration["duration"]["bump"])
+        # NOTE: self.bump.clicked.connect(self.onSignalRate)
+
         # Setup the group box
         box = QtWidgets.QVBoxLayout()
         box.addWidget(self.signalTiers)
@@ -191,6 +191,15 @@ class WaveletController(DataController):
             + "Shift-click to multi-select, Ctrl-click to de-select"
         )
 
+        return groupBox
+
+    def createTierList(self):
+        groupBox = QtWidgets.QGroupBox("Tier for Prosody Annotation")
+        self.tierlist = QtWidgets.QComboBox()
+        # NOTE: self.tierlist.activated.connect(self.onTierChanged)
+        vbox = QtWidgets.QVBoxLayout()
+        vbox.addWidget(self.tierlist)
+        groupBox.setLayout(vbox)
         return groupBox
 
     def weight(self):
@@ -215,19 +224,18 @@ class WaveletController(DataController):
 
         self.sum_feats = QtWidgets.QRadioButton("sum")
         self.mul_feats = QtWidgets.QRadioButton("product")
-
-        if self.configuration["feature_combination"]["type"] == "product":
-            self.mul_feats.setChecked(True)
-        else:
-            self.sum_feats.setChecked(True)
+        self.mul_feats.setChecked(True)
 
         combination_method.addButton(self.sum_feats)
         combination_method.addButton(self.mul_feats)
-        self.sum_feats.clicked.connect(self.onSignalRate)
-        self.mul_feats.clicked.connect(self.onSignalRate)
+
+        # self.sum_feats.clicked.connect(self.onSignalRate)
+        # self.mul_feats.clicked.connect(self.onSignalRate)
+
         hbox = QtWidgets.QHBoxLayout()
         hbox.addWidget(self.sum_feats)
         hbox.addWidget(self.mul_feats)
         groupBox.setLayout(hbox)
         groupBox.setVisible(True)
+
         return groupBox

@@ -14,11 +14,8 @@ class PlayerControllerWidget(QtWidgets.QWidget):
 
     BUTTON_GLYPHS = ("▶", "⏯", "⏹", "Loop") if system() != "Windows" else ("▶️", "⏯️", "⏹️", "Loop️")
 
-    def __init__(self, filename, wav, parent=None, background="default", **kwargs):
+    def __init__(self, parent=None, background="default", **kwargs):
         super().__init__(parent, **kwargs)
-
-        self._filename = filename
-        player.loadNewWav(wav[0], wav[1])
 
         # Define play button
         self._bPlay = QtWidgets.QPushButton(PlayerControllerWidget.BUTTON_GLYPHS[0], self)
@@ -49,12 +46,14 @@ class PlayerControllerWidget(QtWidgets.QWidget):
         self._devices = dict()
         default_device_index = sd.query_hostapis()[0].get("default_" + "output".lower() + "_device")
         default_device = None
-        for device in devices:
+        for index, device in enumerate(devices):
             if device["max_output_channels"] <= 0:  # NOTE: only consider output devices!
                 continue
+            if "index" in device:
+                index = int(device["index"])
 
-            self._devices[device["name"]] = int(device["index"])
-            if int(device["index"]) == default_device_index:
+            self._devices[device["name"]] = index
+            if index == default_device_index:
                 default_device = device["name"]
 
         # Generation Device ComboBox

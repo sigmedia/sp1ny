@@ -15,29 +15,23 @@ from wavelet_prosody_toolkit.prosody_tools import smooth_and_interp
 from wavelet_prosody_toolkit.prosody_tools import cwt_utils
 
 
+from spiny.core import player
+
+
 class WaveletExtractor:
     def __init__(
         self,
-        wav_array=None,
-        sampling_rate=None,
     ):
-        self._wav_array = wav_array
-        self._sampling_rate = sampling_rate
         self._wavelet = np.zeros((10, 10))
         self._frameshift = 1 / 200.0
 
         self._num_scales = 34
         self._scale_distance = 0.25
 
-    def setWav(self, wav, sampling_rate):
-        assert wav is not None
-        self._wav_array = wav
-        self._sampling_rate = sampling_rate
-
     def extract(self):
         self.energy = energy_processing.extract_energy(
-            self._wav_array,
-            self._sampling_rate,
+            player._wav[:, 0],
+            player._sampling_rate,
             200,  # self.configuration["energy"]["band_min"],
             5000,  # self.configuration["energy"]["band_max"],
             "rms",  # self.configuration["energy"]["calculation_method"],
@@ -54,8 +48,8 @@ class WaveletExtractor:
         min_f0 = np.min([max_f0 - 1.0, min_f0])
 
         raw_pitch = f0_processing.extract_f0(
-            self._wav_array,
-            self._sampling_rate,
+            player._wav[:, 0],
+            player._sampling_rate,
             min_f0,
             max_f0,
             50.0,  # float(self.harmonics.value()),
