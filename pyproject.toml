@@ -9,7 +9,7 @@ authors = [
   "Sébastien Le Maguer <lemagues@tcd.ie>",
   "Mark Anderson <lemagues@tcd.ie>"
 ]
-description = "Prosody wavelet analysis toolkit"
+description = "Speech vIsualisation and aNnotation in pYthon"
 readme = "README.md"
 classifiers = [
   'Development Status :: 4 - Beta',
