@@ -102,7 +102,6 @@ class VisualisationArea(DockArea):
             self.addDock(self._dock_coef, "top", dock_align)
         else:
             self.addDock(self._dock_coef, "top", self._dock_wav)
-            raise Exception("ok?!")
 
     def selectPlugin(self, controller):
         controller.setWavPlot(self._dock_wav.wav_plot)

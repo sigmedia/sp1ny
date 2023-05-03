@@ -28,17 +28,8 @@ class SpectrogramPlotWidget(pg.PlotWidget):
         data: np.array
             matrix containing the data to render
 
-        frameshift: float
-            frameshift in senconds
-
-        ticks: TODO
-            color map ticks
-
         parent: pg.GraphicsObject
             the parent object
-
-        background: str
-            the background of the plot
 
         kwargs: kwargs
             arguments passed to pg.PlotWidget

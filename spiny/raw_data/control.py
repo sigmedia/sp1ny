@@ -8,8 +8,7 @@ class RawDataController(DataController):
         self._extractor = extractor
         self._widget = widget
 
-    def setWav(self, wav, sampling_rate, wav_plot):
-        assert wav is not None
+    def setWavPlot(self, wav_plot):
         self._wav_plot = wav_plot
 
     def loadCoefficientFile(self, coefficient_file, dimension, frameshift):

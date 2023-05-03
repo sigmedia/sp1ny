@@ -165,14 +165,11 @@ def main():
     logger.info("Loading wav")
     player.loadNewWav(args.wav_file)
 
-    # Convert frameshift from ms to s
-    frameshift = args.frameshift / 1000
-
     # Check with data
     if args.coefficient_file:
         from spiny.raw_data import controller
 
-        controller.loadCoefficientFile(args.coefficient_file, args.dimension, frameshift)
+        controller.loadCoefficientFile(args.coefficient_file, args.dimension, args.frameshift)
 
     # Load annotation
     logger.info("Load annotation")
@@ -181,7 +178,7 @@ def main():
 
     # Generate window
     logger.info("Rendering")
-    build_gui(APP, frameshift)
+    build_gui(APP, args.frameshift)
 
 
 ###############################################################################
