@@ -16,6 +16,7 @@ import pkgutil
 # spiny internal packages
 from .gui.theme import define_palette
 from .gui.utils import cmapToColormap
+from .gui.helpers.widgets import ExtendedComboBox
 from .core.wav.visualisation import WavDock
 from .annotations.visualisation import AnnotationDock
 from .core import DataDock
@@ -174,7 +175,7 @@ class GUIVisu(QtWidgets.QMainWindow):
         self._control_layout = QtWidgets.QVBoxLayout(self)
 
         # Populate the list of plugins
-        self._plugin_list = QtWidgets.QComboBox(self)
+        self._plugin_list = ExtendedComboBox(self)
         for elt in plugin_entry_dict:
             self._plugin_list.addItem(elt)
 
@@ -185,7 +186,7 @@ class GUIVisu(QtWidgets.QMainWindow):
         self._plugin_list.currentTextChanged.connect(self.selectPlugin)
 
         # Populate the list of plugins
-        self._cmap_list = QtWidgets.QComboBox(self)
+        self._cmap_list = ExtendedComboBox(self)
         cmaps = [
             # Uniform
             "viridis",
@@ -269,6 +270,10 @@ class GUIVisu(QtWidgets.QMainWindow):
             self._filename_label.setText(filename)
 
     def selectPlugin(self, current):
+        # NOTE: this is here because we lack a better way to avoid issues during completion
+        if current not in plugin_entry_dict:
+            return
+
         controller = plugin_entry_dict[current]
         i = self._control_layout.count() - 1
         cur_widget = self._control_layout.itemAt(i).widget()
