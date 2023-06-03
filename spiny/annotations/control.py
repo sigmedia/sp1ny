@@ -37,20 +37,40 @@ class ControlLayout(QtWidgets.QVBoxLayout):
     def __init__(self, parent):
         super().__init__(parent)
 
-        self._current_annotation = None
-        # tier_box = self._generate_tier_box()
-        # self._file_box = self._generate_file_box()
-        self._info_box = self._generate_general_box()
-        ipa_box = self._generate_IPA_box()
+        # Create the main layout
+        box_layout = QtWidgets.QVBoxLayout()
+        box_layout.setContentsMargins(0, 0, 0, 0)
+        box_layout.setAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
 
-        self.setAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
-        # self.addWidget(self._file_box)
-        # self.addWidget(tier_box)
-        self.addWidget(self._info_box)
-        self.addWidget(ipa_box)
+        # Prepare scrollbar
+        scroll = QtWidgets.QScrollArea()
+        scroll.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+        scroll.setWidgetResizable(True)
+
+        # Generate the necessary widgets
+        self._current_annotation = None
+        self._file_box = self._generate_file_box()
+        self._info_box = self._generate_general_box()
+        self._tier_box = self._generate_tier_box()
+        self._ipa_box = self._generate_IPA_box()
+
+        # Add the widgets
+        box_layout.addWidget(self._file_box)
+        box_layout.addWidget(self._tier_box)
+        box_layout.addWidget(self._info_box)
+        box_layout.addWidget(self._ipa_box)
 
         # Nothing selected => no info to show
         self._info_box.setVisible(False)
+
+        # Generate Configuration Widget
+        configuration_widget = QtWidgets.QWidget()
+        configuration_widget.setLayout(box_layout)
+        scroll.setWidget(configuration_widget)
+
+        # Finalize the layout
+        self.setAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
+        self.addWidget(scroll)
 
     def _generate_file_box(self):
         file_box_layout = QtWidgets.QGridLayout()

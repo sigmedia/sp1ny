@@ -222,10 +222,10 @@ class GUIVisu(QtWidgets.QMainWindow):
         self._control_layout.addLayout(place_holder)
         tab1.setLayout(self._control_layout)
 
-        self._annotation_layout = annotation_controller
         # self._annotation_layout.setParent(self)
         tab2 = QtWidgets.QWidget()
         tabs.addTab(tab2, "Annotations")
+        self._annotation_layout = annotation_controller
         tab2.setLayout(self._annotation_layout)
 
         # tab2 = QtWidgets.QWidget()
