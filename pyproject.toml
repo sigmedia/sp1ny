@@ -1,6 +1,69 @@
+[build-system]
+requires = ["poetry_core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry]
+name = "SpINY"
+version = "0.1"
+authors = [
+  "Sébastien Le Maguer <lemagues@tcd.ie>",
+  "Mark Anderson <lemagues@tcd.ie>"
+]
+description = "Speech vIsualisation and aNnotation in pYthon"
+readme = "README.md"
+classifiers = [
+  'Development Status :: 4 - Beta',
+  # Audience
+  'Intended Audience :: Science/Research',
+  # Topics
+  'Topic :: Multimedia :: Sound/Audio :: Speech',
+  'Topic :: Scientific/Engineering :: Information Analysis',
+  'Topic :: Scientific/Engineering :: Visualization',
+  # Pick your license as you wish
+  'License :: OSI Approved :: MIT License',
+  # Python version (FIXME: fix the list of python version based on travis results)
+  'Programming Language :: Python :: 3',
+  'Programming Language :: Python :: 3.7',
+  'Programming Language :: Python :: 3.8',
+  'Programming Language :: Python :: 3.9',
+  'Programming Language :: Python :: 3.10',
+  'Programming Language :: Python :: 3.11',
+]
+
+[tool.poetry.dependencies]
+# Python
+python = ">=3.7"
+# QT/Plotting
+matplotlib = "*"
+pyqtgraph = ">=0.13.1"
+PySide6 = "*"
+# Audio
+librosa = ">=0.10.0"
+pyaudio = "*"
+sounddevice = "*"
+# Annotations
+tgt = "*"
+ipapy = "*"
+# Plugins
+praat-parselmouth = { version = "*", optional = true }
+wavelet_prosody_toolkit = { git = "https://github.com/asuni/wavelet_prosody_toolkit", optional = true }
+# Dev
+pre-commit = { version = "*", optional = true }
+
+[tool.poetry.scripts]
+spiny = "spiny.main:main"
+
+[tool.poetry.extras]
+plugins = ["praat-parselmouth", "wavelet_prosody_toolkit"]
+dev = ["pre-commit"]
+
+[project.urls]
+"Homepage" = "https://github.com/sigmedia/spiny-toolkit"
+"Bug Tracker" = "https://github.com/sigmedia/spiny-toolkit/issues"
+
 [tool.black]
 line-length = 120
-target-version = ['py36', 'py37', 'py38', 'py39']
+target-version = ['py38', 'py39', 'py310', 'py311']
 include = '\.pyi?$'
 exclude = '''
 /(
