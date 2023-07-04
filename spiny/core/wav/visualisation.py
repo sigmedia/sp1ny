@@ -76,13 +76,13 @@ class WavPlotWidget(pg.PlotWidget):
             maxXRange=T,
         )
 
-        # v_bar = pg.InfiniteLine(pos=0, movable=False, angle=90, pen=pg.mkPen({"color": "#F00", "width": 2}))
+        v_bar = pg.InfiniteLine(pos=0, movable=False, angle=90, pen=pg.mkPen({"color": "#F00", "width": 2}))
 
-        # def _update_position_handler(position):
-        #     v_bar.setValue(position)
+        def _update_position_handler(position):
+            v_bar.setValue(position)
 
-        # player.add_position_handler(_update_position_handler)
-        # self.plotItem.addItem(v_bar)
+        player.add_position_handler(_update_position_handler)
+        self.plotItem.addItem(v_bar)
 
 
 class WavDock(Dock):

@@ -101,14 +101,13 @@ class Player(metaclass=Singleton):
             self.setWavData(wav_data)
 
         # Reset position
-        self._position = 0
+        self._position = int(start * self._sampling_rate)
 
         # And now play!
         self._is_playing = True
         if end == -1:
             end = self._wav.shape[0]
         else:
-            start = int(start * self._sampling_rate)
             end = int(end * self._sampling_rate)
 
         new_thread = threading.Thread(target=self.play_handler, args=(start, end))
@@ -130,7 +129,7 @@ class Player(metaclass=Singleton):
 
     def play_handler(self, start, end):
         event = threading.Event()
-        data = self._wav[start:end, :]
+        data = self._wav[:end, :]
 
         def callback(outdata, frames, time, status):
             if status:
@@ -153,10 +152,10 @@ class Player(metaclass=Singleton):
                     else:
                         raise sd.CallbackStop()
                 self._position += chunksize
-
-            # pos = self._position / self._sr
-            # for f in self._position_handlers:
-            #     f(pos)
+            pos = self._position / self._sampling_rate
+            for f in self._position_handlers:
+                print(f'Pos: {self._position:.4f}\tTime: {pos:.4f}\tdata_size: {data.shape[0]}')
+                f(pos)
 
         sd.check_output_settings(
             samplerate=self._sampling_rate,
