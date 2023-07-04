@@ -32,7 +32,7 @@ classifiers = [
 
 [tool.poetry.dependencies]
 # Python
-python = ">=3.7"
+python = ">=3.8, <3.12"
 # QT/Plotting
 matplotlib = "*"
 pyqtgraph = ">=0.13.1"
