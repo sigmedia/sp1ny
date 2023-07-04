@@ -52,6 +52,7 @@ class Player(metaclass=Singleton):
 
         # Define devices and current device being the default one
         self._device = sd.query_hostapis()[0].get("default_" + "output".lower() + "_device")
+        self._device_samplerate = sd.query_devices()[self._device]['default_samplerate']
 
         if filename is not None:
             self.loadNewWav(filename)
@@ -73,7 +74,7 @@ class Player(metaclass=Singleton):
 
         # Load the wav data
         self._filename = filename
-        wav_data, self._sampling_rate = librosa.core.load(filename, sr=None)
+        wav_data, self._sampling_rate = librosa.core.load(filename, sr=self._device_samplerate)
         self.setWavData(wav_data)
 
     def play(self, wav_data=None, start=0, end=-1):
