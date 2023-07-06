@@ -135,6 +135,10 @@ class Player(metaclass=Singleton):
             if status:
                 print(status)
             chunksize = min(len(data) - self._position, frames)
+            # Update position of scrub bars
+            pos = self._position / self._sampling_rate
+            for f in self._position_handlers:
+                f(pos)
             # If stream is paused, keep open but output zeros
             # position is not updated so can resume from same frame
             if self._is_paused:
@@ -152,10 +156,6 @@ class Player(metaclass=Singleton):
                     else:
                         raise sd.CallbackStop()
                 self._position += chunksize
-            pos = self._position / self._sampling_rate
-            for f in self._position_handlers:
-                print(f'Pos: {self._position:.4f}\tTime: {pos:.4f}\tdata_size: {data.shape[0]}')
-                f(pos)
 
         sd.check_output_settings(
             samplerate=self._sampling_rate,
@@ -173,6 +173,10 @@ class Player(metaclass=Singleton):
             event.wait()  # Wait until playback is finished
             self._position = 0
             self._is_playing = False
+            # reset scrub bars
+            for f in self._position_handlers:
+                f(0)
+
 
 
 player = Player()
