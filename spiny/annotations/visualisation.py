@@ -316,5 +316,12 @@ class AnnotationItem(SegmentItem):
         self._text.setText(label)
         self._text.setPos((self._segment.start_time + self._segment.end_time) / 2, 0.5)
 
+    def setBounds(self, start_time, end_time):
+        self._segment.start_time = start_time
+        self.lines[0].setPos(self._segment.start_time)
+        self._segment.end_time = end_time
+        self.lines[1].setPos(self._segment.end_time)
+        self._text.setPos((self._segment.start_time + self._segment.end_time) / 2, 0.5)
+
     def isSelected(self):
         return self._selected

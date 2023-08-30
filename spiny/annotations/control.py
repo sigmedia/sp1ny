@@ -242,15 +242,17 @@ class ControlLayout(QtWidgets.QVBoxLayout):
 
         # Start time
         l1 = QtWidgets.QLabel("Start Time (s)")
-        self._wStartTime = QtWidgets.QLineEdit("<unknown>")
-        self._wStartTime.setEnabled(False)
+        self._wStartTime = QtWidgets.QLineEdit("-1")
+        # self._wStartTime.setEnabled(False)
+        self._wStartTime.textEdited.connect(self.onTimeEdited)
         annotation_info_box_layout.addWidget(l1, 1, 0)
         annotation_info_box_layout.addWidget(self._wStartTime, 1, 1)
 
         # End time
         l2 = QtWidgets.QLabel("End Time (s)")
-        self._wEndTime = QtWidgets.QLineEdit("<unknown>")
-        self._wEndTime.setEnabled(False)
+        self._wEndTime = QtWidgets.QLineEdit("-1")
+        # self._wEndTime.setEnabled(False)
+        self._wEndTime.textEdited.connect(self.onTimeEdited)
         annotation_info_box_layout.addWidget(l2, 2, 0)
         annotation_info_box_layout.addWidget(self._wEndTime, 2, 1)
 
@@ -405,21 +407,24 @@ class ControlLayout(QtWidgets.QVBoxLayout):
 
         # Update infobox base on the information of the new annotation
         if self._current_annotation is not None:
-            self._wStartTime.setText(str(self._current_annotation._segment.start_time))
-            self._wEndTime.setText(str(self._current_annotation._segment.end_time))
+            self._wStartTime.setText(f"{self._current_annotation._segment.start_time:.4f}")
+            self._wEndTime.setText(f"{self._current_annotation._segment.end_time:.4f}")
             self._wLabel.setText(self._current_annotation._segment.label)
             self._info_box.setVisible(True)
         else:
-            self._wStartTime.setText("<Unknown>")
-            self._wEndTime.setText("<Unknown>")
-            self._wLabel.setText("<Unkown>")
+            self._wStartTime.setText("")
+            self._wEndTime.setText("")
+            self._wLabel.setText("")
             self._current_annotation = None
             self._info_box.setVisible(False)
 
-    def onLabelEdited(self):
-        label = self._wLabel.text()
+    def onTimeEdited(self):
         if self._current_annotation is not None:
-            self._current_annotation.updateLabel(label)
+            self._current_annotation.setBounds(float(self._wStartTime.text()), float(self._wEndTime.text()))
+
+    def onLabelEdited(self):
+        if self._current_annotation is not None:
+            self._current_annotation.updateLabel(self._wLabel.text())
 
     def onIPAInsert(self, ipa_symbol):
         self._wLabel.insert(ipa_symbol)
