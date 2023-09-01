@@ -7,14 +7,14 @@ import tgt
 
 # Import abstract class
 from ..model import AnnotationSet, Annotation
-from . import AnnotationLoader
+from . import AnnotationSerialiser
 
 ###############################################################################
 # Classes
 ###############################################################################
 
 
-class TGTAnnotationLoader(AnnotationLoader):
+class TextGridSerialiser(AnnotationSerialiser):
     """Class to load annotations from TextGrid files
 
     Attributes
@@ -27,7 +27,7 @@ class TGTAnnotationLoader(AnnotationLoader):
 
     """
 
-    def load(self, input_file) -> AnnotationSet:
+    def load(self, input_file: pathlib.Path) -> AnnotationSet:
         """Annotation extraction method.
 
         Parameters

@@ -4,7 +4,7 @@ from typing import List
 
 # Import abstract class
 from ..model import AnnotationSet, Annotation
-from . import AnnotationLoader
+from . import AnnotationSerialiser
 
 ###############################################################################
 # global constants
@@ -17,7 +17,7 @@ HTK_UNIT = 10000000
 ###############################################################################
 
 
-class HTKAnnotationLoader(AnnotationLoader):
+class HTKLabelSerialiser(AnnotationSerialiser):
     """Class to load annotations from HTK Label files
 
     Attributes

@@ -8,8 +8,9 @@ from collections import OrderedDict
 from ..gui.widgets import CollapsibleBox
 from .model import AnnotationSet
 from .visualisation import AnnotationDock
-from .io.htk_lab import HTKAnnotationLoader
-from .io.textgrid import TGTAnnotationLoader
+from .io.htk_lab import HTKLabelSerialiser
+from .io.textgrid import TextGridSerialiser
+from .io.json import JSONSerialiser
 
 # from . import HTKAnnotation, TGTAnnotation
 
@@ -377,8 +378,8 @@ class ControlLayout(QtWidgets.QVBoxLayout):
         annotation_file, _ = QtWidgets.QFileDialog.getOpenFileName(
             self._file_box,
             "Load annotation file",
-            "${HOME}",
-            "TextGrid Files (*.TextGrid);; Label Files (*.lab)",
+            "",
+            "TextGrid Files (*.TextGrid);;HTK Label Files (*.lab);;JSON Files (*.json)",
         )
         self._wCurrentFile.setText(annotation_file)
         self.loadAnnotations(pathlib.Path(annotation_file))
@@ -389,10 +390,10 @@ class ControlLayout(QtWidgets.QVBoxLayout):
         annotation_file, _ = QtWidgets.QFileDialog.getSaveFileName(
             self._file_box,
             "Save annotation file",
-            "${HOME}",
-            "TextGrid Files (*.TextGrid)",
+            "",
+            "TextGrid Files (*.TextGrid);;HTK Label Files (*.lab);;JSON Files (*.json)",
         )
-        an_loader = TGTAnnotationLoader()
+        an_loader = JSONSerialiser()
         self._wCurrentFile.setText(annotation_file)
         an_loader.save(annotation_file, self._model)
 
@@ -452,9 +453,11 @@ class ControlLayout(QtWidgets.QVBoxLayout):
     def loadAnnotations(self, annotation_file: pathlib.Path) -> None:
 
         if annotation_file.name.endswith(".lab"):
-            an_loader = HTKAnnotationLoader()
+            an_loader = HTKLabelSerialiser()
         elif annotation_file.name.endswith(".TextGrid"):
-            an_loader = TGTAnnotationLoader()
+            an_loader = TextGridSerialiser()
+        elif annotation_file.name.endswith(".json"):
+            an_loader = JSONSerialiser()
         else:
             raise Exception("The annotation cannot be parsed, format is unknown")
         model = an_loader.load(annotation_file)
