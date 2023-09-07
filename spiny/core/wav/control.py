@@ -123,3 +123,132 @@ class PlayerControllerWidget(QtWidgets.QWidget):
     def volume_changed(self):
         player._player_volume = self._sVolume.value() / 100
         self._lVolume.setText(f"{self._sVolume.value()}%")
+
+
+class ControlLayout(QtWidgets.QVBoxLayout):
+    def __init__(self, parent):
+        super().__init__(parent)
+
+        # Create the main layout
+        box_layout = QtWidgets.QVBoxLayout()
+        box_layout.setContentsMargins(0, 0, 0, 0)
+        box_layout.setAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
+
+        # Prepare scrollbar
+        scroll = QtWidgets.QScrollArea()
+        scroll.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+        scroll.setWidgetResizable(True)
+
+        # Generate the necessary widgets
+        self._file_box = self._generate_file_box()
+        self._eq_widget = EqWidget(None, (9, 1))  # FIXME: place holder but not work
+
+        # Add the widgets
+        box_layout.addWidget(self._file_box)
+        box_layout.addWidget(self._eq_widget)
+
+        # Generate Configuration Widget
+        configuration_widget = QtWidgets.QWidget()
+        configuration_widget.setLayout(box_layout)
+        scroll.setWidget(configuration_widget)
+
+        # Finalize the layout
+        self.setAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
+        self.addWidget(scroll)
+
+    def _generate_file_box(self):
+        file_box_layout = QtWidgets.QGridLayout()
+        file_box_layout.setAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
+
+        # Start time
+        l1 = QtWidgets.QLabel("Current File")
+        self._wCurrentFile = QtWidgets.QLineEdit("none")
+        self._wCurrentFile.setEnabled(False)
+        file_box_layout.addWidget(l1, 1, 0)
+        file_box_layout.addWidget(self._wCurrentFile, 1, 1)
+
+        self._bLoadFile = QtWidgets.QPushButton("Load File")
+        # self._bLoadFile.clicked.connect(self._load_annotation_file)
+        self._bLoadFile.setDefault(False)
+        self._bLoadFile.setAutoDefault(False)
+        file_box_layout.addWidget(self._bLoadFile)
+
+        self._bSaveFile = QtWidgets.QPushButton("Save File")
+        # self._bSaveFile.clicked.connect(self._save_annotation_file)
+        self._bSaveFile.setDefault(False)
+        self._bSaveFile.setAutoDefault(False)
+        file_box_layout.addWidget(self._bSaveFile)
+
+        file_box = QtWidgets.QGroupBox("Audio File")
+        file_box.setLayout(file_box_layout)
+
+        return file_box
+
+
+class EqWidget(QtWidgets.QGroupBox):
+    def __init__(self, parent, wav):
+        super().__init__(title="Equalizer", parent=parent)
+
+        self._signal = wav[0]
+        self._sampling_rate = wav[1]
+
+        slider_layout = self._define_sliders()
+        self._apply_button = QtWidgets.QPushButton("Apply")
+        overall_layout = QtWidgets.QVBoxLayout()
+        overall_layout.addLayout(slider_layout)
+        overall_layout.addWidget(self._apply_button)
+        self.setLayout(overall_layout)
+
+    def _define_sliders(self):
+
+        self._frequencies = [50, 200, 1000, 2000, 4000, 8000, 16000]
+        self._slider_array = []
+
+        layout = QtWidgets.QHBoxLayout()
+
+        prev_freq = 0
+        for freq in self._frequencies:
+
+            cur_slider = EqSlider(prev_freq, freq, self)
+            layout.addWidget(cur_slider)
+            prev_freq = freq
+
+        return layout
+
+
+class EqSlider(QtWidgets.QWidget):
+    def __init__(self, lower_freq, upper_freq, parent=None):
+        super().__init__(parent=parent)
+        self._verticalLayout = QtWidgets.QVBoxLayout(self)
+        self._label = QtWidgets.QLabel(self)
+        self._verticalLayout.addWidget(self._label)
+        self._horizontalLayout = QtWidgets.QHBoxLayout()
+        spacerItem = QtWidgets.QSpacerItem(0, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
+        self._horizontalLayout.addItem(spacerItem)
+        self._slider = QtWidgets.QSlider(self)
+        self._slider.setOrientation(QtCore.Qt.Vertical)
+        self._horizontalLayout.addWidget(self._slider)
+        spacerItem1 = QtWidgets.QSpacerItem(0, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
+        self._horizontalLayout.addItem(spacerItem1)
+        self._verticalLayout.addLayout(self._horizontalLayout)
+        self.resize(self.sizeHint())
+
+        self._slider.setMinimum(-120)
+        self._slider.setMaximum(0)
+        self._slider.setValue(0)
+        self._slider.setTickPosition(QtWidgets.QSlider.TicksBelow)
+        self._slider.setTickInterval(10)  # FIXME: hardcoded
+
+        self._lower_freq = lower_freq
+        self._upper_freq = upper_freq
+
+        self.setLabelValue(upper_freq)
+
+    def setLabelValue(self, upper_freq):
+        if upper_freq >= 1000:
+            self._label.setText(f"< {int(upper_freq/1000):2d}k")
+        else:
+            self._label.setText(f"< {upper_freq}")
+
+
+controller = ControlLayout(None)

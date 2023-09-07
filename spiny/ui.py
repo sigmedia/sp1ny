@@ -18,12 +18,14 @@ from .gui.theme import define_palette
 from .gui.utils import cmapToColormap
 from .gui.helpers.widgets import ExtendedComboBox
 from .core.wav.visualisation import WavDock
+from .core.wav import controller as audio_controller
 from .annotations.visualisation import AnnotationDock
 from .core import DataDock
 from .core import player
 from .core.wav import PlayerControllerWidget
 from .core import plugin_entry_dict
 from .annotations import controller as annotation_controller
+
 
 import spiny.plugins  # NOTE: we can't use relative import as the prefix is used to validate the plugins
 
@@ -231,8 +233,10 @@ class GUIVisu(QtWidgets.QMainWindow):
         self._annotation_layout.resetView()
         tab2.setLayout(self._annotation_layout)
 
-        # tab2 = QtWidgets.QWidget()
-        # tabs.addTab(tab2, "Wav/Signal")
+        tab3 = QtWidgets.QWidget()
+        tabs.addTab(tab3, "Audio")
+        self._audio_layout = audio_controller
+        tab3.setLayout(self._audio_layout)
 
         right_layout.addWidget(tabs)
 
