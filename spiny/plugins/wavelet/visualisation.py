@@ -1,12 +1,11 @@
 # PyQTGraph
-import pyqtgraph as pg
 from pyqtgraph.Qt import QtGui, QtWidgets
 
 # SpINY
-from spiny.gui.items import SelectablePlotItem
+from spiny.gui.widgets import DataWidget
 
 
-class WaveletPlotWidget(pg.PlotWidget):
+class WaveletPlotWidget(DataWidget):
     """Image plot widget allowing to highlight some regions
 
     Attributes
@@ -44,8 +43,9 @@ class WaveletPlotWidget(pg.PlotWidget):
             arguments passed to pg.PlotWidget
 
         """
+        super().__init__(parent)
         color = QtWidgets.QApplication.instance().palette().color(QtGui.QPalette.Base)
-        pg.GraphicsView.__init__(self, parent, background=color)
+        self.setBackground(color)
         self.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
         self.enableMouse(False)
 
@@ -55,24 +55,19 @@ class WaveletPlotWidget(pg.PlotWidget):
         self._ticks = None
 
     def refresh(self):
-        self._img = pg.ImageItem()
-        self._img.setImage(self._wavelet_extractor._wavelet.T)
 
         scale_distance_hz = self._wavelet_extractor._scale_distance * 1000
         tr = QtGui.QTransform()
-        # 2. scale
         y_scale = self._wavelet_extractor._num_scales * scale_distance_hz
         y_scale /= self._wavelet_extractor._wavelet.shape[1]
         tr.scale(self._wavelet_extractor._frameshift, y_scale)
-        self._img.setTransform(tr)
 
-        # Generate plot
-        self.plotItem = SelectablePlotItem()
-        self.plotItem.getViewBox().addItem(self._img)
-        self.setCentralItem(self.plotItem)
+        # Update Image
+        self._imageItem.setImage(self._wavelet_extractor._wavelet)
+        self._imageItem.setTransform(tr)
 
         # Set time and frequency axes
-        self.plotItem.setLimits(
+        self._plotItem.setLimits(
             minYRange=0,
             maxYRange=self._wavelet_extractor._num_scales * scale_distance_hz,
             yMin=0,
@@ -86,7 +81,4 @@ class WaveletPlotWidget(pg.PlotWidget):
 
     def setTicks(self, ticks):
         self._ticks = ticks
-        # Define and assign histogram
-        self.hist = pg.HistogramLUTWidget()
-        self.hist.setImageItem(self._img)
-        self.hist.gradient.restoreState({"mode": "rgb", "ticks": ticks})
+        self._histItem.gradient.restoreState({"mode": "rgb", "ticks": ticks})

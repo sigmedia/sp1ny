@@ -26,7 +26,6 @@ from .core.wav import PlayerControllerWidget
 from .core import plugin_entry_dict
 from .annotations import controller as annotation_controller
 
-
 import spiny.plugins  # NOTE: we can't use relative import as the prefix is used to validate the plugins
 
 

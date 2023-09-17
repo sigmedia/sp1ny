@@ -1,12 +1,11 @@
 # PyQTGraph
-import pyqtgraph as pg
 from pyqtgraph.Qt import QtGui, QtWidgets
 
 # SpINY
-from spiny.gui.items import SelectablePlotItem
+from spiny.gui.widgets import DataWidget
 
 
-class RawDataPlotWidget(pg.PlotWidget):
+class RawDataPlotWidget(DataWidget):
     """Image plot widget allowing to highlight some regions
 
     Attributes
@@ -35,8 +34,9 @@ class RawDataPlotWidget(pg.PlotWidget):
             arguments passed to pg.PlotWidget
 
         """
+        super().__init__(parent)
         color = QtWidgets.QApplication.instance().palette().color(QtGui.QPalette.Base)
-        pg.GraphicsView.__init__(self, parent, background=color)
+        self.setBackground(color)
         self.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
         self.enableMouse(False)
 
@@ -47,20 +47,15 @@ class RawDataPlotWidget(pg.PlotWidget):
         self._ticks = None
 
     def refresh(self):
-        self._img = pg.ImageItem()
-        self._img.setImage(self._data_extractor._data.T)
-
         tr = QtGui.QTransform()
         tr.scale(self._data_extractor._frameshift * 0.001, 1)
-        self._img.setTransform(tr)
 
-        # Generate plot
-        self.plotItem = SelectablePlotItem()
-        self.plotItem.getViewBox().addItem(self._img)
-        self.setCentralItem(self.plotItem)
+        # Generate image item
+        self._imageItem.setImage(self._data_extractor._data.T)
+        self._imageItem.setTransform(tr)
 
-        # Set the limits to prevent bad (FIXME: hardcoded values)
-        self.plotItem.setLimits(
+        # Set the limits to focus the rendering
+        self._plotItem.setLimits(
             minYRange=0,
             maxYRange=self._data_extractor._data.shape[1],
             yMin=0,
@@ -69,13 +64,11 @@ class RawDataPlotWidget(pg.PlotWidget):
             xMax=self._data_extractor._frameshift * 0.001 * self._data_extractor._data.shape[0],
         )
 
+        # Update the ticks and the histogram
         if self._ticks is not None:
             self.setTicks(self._ticks)
 
     def setTicks(self, ticks):
         self._ticks = ticks
-
-        # Define and assign histogram
-        self.hist = pg.HistogramLUTWidget()
-        self.hist.setImageItem(self._img)
-        self.hist.gradient.restoreState({"mode": "rgb", "ticks": ticks})
+        self._histItem.gradient.restoreState({"mode": "rgb", "ticks": ticks})
+        # self._histItem.setLevels(self._spectrum_extractor._spectrum_.min(), self.data.max())

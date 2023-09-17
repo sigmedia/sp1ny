@@ -23,7 +23,6 @@ def define_dark_palette(app):
 
 
 def define_light_palette(app):
-
     pg.setConfigOption("background", "w")
     pg.setConfigOption("foreground", "k")
 

@@ -141,3 +141,72 @@ class CollapsibleBox(QtWidgets.QWidget):
         content_animation.setDuration(500)
         content_animation.setStartValue(0)
         content_animation.setEndValue(content_height)
+
+
+class DataWidget(pg.GraphicsLayoutWidget):
+    """Helper to define a Refined Data area visualisation
+
+    The widget is composed of two items:
+      - the HistogramLUTItem on top to have a refined control of the contrast
+      - the SelectablePlotItem to visualise the data
+
+    As for PlotWidget, a set of methods specific to PlotItem are accessible directly from the widget
+    """
+
+    def __init__(self, parent=None) -> None:
+        """Initialisation of the widget
+
+        It creates place holders for the two items and hook the
+        methods to the plotItem
+
+        Parameters
+        ----------
+        parent : QWidget
+            The parent widget
+        """
+        super().__init__(parent, border=False)
+
+        self.ci.layout.setContentsMargins(0, 0, 0, 0)
+        self.ci.layout.setSpacing(0)
+
+        # A _plotItem area (ViewBox + axes) for displaying the image
+        self._plotItem = SelectablePlotItem()
+        self._plotItem.setContentsMargins(0, 0, 0, 0)
+
+        # Item for displaying image data
+        self._imageItem = pg.ImageItem()
+        self._plotItem.addItem(self._imageItem)
+
+        # Contrast/color control
+        self._histItem = pg.HistogramLUTItem(orientation="horizontal")
+        self._histItem.vb.setMaximumHeight(10)
+        self._histItem.gradient.setMaximumHeight(10)
+        self._histItem.setImageItem(self._imageItem)
+        self.addItem(self._histItem)
+
+        self.nextRow()
+        self.addItem(self._plotItem)
+
+        for m in [
+            "addItem",
+            "removeItem",
+            "autoRange",
+            "clear",
+            "setAxisItems",
+            "setXRange",
+            "setYRange",
+            "setRange",
+            "setAspectLocked",
+            "setMouseEnabled",
+            "setXLink",
+            "setYLink",
+            "enableAutoRange",
+            "disableAutoRange",
+            "setLimits",
+            "register",
+            "unregister",
+            "viewRect",
+            "hideAxis",
+            "getAxis",
+        ]:
+            setattr(self, m, getattr(self._plotItem, m))

@@ -1,12 +1,11 @@
 # PyQTGraph
-import pyqtgraph as pg
 from pyqtgraph.Qt import QtGui, QtWidgets
 
 # SpINY
-from spiny.gui.items import SelectablePlotItem
+from spiny.gui.widgets import DataWidget
 
 
-class SpectrogramPlotWidget(pg.PlotWidget):
+class SpectrogramPlotWidget(DataWidget):
     """Image plot widget allowing to highlight some regions
 
     Attributes
@@ -35,20 +34,18 @@ class SpectrogramPlotWidget(pg.PlotWidget):
             arguments passed to pg.PlotWidget
 
         """
-
+        super().__init__(parent)
         color = QtWidgets.QApplication.instance().palette().color(QtGui.QPalette.Base)
-        pg.GraphicsView.__init__(self, parent, background=color)
+        self.setBackground(color)
         self.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
         self.enableMouse(False)
-
-        self._spectrum_extractor = spectrum_extractor
 
         # NOTE: needed to conserve the colormap
         self._ticks = None
 
+        self._spectrum_extractor = spectrum_extractor
+
     def refresh(self):
-        self._img = pg.ImageItem()
-        self._img.setImage(self._spectrum_extractor._spectrum.T)
 
         # 1. translate to the minimal frequency
         tr = QtGui.QTransform()
@@ -60,15 +57,12 @@ class SpectrogramPlotWidget(pg.PlotWidget):
         y_scale /= self._spectrum_extractor._spectrum.shape[1]
         tr.scale(self._spectrum_extractor._frameshift * 0.001, y_scale)
 
-        self._img.setTransform(tr)
+        # Generate image item
+        self._imageItem.setImage(self._spectrum_extractor._spectrum)
+        self._imageItem.setTransform(tr)
 
-        # Generate plot
-        self.plotItem = SelectablePlotItem()
-        self.plotItem.getViewBox().addItem(self._img)
-        self.setCentralItem(self.plotItem)
-
-        # Set the limits to prevent bad (FIXME: hardcoded values)
-        self.plotItem.setLimits(
+        # Set the limits to focus the rendering
+        self._plotItem.setLimits(
             minYRange=0,
             maxYRange=self._spectrum_extractor._spectrum.shape[1] * y_scale,
             yMin=0,
@@ -77,13 +71,11 @@ class SpectrogramPlotWidget(pg.PlotWidget):
             xMax=self._spectrum_extractor._frameshift * 0.001 * self._spectrum_extractor._spectrum.shape[0],
         )
 
+        # Update the ticks and the histogram
         if self._ticks is not None:
             self.setTicks(self._ticks)
 
     def setTicks(self, ticks):
         self._ticks = ticks
-
-        # Define and assign histogram
-        self.hist = pg.HistogramLUTWidget()
-        self.hist.setImageItem(self._img)
-        self.hist.gradient.restoreState({"mode": "rgb", "ticks": ticks})
+        self._histItem.gradient.restoreState({"mode": "rgb", "ticks": ticks})
+        # FIXME: self._histItem.plot.setLogMode(False, True)
