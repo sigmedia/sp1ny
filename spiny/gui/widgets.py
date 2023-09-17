@@ -85,9 +85,10 @@ class MAPPlotWidget(pg.PlotWidget):
 
 
 class CollapsibleBox(QtWidgets.QWidget):
-    """This class has been adapted from a PyQt5 example
+    """A Collapsible GroupBox widget.
 
-    The exampple is provided at this address: https://stackoverflow.com/a/52617714
+    This class has been adapted from a PyQt5 example
+    The example is provided at this address: https://stackoverflow.com/a/52617714
     """
 
     def __init__(self, title="", parent=None):
@@ -121,6 +122,7 @@ class CollapsibleBox(QtWidgets.QWidget):
         self.toggle_animation.setDirection(
             QtCore.QAbstractAnimation.Forward if not checked else QtCore.QAbstractAnimation.Backward
         )
+        self.toggle_button.setChecked(not checked)  # FIXME: seems to do the job but in a chunky way
         self.toggle_animation.start()
 
     def setContentLayout(self, layout):
