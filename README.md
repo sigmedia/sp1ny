@@ -8,6 +8,8 @@ You should expect limited performances as well as unstable use.
 We released this prototype for the Show and Tell of INTERSPEECH 2023 in order to collect the need of the community and define the directions to take to reach a useful tool.
 We are making all the effort we can to improve this prototype to obtain a stable version of Sp1NY.
 
+![A screenshot of Sp1NY](/sp1ny.png)
+
 ## Pre-requisites
 
 It is necesary to have Qt and PortAudio installed on your system.
