@@ -72,14 +72,16 @@ class AnnotationDock(Dock):
                 name="%s_%s" % (self.name(), k), tier_name=k, model=self._model, handle_segment=self._handle_segment
             )
             annotation_plot.getAxis("left").setLabel(k)
-            previous_annotation = None
-            for i, elt in enumerate(self._model.annotations[k]):
-                # Generate region item
-                seg = AnnotationItem(elt, handle_edit=self._handle_segment)
-                seg._previous_annotation_item = previous_annotation
-                if previous_annotation is not None:
-                    previous_annotation._next_annotation_item = seg
-                annotation_plot.addItem(seg)
+
+            # NOTE: this is kept for record (but will be removed when the tierplot will be finalised)
+            # previous_annotation = None
+            # for i, elt in enumerate(self._model.annotations[k]):
+            #     # Generate region item
+            #     seg = AnnotationItem(elt, handle_edit=self._handle_segment)
+            #     seg._previous_annotation_item = previous_annotation
+            #     if previous_annotation is not None:
+            #         previous_annotation._next_annotation_item = seg
+            #     annotation_plot.addItem(seg)
 
             if len(self._model.annotations[k]) > 0:
                 if T_max < self._model.annotations[k][-1].end_time:
@@ -118,12 +120,46 @@ class TierPlot(pg.PlotWidget):
     def __init__(self, *args, tier_name="", model=None, handle_segment, **kwargs):
         assert model is not None
         super().__init__(*args, **kwargs)
+        self.getViewBox().setBackgroundColor((0, 0, 0, 25)) # FIXME: harcoded
         self._tier_name = tier_name
         self._model = model
         self._handle_segment = handle_segment
         self.keyPressed.connect(self.on_key)
         self.scene().sigMouseClicked.connect(self.mouse_clicked)
         self._start_pos = None
+
+        self.threshold = 50 # FIXME: hardcoded threshold  # Minimum size in pixels for region to be drawn
+        self.linear_regions = []
+
+        # Initial rendering
+        self.updateVisibleRegions()
+
+        # Connect the rangeChanged signal to update visible regions
+        self.getPlotItem().getViewBox().sigXRangeChanged.connect(self.updateVisibleRegions)
+
+    def updateVisibleRegions(self):
+        # Clear previous regions
+        for region in self.linear_regions:
+            self.removeItem(region)
+        self.linear_regions.clear()
+
+        # Get the current visible range
+        view_range = self.getPlotItem().getViewBox().viewRange()
+        x_min, x_max = view_range[0]
+
+        # Check which regions are visible and meet the size threshold
+        tier = self._model.annotations[self._tier_name]
+        for an in tier:
+            start = an.start_time
+            end = an.end_time
+
+            if end >= x_min and start <= x_max:  # Check if within visible range
+                region_width = self.getPlotItem().vb.mapViewToScene(pg.Point(end, 0)).x() - \
+                               self.getPlotItem().vb.mapViewToScene(pg.Point(start, 0)).x()
+                if region_width >= self.threshold:  # Check if region is above the size threshold
+                    region = AnnotationItem(an, showLabel=True)
+                    self.addItem(region)
+                    self.linear_regions.append(region)
 
     def keyPressEvent(self, event):
         super(TierPlot, self).keyPressEvent(event)
@@ -229,7 +265,7 @@ class AnnotationItem(SegmentItem):
         self._handle_edit = handle_edit
 
         # Some adaptations
-        brush = QtGui.QBrush(QtGui.QColor(0, 0, 0, 0))
+        brush = QtGui.QBrush(QtGui.QColor(255, 255, 255, 255))
         self.setBrush(brush)
         self._default_brush = brush
         hover_brush = QtGui.QBrush(QtGui.QColor(0, 0, 255, 100))
