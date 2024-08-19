@@ -2,7 +2,7 @@ import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 from pyqtgraph.dockarea import Dock
 
-from spiny.gui.items import SegmentItem
+from spiny.ui.segment import SegmentItem
 from .model import Annotation
 from spiny.audio import player
 

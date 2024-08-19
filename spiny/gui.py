@@ -14,9 +14,9 @@ import importlib
 import pkgutil
 
 # spiny internal packages
-from spiny.gui.theme import define_palette
-from spiny.gui.utils import cmapToColormap
-from spiny.gui.helpers.widgets import ExtendedComboBox
+from spiny.ui.theme import define_palette
+from spiny.ui.utils import cmapToColormap
+from spiny.ui.helpers.widgets import ExtendedComboBox
 from spiny.audio.visualisation import WavDock
 from spiny.audio import controller as audio_controller
 from spiny.annotations.visualisation import AnnotationDock

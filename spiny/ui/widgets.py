@@ -17,7 +17,7 @@ import pyqtgraph as pg
 from pyqtgraph.Qt import QtWidgets, QtGui, QtCore
 
 # SpINY
-from spiny.gui.items import SelectablePlotItem
+from .segment import SelectablePlotItem
 
 
 ###############################################################################

@@ -7,7 +7,7 @@ from pyqtgraph.Qt import QtGui, QtWidgets
 from pyqtgraph.dockarea import Dock
 
 # SpINY
-from spiny.gui.items import SelectablePlotItem
+from spiny.ui.segment import SelectablePlotItem
 from .player import player
 
 ###############################################################################

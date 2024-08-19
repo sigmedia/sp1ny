@@ -5,7 +5,7 @@ from ipapy import IPA_CHARS
 from ipapy.ipachar import IPAConsonant, IPASuprasegmental, IPADiacritic, IPAVowel
 from collections import OrderedDict
 
-from ..gui.widgets import CollapsibleBox
+from ..ui.widgets import CollapsibleBox
 from .model import AnnotationSet
 from .visualisation import AnnotationDock
 from .io.htk_lab import HTKLabelSerialiser

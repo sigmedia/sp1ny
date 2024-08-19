@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import OrderedDict
 
-from ..core import Segment
+from spiny.ui.segment import Segment
 
 
 @dataclass

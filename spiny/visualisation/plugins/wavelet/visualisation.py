@@ -2,7 +2,7 @@
 from pyqtgraph.Qt import QtGui, QtWidgets
 
 # SpINY
-from spiny.gui.widgets import DataWidget
+from spiny.ui.widgets import DataWidget
 
 
 class WaveletPlotWidget(DataWidget):

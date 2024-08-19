@@ -1,13 +1,16 @@
+from dataclasses import dataclass
 from typing import Optional
-from spiny.core.segment import Segment
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui
 from spiny.audio import player
 
 
-###############################################################################
-# Classes
-###############################################################################
+@dataclass
+class Segment:
+    start_time: float
+    end_time: float
+
+
 class SelectablePlotItem(pg.PlotItem):
     """PlotItem using a SelectableViewBox instead of a standard pg.ViewBox"""
 

@@ -3,7 +3,7 @@ import pyqtgraph as pg
 from pyqtgraph.Qt import QtGui, QtWidgets
 
 # SpINY
-from spiny.gui.items import SelectablePlotItem
+from spiny.ui.segment import SelectablePlotItem
 
 
 class SpectrogramPraatPlotWidget(pg.PlotWidget):
