@@ -12,8 +12,6 @@ from .io.htk_lab import HTKLabelSerialiser
 from .io.textgrid import TextGridSerialiser
 from .io.json import JSONSerialiser
 
-# from . import HTKAnnotation, TGTAnnotation
-
 
 class QListWidgetItemHideable(QtWidgets.QListWidgetItem):
     def __init__(self, *args, **kwargs):
@@ -60,7 +58,6 @@ class QLabelClickable(QtWidgets.QLabel):
 
 
 class ControlLayout(QtWidgets.QVBoxLayout):
-
     UNSELECTED_COLOR = QtGui.QColor.fromRgb(234, 167, 153)
     DEFAULT_COLOR = QtGui.QColor.fromRgb(255, 255, 255)
 
@@ -200,7 +197,6 @@ class ControlLayout(QtWidgets.QVBoxLayout):
         self.resetView()
 
     def _remove_tiers(self):
-
         # Remove from the model
         list_index = []
         for item in self._list_tiers_widget.selectedItems():
@@ -270,7 +266,6 @@ class ControlLayout(QtWidgets.QVBoxLayout):
         return annotation_info_box
 
     def _generate_IPA_box(self):
-
         ipa_box_layout = QtWidgets.QVBoxLayout()
         ipa_box_layout.setAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
 
@@ -451,7 +446,6 @@ class ControlLayout(QtWidgets.QVBoxLayout):
         self.updateTierList()
 
     def loadAnnotations(self, annotation_file: pathlib.Path) -> None:
-
         if annotation_file.name.endswith(".lab"):
             an_loader = HTKLabelSerialiser()
         elif annotation_file.name.endswith(".TextGrid"):
