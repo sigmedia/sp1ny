@@ -29,13 +29,6 @@ import spiny.plugins  # NOTE: we import the full plugins package path to dynamic
 
 
 #####################################################################################################
-# PyQtGraph global configuration
-#####################################################################################################
-
-# Interpret image data as row-major instead of col-major
-pg.setConfigOptions(imageAxisOrder="row-major")
-
-#####################################################################################################
 # Plugin configuration
 #####################################################################################################
 
