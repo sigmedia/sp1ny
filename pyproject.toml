@@ -55,7 +55,7 @@ spiny = "spiny.main:main"
 
 [tool.poetry.extras]
 plugins = ["praat-parselmouth", "wavelet_prosody_toolkit"]
-dev = ["pre-commit"]
+dev = ["pre-commit", "black", "basedpyright"]
 
 [project.urls]
 "Homepage" = "https://github.com/sigmedia/spiny-toolkit"
@@ -78,3 +78,6 @@ exclude = '''
 
 [tool.flake8]
 max-line-length = 120
+
+[tool.basedpyright]
+typeCheckingMode = "standard"
