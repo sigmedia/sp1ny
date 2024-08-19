@@ -15,7 +15,7 @@ from wavelet_prosody_toolkit.prosody_tools import smooth_and_interp
 from wavelet_prosody_toolkit.prosody_tools import cwt_utils
 
 
-from spiny.core import player
+from spiny.audio import player
 
 
 class WaveletExtractor:

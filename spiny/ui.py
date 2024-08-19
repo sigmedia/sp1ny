@@ -17,12 +17,12 @@ import pkgutil
 from spiny.gui.theme import define_palette
 from spiny.gui.utils import cmapToColormap
 from spiny.gui.helpers.widgets import ExtendedComboBox
-from spiny.core.wav.visualisation import WavDock
-from spiny.core.wav import controller as audio_controller
+from spiny.audio.visualisation import WavDock
+from spiny.audio import controller as audio_controller
 from spiny.annotations.visualisation import AnnotationDock
 from spiny.core import DataDock
-from spiny.core import player
-from spiny.core.wav import PlayerControllerWidget
+from spiny.audio import player
+from spiny.audio import PlayerControllerWidget
 from spiny.core import plugin_entry_dict
 from spiny.annotations import controller as annotation_controller
 import spiny.plugins  # NOTE: we import the full plugins package path to dynamically parse the list of plugins

@@ -50,6 +50,7 @@ class PlayerControllerWidget(QtWidgets.QWidget):
         for index, device in enumerate(devices):
             if device["max_output_channels"] <= 0:  # NOTE: only consider output devices!
                 continue
+
             if "index" in device:
                 index = int(device["index"])
 

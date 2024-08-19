@@ -1,7 +1,7 @@
 import numpy as np
 import librosa
 
-from spiny.core import player
+from spiny.audio import player
 
 
 class SpectrumExtractor:

@@ -4,7 +4,7 @@ from pyqtgraph.dockarea import Dock
 
 from spiny.gui.items import SegmentItem
 from .model import Annotation
-from spiny.core import player
+from spiny.audio import player
 
 
 class AnnotationDock(Dock):

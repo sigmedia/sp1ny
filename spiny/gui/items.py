@@ -2,7 +2,7 @@ from typing import Optional
 from spiny.core.segment import Segment
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui
-from spiny.core import player
+from spiny.audio import player
 
 
 ###############################################################################

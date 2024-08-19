@@ -33,7 +33,7 @@ else:
 try:
     from spiny.annotations import load_annotations
     from spiny.ui import build_gui
-    from spiny.core import player
+    from spiny.audio import player
 except Exception as ex:
     raise ex
 

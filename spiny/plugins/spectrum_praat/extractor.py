@@ -2,7 +2,7 @@ import numpy as np
 import parselmouth
 
 
-from spiny.core import player
+from spiny.audio import player
 
 
 class SpectrumPraatExtractor:
