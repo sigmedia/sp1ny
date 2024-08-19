@@ -1,5 +1,5 @@
 try:
-    from spiny.core import plugin_entry_dict
+    from spiny.visualisation import plugin_entry_dict
     from .extractor import WaveletExtractor
     from .control import WaveletController
     from .visualisation import WaveletPlotWidget

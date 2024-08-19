@@ -20,12 +20,13 @@ from spiny.gui.helpers.widgets import ExtendedComboBox
 from spiny.audio.visualisation import WavDock
 from spiny.audio import controller as audio_controller
 from spiny.annotations.visualisation import AnnotationDock
-from spiny.core import DataDock
 from spiny.audio import player
 from spiny.audio import PlayerControllerWidget
-from spiny.core import plugin_entry_dict
 from spiny.annotations import controller as annotation_controller
-import spiny.plugins  # NOTE: we import the full plugins package path to dynamically parse the list of plugins
+
+from spiny.visualisation import DataDock
+from spiny.visualisation import plugin_entry_dict
+import spiny.visualisation.plugins  # NOTE: we import the full plugins package path to dynamically parse the list of plugins
 
 
 #####################################################################################################
@@ -42,7 +43,7 @@ def iter_namespace(ns_pkg):
     return pkgutil.iter_modules(ns_pkg.__path__, ns_pkg.__name__ + ".")
 
 
-discovered_plugins = {name: importlib.import_module(name) for _, name, _ in iter_namespace(spiny.plugins)}
+discovered_plugins = {name: importlib.import_module(name) for _, name, _ in iter_namespace(spiny.visualisation.plugins)}
 
 #####################################################################################################
 # Classes

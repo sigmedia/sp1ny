@@ -1,15 +1,23 @@
 from pyqtgraph.dockarea import Dock
 
+__all__ = ["DataDock", "DataController", "plugin_entry_dict"]
+
 
 class DataController:
     def __init__(self):
-        pass
+        self._extractor = None
+        self._widget = None
+        self._wav_plot = None
 
     def extract(self):
+        assert self._extractor is not None
         self._extractor.extract()
         self.refresh()
 
     def refresh(self):
+        assert self._widget is not None
+        assert self._wav_plot is not None
+
         self._widget.refresh()
         self._widget.setXLink(self._wav_plot)
 

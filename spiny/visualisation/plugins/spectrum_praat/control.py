@@ -1,5 +1,5 @@
 from pyqtgraph.Qt import QtWidgets, QtCore
-from spiny.core import DataController
+from spiny.visualisation import DataController
 
 
 class SpectrumPraatController(DataController):
