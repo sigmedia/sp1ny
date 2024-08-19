@@ -37,7 +37,7 @@ class JSONSerialiser(AnnotationSerialiser):
 
         Parameters
         ----------
-        input_file : str
+        input_file : pathlib.Path
             The TextGrid file containing the annotations
 
         Returns
@@ -59,7 +59,7 @@ class JSONSerialiser(AnnotationSerialiser):
 
         return AnnotationSet(tiers, set(json_content["ignored"]))
 
-    def save(self, output_file: pathlib.Path, annotation_set: AnnotationSet) -> None:
+    def save(self, output_file: pathlib.Path, annotations: AnnotationSet) -> None:
         # Generat
         with open(output_file, "w") as f_out:
-            json.dump(annotation_set, f_out, indent=2, cls=EnhancedJSONEncoder)
+            json.dump(annotations, f_out, indent=2, cls=EnhancedJSONEncoder)

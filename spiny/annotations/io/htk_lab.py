@@ -1,6 +1,7 @@
 # Regular expression
+import pathlib
 import re
-from typing import List
+from typing import OrderedDict
 
 # Import abstract class
 from ..model import AnnotationSet, Annotation
@@ -31,13 +32,13 @@ class HTKLabelSerialiser(AnnotationSerialiser):
 
     """
 
-    def load(self, htk_file) -> AnnotationSet:
+    def load(self, input_file: pathlib.Path) -> AnnotationSet:
         """Annotation extraction method.
 
         Parameters
         ----------
-        htk_file : str
-            The htk label file containing the annotations
+        input_file : pathlib.Path
+            The HTK label file containing the annotations
 
         Returns
         -------
@@ -49,9 +50,9 @@ class HTKLabelSerialiser(AnnotationSerialiser):
         NotImplementedError
             If the label is not correctly formatted
         """
-        annotations: List[Annotation] = []
+        annotations: list[Annotation] = []
 
-        with open(htk_file) as f:
+        with open(input_file) as f:
             for line in f:
                 # Preprocess
                 line = line.strip()
@@ -77,7 +78,7 @@ class HTKLabelSerialiser(AnnotationSerialiser):
                 annotation: Annotation = Annotation(start_time, end_time, label)
                 annotations.append(annotation)
 
-        an_dict = dict()
+        an_dict: dict[str, list[Annotation]] = OrderedDict()
         an_dict["default"] = annotations
         annotation_set: AnnotationSet = AnnotationSet(an_dict, set())
         return annotation_set

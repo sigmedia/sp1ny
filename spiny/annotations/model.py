@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import OrderedDict, List, Set
+from typing import OrderedDict
 
 from ..core import Segment
 
@@ -11,5 +11,5 @@ class Annotation(Segment):
 
 @dataclass
 class AnnotationSet:
-    annotations: OrderedDict[str, List[Annotation]]
-    ignored: Set[str]
+    annotations: OrderedDict[str, list[Annotation]]
+    ignored: set[str]

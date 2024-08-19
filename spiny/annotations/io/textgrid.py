@@ -1,5 +1,5 @@
-from typing import List
-
+# Python
+from typing import OrderedDict
 import pathlib
 
 # Textgrid utilities
@@ -32,7 +32,7 @@ class TextGridSerialiser(AnnotationSerialiser):
 
         Parameters
         ----------
-        input_file : str
+        input_file : pathlib.Path
             The TextGrid file containing the annotations
 
         Returns
@@ -47,9 +47,9 @@ class TextGridSerialiser(AnnotationSerialiser):
         except UnicodeError:
             the_tgt = tgt.io3.read_textgrid(input_file, encoding="utf-16")
 
-        an_dict = dict()
+        an_dict: OrderedDict[str, list[Annotation]] = OrderedDict()
         for cur_tier in the_tgt.tiers:
-            annotations: List[Annotation] = []
+            annotations: list[Annotation] = []
 
             for an in cur_tier.annotations:
                 annotation: Annotation = Annotation(an.start_time, an.end_time, an.text)
@@ -64,9 +64,9 @@ class TextGridSerialiser(AnnotationSerialiser):
         annotation_set: AnnotationSet = AnnotationSet(an_dict, set())
         return annotation_set
 
-    def save(self, output_file: pathlib.Path, annotation_set: AnnotationSet) -> None:
+    def save(self, output_file: pathlib.Path, annotations: AnnotationSet) -> None:
         the_textgrid = tgt.core.TextGrid()
-        for tier_name, cur_tier in annotation_set.annotations.items():
+        for tier_name, cur_tier in annotations.annotations.items():
             the_tier = tgt.core.IntervalTier(start_time=0, end_time=1, name=tier_name)
             for cur_annotation in cur_tier:
                 the_annotation = tgt.core.Interval(
