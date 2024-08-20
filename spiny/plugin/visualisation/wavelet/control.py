@@ -1,6 +1,5 @@
 from pyqtgraph.Qt import QtWidgets, QtCore
-from spiny.visualisation import DataController
-
+from spiny.visualisation.base import DataController
 from spiny.annotations import controller as annotation_controller
 
 

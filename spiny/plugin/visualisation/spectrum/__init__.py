@@ -1,4 +1,4 @@
-from spiny.visualisation import plugin_entry_dict
+from spiny.visualisation.plugin_management import plugin_entry_dict
 from .extractor import SpectrumExtractor
 from .control import SpectrumController
 from .visualisation import SpectrogramPlotWidget

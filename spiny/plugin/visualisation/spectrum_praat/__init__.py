@@ -1,5 +1,5 @@
 try:
-    from spiny.visualisation import plugin_entry_dict
+    from spiny.visualisation.plugin_management import plugin_entry_dict
     from .extractor import SpectrumPraatExtractor
     from .control import SpectrumPraatController
     from .visualisation import SpectrogramPraatPlotWidget
