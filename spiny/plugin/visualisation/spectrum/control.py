@@ -4,12 +4,7 @@ from spiny.visualisation.base import DataController
 
 class SpectrumController(DataController):
     def __init__(self, extractor, widget):
-        self._name = "Spectrogram"
-        self._extractor = extractor
-        self._widget = widget
-
-    def setWavPlot(self, wav_plot):
-        self._wav_plot = wav_plot
+        super().__init__("Spectrogram", extractor, widget)
 
     def extract(self):
         self._extractor._cutoff = (int(self._wMinFreq.text()), int(self._wMaxFreq.text()))

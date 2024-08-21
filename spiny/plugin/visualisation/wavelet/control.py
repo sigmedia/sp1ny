@@ -5,17 +5,9 @@ from spiny.annotations import controller as annotation_controller
 
 class WaveletController(DataController):
     def __init__(self, extractor, widget):
-        self._name = "Wavelet"
-        self._extractor = extractor
-        self._widget = widget
+        super().__init__("Wavelet", extractor, widget)
         annotation_controller.list_registered_modules.add(self._tier_list_updated)
 
-    def setWavPlot(self, wav_plot):
-        self._wav_plot = wav_plot
-
-    def extract(self):
-        self._extractor.extract()
-        self.refresh()
 
     def setControlPanel(self, panel):
 

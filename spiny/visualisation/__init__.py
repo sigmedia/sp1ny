@@ -1,7 +1,7 @@
 from .core import VisualisationController
-from .core import VisualisationArea
+from .core import DataDock
 
-__all__ = ["VisualisationArea", "VisualisationController"]
+__all__ = ["DataDock", "VisualisationController"]
 
 import importlib
 import pkgutil

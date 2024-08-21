@@ -5,7 +5,7 @@ import logging
 
 # Plotting
 from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
-
+from pyqtgraph.dockarea import DockArea
 
 # spiny internal packages
 from spiny.ui.theme import define_palette
@@ -13,12 +13,42 @@ from spiny.audio import controller as audio_controller
 from spiny.audio import player
 from spiny.audio import PlayerControllerWidget
 from spiny.annotations import controller as annotation_controller
-from spiny.visualisation import VisualisationArea, VisualisationController
+from spiny.visualisation import VisualisationController, DataDock
+from spiny.audio.visualisation import WavDock
+from spiny.annotations.visualisation import AnnotationDock
 
 #####################################################################################################
 # Classes
 #####################################################################################################
+class MainArea(DockArea):
+    def __init__(self, frameshift: float, parent):
+        super().__init__(parent=parent)
+        self.logger = logging.getLogger(self.__class__.__name__)
+        """Helper to fill the dock area"""
+        # Generate wav part
+        self.logger.debug("Plot waveform part")
+        self.dock_wav = WavDock("Signal", (950, 20))
 
+        # Generate data part
+        self.logger.debug("Plot coefficient part")
+        self.dock_visualisation = DataDock(
+            (950, 200),
+        )
+
+        # Generate annotation part
+        self.logger.debug("Plot annotation part")
+        self.dock_annotation = AnnotationDock(
+            "Annotations", (950, 20), self.dock_wav.wav_plot
+        )  # Size doesn't seem to affect anything
+
+        # Define the label on wav plots
+        self.dock_wav.wav_plot.setLabel("bottom", "Time", units="s")
+
+        # - Add docks
+        self.logger.debug("Add docks to the area")
+        self.addDock(self.dock_wav, "left")
+        self.addDock(self.dock_annotation, "top", self.dock_wav)
+        self.addDock(self.dock_visualisation, "top", self.dock_annotation)
 
 class GUIVisu(QtWidgets.QMainWindow):
     def __init__(self, frameshift):
@@ -61,7 +91,7 @@ class GUIVisu(QtWidgets.QMainWindow):
         ##########################################
         # Define the left part of the window
         ##########################################
-        self.visualisation_area = VisualisationArea(frameshift)
+        self.visualisation_area = MainArea(frameshift, parent=self)
         left_layout = QtWidgets.QVBoxLayout()
         left_layout.addWidget(self.visualisation_area)
 
@@ -72,14 +102,14 @@ class GUIVisu(QtWidgets.QMainWindow):
 
         # Initialize tab screen
         tabs = QtWidgets.QTabWidget()
-        tab1 = VisualisationController(self, self.visualisation_area)
+        tab1 = VisualisationController(self, self.visualisation_area.dock_visualisation)
         tabs.addTab(tab1, "Data/Visualization")
 
         # self._annotation_layout.setParent(self)
         tab2 = QtWidgets.QWidget()
         tabs.addTab(tab2, "Annotations")
         self._annotation_layout = annotation_controller
-        self._annotation_layout.setView(self.visualisation_area._dock_annotation)
+        self._annotation_layout.setView(self.visualisation_area.dock_annotation)
         self._annotation_layout.resetView()
         tab2.setLayout(self._annotation_layout)
 

@@ -8,9 +8,6 @@ class RawDataController(DataController):
         self._extractor = extractor
         self._widget = widget
 
-    def setWavPlot(self, wav_plot):
-        self._wav_plot = wav_plot
-
     def loadCoefficientFile(self, coefficient_file, dimension, frameshift):
         self._extractor.loadCoefficientFile(coefficient_file, dimension, frameshift)
 

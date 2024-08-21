@@ -1,47 +1,58 @@
-# Logging
 import logging
 
 # Plotting
 import matplotlib as mpl
-from pyqtgraph.dockarea import DockArea
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtWidgets
+from pyqtgraph.dockarea import Dock
 
 # Spiny
 from spiny.ui.utils import cmapToColormap
 from spiny.ui.helpers.widgets import ExtendedComboBox
-from spiny.audio.visualisation import WavDock
-from spiny.annotations.visualisation import AnnotationDock
-from .base import DataDock
-
 from .plugin_management import plugin_entry_dict
 
-class VisualisationArea(DockArea):
-    """DockArea filled with a plot containing a waveform and a give data (matrix only for now) as well
-    as optional annotations.
 
-    Attributes
-    ----------
+class DataDock(Dock):
+    def __init__(self, size):
+        Dock.__init__(self, name="Place Hold", size=size)
+        self.logger = logging.getLogger(self.__class__.__name__)
 
-    ticks : TODO
-        The color map ticks
-    """
+        # Override the label
+        self.label.sigClicked.connect(self.mouseClicked)
+        self._data_plot = None
+        self._wav_plot = None
 
-    def __init__(self, frameshift):
+    def setWavPlot(self, wav_plot):
+        self._wav_plot = wav_plot
+
+    def removeWidget(self, widget):
         """
-        Parameters
-        ----------
-        frameshift : float
-           The frameshift used to extract the coefficients from the waveform
+        Add a new widget to the interior of this Dock.
+        Each Dock uses a QGridLayout to arrange widgets within.
         """
-        # Superclass initialisation
-        super().__init__()
+        self.widgets.remove(widget)
+        i = self.layout.count() - 1
+        cur_widget = self.layout.itemAt(i).widget()
+        if cur_widget is not None:
+            cur_widget.setParent(None)
+        self.currentRow = self.currentRow - 1
 
-        self.logger = logging.getLogger("VisualisationArea")
-        self.frameshift = frameshift
+    def setWidget(self, widget, name):
+        # Ensure widgets are removed
+        if self._data_plot is not None:
+            self.removeWidget(self._data_plot)
 
-        # - Generate color map
-        self.__fill()
+        # Now define new one
+        self._data_plot = widget
+        self._data_plot.hideAxis("bottom")
+        self._data_plot.getAxis("left").setWidth(50)
+
+        # Add plot
+        # self.data_plot.disableAutoRange()
+        self.addWidget(self._data_plot)
+
+        # Update the name
+        self.setTitle(name)
 
     def updateColorMap(self, cmap_name):
         self.logger.debug("Generate ticks for data plotting")
@@ -51,40 +62,16 @@ class VisualisationArea(DockArea):
         lut = cmap.getLookupTable(0.0, 1.0, 10)
         ticks = list(enumerate(lut))
         self.ticks = [(ticks[i][0] / ticks[-1][0], ticks[i][1]) for i in range(len(ticks))]
-        if self._dock_coef._data_plot is not None:
-            self._dock_coef._data_plot.setTicks(self.ticks)
-
-    def __fill(self):
-        """Helper to fill the dock area"""
-        # Generate wav part
-        self.logger.debug("Plot waveform part")
-        self._dock_wav = WavDock("Signal", (950, 20))
-
-        # Generate data part
-        self.logger.debug("Plot coefficient part")
-        self._dock_coef = DataDock(
-            (950, 200),
-        )
-
-        # Generate annotation part
-        self.logger.debug("Plot annotation part")
-        self._dock_annotation = AnnotationDock(
-            "Annotations", (950, 20), self._dock_wav.wav_plot
-        )  # Size doesn't seem to affect anything
-
-        # Define the label on wav plots
-        self._dock_wav.wav_plot.setLabel("bottom", "Time", units="s")
-
-        # - Add docks
-        self.logger.debug("Add docks to the area")
-        self.addDock(self._dock_wav, "left")
-        self.addDock(self._dock_annotation, "top", self._dock_wav)
-        self.addDock(self._dock_coef, "top", self._dock_annotation)
+        if self._data_plot is not None:
+            self._data_plot.setTicks(self.ticks)
 
     def selectPlugin(self, controller):
-        controller.setWavPlot(self._dock_wav.wav_plot)
         controller.extract()
-        self._dock_coef.setWidget(controller._widget, controller._name)
+        self.setWidget(controller._widget, controller._name)
+        self._data_plot.setXLink(self._wav_plot)
+
+    def mouseClicked(self):
+        pass
 
 class VisualisationController(QtWidgets.QWidget):
     def __init__(self, parent, visualisation_area):
