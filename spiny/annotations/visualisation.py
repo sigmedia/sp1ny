@@ -167,7 +167,6 @@ class TierPlot(pg.PlotWidget):
 
     def on_key(self, event):
         if event.key() == QtCore.Qt.Key_Delete:
-            print(self._tier_name)
             handle_item = None
             # Remove item from the view
             for item in self.items():

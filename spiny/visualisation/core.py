@@ -81,6 +81,7 @@ class VisualisationController(QtWidgets.QWidget):
 
         # Populate the list of plugins
         self._plugin_list = ExtendedComboBox(self)
+        self._plugin_list.addItem("None")
         for elt in plugin_entry_dict:
             self._plugin_list.addItem(elt)
 
@@ -133,6 +134,9 @@ class VisualisationController(QtWidgets.QWidget):
         self.selectColorMap(self._cmap_list.currentText())
 
     def selectPlugin(self, current):
+        if current.lower() == "none":
+            self._visualisation_area.hide()
+
         # NOTE: this is here because we lack a better way to avoid issues during completion
         if current not in plugin_entry_dict:
             return
@@ -146,6 +150,7 @@ class VisualisationController(QtWidgets.QWidget):
         controller.setControlPanel(self.layout())
         self._visualisation_area.selectPlugin(controller)
         self.selectColorMap(self._cmap_list.currentText())
+        self._visualisation_area.show()
 
     def selectColorMap(self, cmap_name):
         self._visualisation_area.updateColorMap(cmap_name)

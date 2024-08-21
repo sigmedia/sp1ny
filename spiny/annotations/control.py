@@ -200,8 +200,6 @@ class ControlLayout(QtWidgets.QVBoxLayout):
         # Remove from the model
         list_index = []
         for item in self._list_tiers_widget.selectedItems():
-            print("===========")
-            print(item.text())
             del self._model.annotations[item.text()]
             list_index.append(self._list_tiers_widget.row(item))
 
