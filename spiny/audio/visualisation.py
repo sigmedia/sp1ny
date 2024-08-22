@@ -63,17 +63,19 @@ class WavPlotWidget(pg.PlotWidget):
         color = QtWidgets.QApplication.instance().palette().color(QtGui.QPalette.Text)
         self.plotItem.plot(
             x, player._wav.squeeze(), pen=color
-        )  # FIXME: duplicate things, find a way to get rid of this!
+        )
 
         # Define the limits to constraint the zoom
         T = player._wav.shape[0] / player._sampling_rate
         self.plotItem.setLimits(
-            yMin=-1,
-            yMax=1,
             xMin=0,
             xMax=T,
             minXRange=0,
             maxXRange=T,
+            yMin=-1,
+            yMax=1,
+            minYRange=-1,
+            maxYRange=1
         )
 
         v_bar = pg.InfiniteLine(pos=0, movable=False, angle=90, pen=pg.mkPen({"color": "#F00", "width": 2}))

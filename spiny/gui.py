@@ -28,11 +28,14 @@ class MainArea(DockArea):
         # Generate wav part
         self.logger.debug("Plot waveform part")
         self.dock_wav = WavDock("Signal", (950, 20))
+        self.dock_wav.wav_plot.setLabel("bottom", "Time", units="s")
+
 
         # Generate data part
         self.logger.debug("Plot coefficient part")
         self.dock_visualisation = DataDock(
             (950, 200),
+            wav_plot = self.dock_wav.wav_plot
         )
 
         # Generate annotation part
@@ -41,8 +44,6 @@ class MainArea(DockArea):
             "Annotations", (950, 20), self.dock_wav.wav_plot
         )  # Size doesn't seem to affect anything
 
-        # Define the label on wav plots
-        self.dock_wav.wav_plot.setLabel("bottom", "Time", units="s")
 
         # - Add docks
         self.logger.debug("Add docks to the area")

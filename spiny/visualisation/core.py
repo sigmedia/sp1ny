@@ -13,16 +13,13 @@ from .plugin_management import plugin_entry_dict
 
 
 class DataDock(Dock):
-    def __init__(self, size):
+    def __init__(self, size, wav_plot):
         Dock.__init__(self, name="Place Hold", size=size)
         self.logger = logging.getLogger(self.__class__.__name__)
 
         # Override the label
         self.label.sigClicked.connect(self.mouseClicked)
         self._data_plot = None
-        self._wav_plot = None
-
-    def setWavPlot(self, wav_plot):
         self._wav_plot = wav_plot
 
     def removeWidget(self, widget):
@@ -72,6 +69,7 @@ class DataDock(Dock):
 
     def mouseClicked(self):
         pass
+
 
 class VisualisationController(QtWidgets.QWidget):
     def __init__(self, parent, visualisation_area):
@@ -136,6 +134,7 @@ class VisualisationController(QtWidgets.QWidget):
     def selectPlugin(self, current):
         if current.lower() == "none":
             self._visualisation_area.hide()
+            return
 
         # NOTE: this is here because we lack a better way to avoid issues during completion
         if current not in plugin_entry_dict:
