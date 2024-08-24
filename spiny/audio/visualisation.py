@@ -1,4 +1,4 @@
-# Python
+# Numerical
 import numpy as np
 
 # PyQTGraph
@@ -50,7 +50,6 @@ class WavPlotWidget(pg.PlotWidget):
         super().__init__(parent=parent)
 
         # Save reference to wav
-        x = np.arange(player._wav.shape[0]) / player._sampling_rate
 
         # Prepare plot item
         self.plotItem = SelectablePlotItem(
@@ -60,24 +59,12 @@ class WavPlotWidget(pg.PlotWidget):
             **kwargs,
         )
         self.setCentralItem(self.plotItem)
-        color = QtWidgets.QApplication.instance().palette().color(QtGui.QPalette.Text)
-        self.plotItem.plot(
-            x, player._wav.squeeze(), pen=color
-        )
 
         # Define the limits to constraint the zoom
         T = player._wav.shape[0] / player._sampling_rate
-        self.plotItem.setLimits(
-            xMin=0,
-            xMax=T,
-            minXRange=0,
-            maxXRange=T,
-            yMin=-1,
-            yMax=1,
-            minYRange=-1,
-            maxYRange=1
-        )
-
+        self.plotItem.setLimits(xMin=0, xMax=T, minXRange=0, maxXRange=T)
+        self.plotItem.setYRange(-1, 1)
+        self.plotItem.setXRange(0, T)
         v_bar = pg.InfiniteLine(pos=0, movable=False, angle=90, pen=pg.mkPen({"color": "#F00", "width": 2}))
 
         def _update_position_handler(position):
@@ -85,6 +72,33 @@ class WavPlotWidget(pg.PlotWidget):
 
         player.add_position_handler(_update_position_handler)
         self.plotItem.addItem(v_bar)
+
+        # Initial rendering
+        self.updateVisibleRegions()
+
+        # Connect the rangeChanged signal to update visible regions
+        self.getPlotItem().getViewBox().sigXRangeChanged.connect(self.updateVisibleRegions)
+
+    def updateVisibleRegions(self):
+        # Get the current visible range
+        view_range = self.getPlotItem().getViewBox().viewRange()
+        x_min, x_max = view_range[0]
+        x_min = int(x_min * player._sampling_rate)
+        x_max = int(x_max * player._sampling_rate)
+        step = (x_max - x_min) // 10000  # FIXME: number of points being hardcoded is bad
+        if step < 1:
+            step = 1
+
+        # ???
+        self.getPlotItem().clear()
+
+        # Plot a nice version of the current one
+        x = np.arange(x_min, x_max, step)
+        # y = decimate([x_min:x_max], step)
+        y = player._wav.squeeze()[x]
+
+        color = QtWidgets.QApplication.instance().palette().color(QtGui.QPalette.Text)
+        self.plotItem.plot(x / player._sampling_rate, y, pen=color)
 
 
 class WavDock(Dock):
@@ -129,7 +143,7 @@ class WavDock(Dock):
             The color map ticks
 
         """
-        Dock.__init__(self, name=name, size=size)
+        super().__init__(name=name, size=size, autoOrientation=False)
         self.__plotWav()
 
         # Label space
