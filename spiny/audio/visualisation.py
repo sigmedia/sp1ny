@@ -161,3 +161,29 @@ class WavDock(Dock):
 
         self.wav_plot = WavPlotWidget(name="%s waveform" % self.name)
         self.addWidget(self.wav_plot)
+
+    def setOrientation(self, o="auto", force=False):
+        """
+        Sets the orientation of the title bar for this Dock.
+        Must be one of 'auto', 'horizontal', or 'vertical'.
+        By default ('auto'), the orientation is determined
+        based on the aspect ratio of the Dock.
+        """
+        # setOrientation may be called before the container is set in some cases
+        # (via resizeEvent), so there's no need to do anything here until called
+        # again by containerChanged
+        if self.container() is None:
+            return
+
+        if o == "auto" and self.autoOrient:
+            if self.container().type() == "tab":
+                o = "horizontal"
+            elif self.width() > self.height() * 1.5:
+                o = "vertical"
+            else:
+                o = "horizontal"
+
+        if force and self.orientation != o:
+            self.orientation = o
+            self.label.setOrientation(o)
+            self.updateStyle()

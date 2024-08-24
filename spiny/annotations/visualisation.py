@@ -28,7 +28,7 @@ class AnnotationDock(Dock):
             The annotation loader object
 
         """
-        Dock.__init__(self, name=name, size=size)
+        super().__init__(name=name, size=size, autoOrientation=False)
 
         self.startPos = None
 
@@ -113,6 +113,32 @@ class AnnotationDock(Dock):
         for i in reversed(range(self.vbox.count())):
             self.vbox.itemAt(i).widget().setParent(None)
 
+    def setOrientation(self, o="auto", force=False):
+        """
+        Sets the orientation of the title bar for this Dock.
+        Must be one of 'auto', 'horizontal', or 'vertical'.
+        By default ('auto'), the orientation is determined
+        based on the aspect ratio of the Dock.
+        """
+        # setOrientation may be called before the container is set in some cases
+        # (via resizeEvent), so there's no need to do anything here until called
+        # again by containerChanged
+        if self.container() is None:
+            return
+
+        if o == "auto" and self.autoOrient:
+            if self.container().type() == "tab":
+                o = "horizontal"
+            elif self.width() > self.height() * 1.5:
+                o = "vertical"
+            else:
+                o = "horizontal"
+
+        if force and self.orientation != o:
+            self.orientation = o
+            self.label.setOrientation(o)
+            self.updateStyle()
+
 
 class TierPlot(pg.PlotWidget):
     keyPressed = QtCore.Signal(QtCore.QEvent)
@@ -120,7 +146,7 @@ class TierPlot(pg.PlotWidget):
     def __init__(self, *args, tier_name="", model=None, handle_segment, **kwargs):
         assert model is not None
         super().__init__(*args, **kwargs)
-        self.getViewBox().setBackgroundColor((0, 0, 0, 25)) # FIXME: harcoded
+        self.getViewBox().setBackgroundColor((0, 0, 0, 25))  # FIXME: harcoded
         self._tier_name = tier_name
         self._model = model
         self._handle_segment = handle_segment
@@ -128,7 +154,7 @@ class TierPlot(pg.PlotWidget):
         self.scene().sigMouseClicked.connect(self.mouse_clicked)
         self._start_pos = None
 
-        self.threshold = 50 # FIXME: hardcoded threshold  # Minimum size in pixels for region to be drawn
+        self.threshold = 50  # FIXME: hardcoded threshold  # Minimum size in pixels for region to be drawn
         self.linear_regions = []
 
         # Initial rendering
@@ -154,12 +180,15 @@ class TierPlot(pg.PlotWidget):
             end = an.end_time
 
             if end >= x_min and start <= x_max:  # Check if within visible range
-                region_width = self.getPlotItem().vb.mapViewToScene(pg.Point(end, 0)).x() - \
-                               self.getPlotItem().vb.mapViewToScene(pg.Point(start, 0)).x()
+                region_width = (
+                    self.getPlotItem().vb.mapViewToScene(pg.Point(end, 0)).x()
+                    - self.getPlotItem().vb.mapViewToScene(pg.Point(start, 0)).x()
+                )
                 if region_width >= self.threshold:  # Check if region is above the size threshold
-                    region = AnnotationItem(an, showLabel=True)
+                    region = AnnotationItem(an, self._handle_segment)
                     self.addItem(region)
                     self.linear_regions.append(region)
+                    region.showLabel(region_width)
 
     def keyPressEvent(self, event):
         super(TierPlot, self).keyPressEvent(event)
@@ -242,7 +271,7 @@ class AnnotationItem(SegmentItem):
 
     """
 
-    def __init__(self, annotation, showLabel=True, handle_edit=None):
+    def __init__(self, annotation, handle_edit=None):
         """
         Parameters
         ----------
@@ -271,14 +300,14 @@ class AnnotationItem(SegmentItem):
         self.setHoverBrush(hover_brush)
 
         # Add label
-        if showLabel:
-            self._text = pg.TextItem(
-                text=self._segment.label,
-                anchor=(0.5, 0.5),
-                color=QtWidgets.QApplication.instance().palette().color(QtGui.QPalette.Text),
-            )
-            self._text.setPos((self._segment.start_time + self._segment.end_time) / 2, 0.5)
-            self._text.setParentItem(self)
+        self._text = pg.TextItem(
+            text=self._segment.label,
+            anchor=(0.5, 0.5),
+            color=QtWidgets.QApplication.instance().palette().color(QtGui.QPalette.Text),
+        )
+
+        self._text.setPos((self._segment.start_time + self._segment.end_time) / 2, 0.5)
+        self._text.setParentItem(self)
 
     def hoverEvent(self, ev):
         """Override hoverEvent to relax some conditions
@@ -360,3 +389,10 @@ class AnnotationItem(SegmentItem):
 
     def isSelected(self):
         return self._selected
+
+    def showLabel(self, region_width):
+        text_width = self._text.boundingRect().width()
+        if region_width < text_width:
+            self._text.hide()
+        else:
+            self._text.show()

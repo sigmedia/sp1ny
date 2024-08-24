@@ -14,7 +14,7 @@ from .plugin_management import plugin_entry_dict
 
 class DataDock(Dock):
     def __init__(self, size, wav_plot):
-        Dock.__init__(self, name="Place Hold", size=size)
+        super().__init__(name="Place Holder", size=size, autoOrientation=False)
         self.logger = logging.getLogger(self.__class__.__name__)
 
         # Override the label
@@ -69,6 +69,32 @@ class DataDock(Dock):
 
     def mouseClicked(self):
         pass
+
+    def setOrientation(self, o="auto", force=False):
+        """
+        Sets the orientation of the title bar for this Dock.
+        Must be one of 'auto', 'horizontal', or 'vertical'.
+        By default ('auto'), the orientation is determined
+        based on the aspect ratio of the Dock.
+        """
+        # setOrientation may be called before the container is set in some cases
+        # (via resizeEvent), so there's no need to do anything here until called
+        # again by containerChanged
+        if self.container() is None:
+            return
+
+        if o == "auto" and self.autoOrient:
+            if self.container().type() == "tab":
+                o = "horizontal"
+            elif self.width() > self.height() * 1.5:
+                o = "vertical"
+            else:
+                o = "horizontal"
+
+        if force and self.orientation != o:
+            self.orientation = o
+            self.label.setOrientation(o)
+            self.updateStyle()
 
 
 class VisualisationController(QtWidgets.QWidget):

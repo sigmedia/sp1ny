@@ -92,7 +92,7 @@ class SegmentItem(pg.LinearRegionItem):
             List of related segments (instances of SegmentItem). (default: [])
         """
 
-        pg.GraphicsObject.__init__(self)
+        super().__init__()
 
         self._segment = segment
         self._related = related

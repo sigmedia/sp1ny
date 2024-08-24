@@ -24,12 +24,11 @@ class MainArea(DockArea):
     def __init__(self, frameshift: float, parent):
         super().__init__(parent=parent)
         self.logger = logging.getLogger(self.__class__.__name__)
-        """Helper to fill the dock area"""
-        # Generate wav part
-        self.logger.debug("Plot waveform part")
-        self.dock_wav = WavDock("Signal", (950, 20))
-        self.dock_wav.wav_plot.setLabel("bottom", "Time", units="s")
 
+        # Generate wav part
+        self.dock_wav = WavDock(name="Signal", size=(950, 150))
+        self.dock_wav.wav_plot.setLabel("bottom", "Time", units="s")
+        self.dock_wav.setFixedHeight(150)
 
         # Generate data part
         self.logger.debug("Plot coefficient part")
@@ -42,14 +41,17 @@ class MainArea(DockArea):
         self.logger.debug("Plot annotation part")
         self.dock_annotation = AnnotationDock(
             "Annotations", (950, 20), self.dock_wav.wav_plot
-        )  # Size doesn't seem to affect anything
-
+        )
 
         # - Add docks
         self.logger.debug("Add docks to the area")
-        self.addDock(self.dock_wav, "left")
+        self.addDock(self.dock_wav, "top")
         self.addDock(self.dock_annotation, "top", self.dock_wav)
         self.addDock(self.dock_visualisation, "top", self.dock_annotation)
+
+        self.dock_wav.setOrientation(o='vertical', force=True)
+        self.dock_annotation.setOrientation(o='vertical', force=True)
+        self.dock_visualisation.setOrientation(o='vertical', force=True)
 
 class GUIVisu(QtWidgets.QMainWindow):
     def __init__(self, frameshift):
