@@ -141,11 +141,7 @@ class ControlLayout(QtWidgets.QVBoxLayout):
         scroll.setWidgetResizable(True)
 
         # Generate the necessary widgets
-        self._file_box = self._generate_file_box()
         self._eq_widget = EqWidget(None, (9, 1))  # FIXME: place holder but not work
-
-        # Add the widgets
-        box_layout.addWidget(self._file_box)
         box_layout.addWidget(self._eq_widget)
 
         # Generate Configuration Widget
@@ -156,34 +152,6 @@ class ControlLayout(QtWidgets.QVBoxLayout):
         # Finalize the layout
         self.setAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
         self.addWidget(scroll)
-
-    def _generate_file_box(self):
-        file_box_layout = QtWidgets.QGridLayout()
-        file_box_layout.setAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
-
-        # Start time
-        l1 = QtWidgets.QLabel("Current File")
-        self._wCurrentFile = QtWidgets.QLineEdit("none")
-        self._wCurrentFile.setEnabled(False)
-        file_box_layout.addWidget(l1, 1, 0)
-        file_box_layout.addWidget(self._wCurrentFile, 1, 1)
-
-        self._bLoadFile = QtWidgets.QPushButton("Load File")
-        # self._bLoadFile.clicked.connect(self._load_annotation_file)
-        self._bLoadFile.setDefault(False)
-        self._bLoadFile.setAutoDefault(False)
-        file_box_layout.addWidget(self._bLoadFile)
-
-        self._bSaveFile = QtWidgets.QPushButton("Save File")
-        # self._bSaveFile.clicked.connect(self._save_annotation_file)
-        self._bSaveFile.setDefault(False)
-        self._bSaveFile.setAutoDefault(False)
-        file_box_layout.addWidget(self._bSaveFile)
-
-        file_box = QtWidgets.QGroupBox("Audio File")
-        file_box.setLayout(file_box_layout)
-
-        return file_box
 
 
 class EqWidget(QtWidgets.QGroupBox):
@@ -201,7 +169,6 @@ class EqWidget(QtWidgets.QGroupBox):
         self.setLayout(overall_layout)
 
     def _define_sliders(self):
-
         self._frequencies = [50, 200, 1000, 2000, 4000, 8000, 16000]
         self._slider_array = []
 
@@ -209,7 +176,6 @@ class EqWidget(QtWidgets.QGroupBox):
 
         prev_freq = 0
         for freq in self._frequencies:
-
             cur_slider = EqSlider(prev_freq, freq, self)
             layout.addWidget(cur_slider)
             prev_freq = freq
