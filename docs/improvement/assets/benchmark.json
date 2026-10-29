@@ -1,0 +1,240 @@
+{
+ "base_short": {
+  "import": {
+   "s": 0.884,
+   "rss_mb": 121,
+   "peak_mb": 121
+  },
+  "load_wav": {
+   "s": 1.003,
+   "rss_mb": 232,
+   "peak_mb": 246
+  },
+  "discover_plugins": {
+   "s": 0.053,
+   "rss_mb": 350,
+   "peak_mb": 349
+  },
+  "build_window": {
+   "s": 0.158,
+   "rss_mb": 384,
+   "peak_mb": 383
+  },
+  "first_paint": {
+   "s": 0.353,
+   "rss_mb": 485,
+   "peak_mb": 484
+  },
+  "load_annotations": {
+   "s": 0.175,
+   "rss_mb": 494,
+   "peak_mb": 493
+  },
+  "select Raw DATA": {
+   "s": 0.037,
+   "rss_mb": 494,
+   "peak_mb": 493
+  },
+  "select Spectrogram": {
+   "s": 2.713,
+   "rss_mb": 817,
+   "peak_mb": 1323
+  },
+  "select Spectrogram (Praat)": {
+   "s": 0.385,
+   "rss_mb": 891,
+   "peak_mb": 1323
+  },
+  "pan full view x10": {
+   "s": 0.429,
+   "rss_mb": 949,
+   "peak_mb": 1640
+  },
+  "pan 60s view x10": {
+   "s": 0.397,
+   "rss_mb": 949,
+   "peak_mb": 1640
+  },
+  "pan 5s view x10": {
+   "s": 0.406,
+   "rss_mb": 949,
+   "peak_mb": 1640
+  },
+  "colormap change": {
+   "s": 0.139,
+   "rss_mb": 949,
+   "peak_mb": 1640
+  }
+ },
+ "base_long": {
+  "import": {
+   "s": 1.032,
+   "rss_mb": 121,
+   "peak_mb": 120
+  },
+  "load_wav": {
+   "s": 1.204,
+   "rss_mb": 261,
+   "peak_mb": 334
+  },
+  "discover_plugins": {
+   "s": 0.065,
+   "rss_mb": 379,
+   "peak_mb": 378
+  },
+  "build_window": {
+   "s": 0.306,
+   "rss_mb": 490,
+   "peak_mb": 528
+  },
+  "first_paint": {
+   "s": 1.674,
+   "rss_mb": 912,
+   "peak_mb": 911
+  },
+  "load_annotations": {
+   "s": 0.555,
+   "rss_mb": 937,
+   "peak_mb": 936
+  },
+  "select Raw DATA": {
+   "s": 0.146,
+   "rss_mb": 937,
+   "peak_mb": 936
+  }
+ },
+ "new_short": {
+  "import": {
+   "s": 0.64,
+   "rss_mb": 111,
+   "peak_mb": 110
+  },
+  "load_wav": {
+   "s": 0.008,
+   "rss_mb": 122,
+   "peak_mb": 122
+  },
+  "discover_plugins": {
+   "s": 0.038,
+   "rss_mb": 144,
+   "peak_mb": 143
+  },
+  "build_window": {
+   "s": 0.145,
+   "rss_mb": 164,
+   "peak_mb": 164
+  },
+  "first_paint": {
+   "s": 0.07,
+   "rss_mb": 189,
+   "peak_mb": 195
+  },
+  "load_annotations": {
+   "s": 0.089,
+   "rss_mb": 196,
+   "peak_mb": 195
+  },
+  "select Raw DATA": {
+   "s": 0.007,
+   "rss_mb": 196,
+   "peak_mb": 195
+  },
+  "select Spectrogram": {
+   "s": 0.62,
+   "rss_mb": 274,
+   "peak_mb": 329
+  },
+  "select Spectrogram (Praat)": {
+   "s": 0.556,
+   "rss_mb": 330,
+   "peak_mb": 469
+  },
+  "pan full view x10": {
+   "s": 0.116,
+   "rss_mb": 357,
+   "peak_mb": 469
+  },
+  "pan 60s view x10": {
+   "s": 0.091,
+   "rss_mb": 357,
+   "peak_mb": 469
+  },
+  "pan 5s view x10": {
+   "s": 0.088,
+   "rss_mb": 357,
+   "peak_mb": 469
+  },
+  "colormap change": {
+   "s": 0.016,
+   "rss_mb": 357,
+   "peak_mb": 469
+  }
+ },
+ "new_long": {
+  "import": {
+   "s": 0.696,
+   "rss_mb": 109,
+   "peak_mb": 109
+  },
+  "load_wav": {
+   "s": 0.058,
+   "rss_mb": 150,
+   "peak_mb": 149
+  },
+  "discover_plugins": {
+   "s": 0.038,
+   "rss_mb": 173,
+   "peak_mb": 172
+  },
+  "build_window": {
+   "s": 0.195,
+   "rss_mb": 212,
+   "peak_mb": 211
+  },
+  "first_paint": {
+   "s": 0.095,
+   "rss_mb": 237,
+   "peak_mb": 242
+  },
+  "load_annotations": {
+   "s": 0.132,
+   "rss_mb": 248,
+   "peak_mb": 247
+  },
+  "select Raw DATA": {
+   "s": 0.007,
+   "rss_mb": 248,
+   "peak_mb": 247
+  },
+  "select Spectrogram": {
+   "s": 3.019,
+   "rss_mb": 427,
+   "peak_mb": 714
+  },
+  "select Spectrogram (Praat)": {
+   "s": 2.347,
+   "rss_mb": 401,
+   "peak_mb": 714
+  },
+  "pan full view x10": {
+   "s": 0.109,
+   "rss_mb": 508,
+   "peak_mb": 797
+  },
+  "pan 60s view x10": {
+   "s": 0.107,
+   "rss_mb": 508,
+   "peak_mb": 797
+  },
+  "pan 5s view x10": {
+   "s": 0.102,
+   "rss_mb": 508,
+   "peak_mb": 797
+  },
+  "colormap change": {
+   "s": 0.02,
+   "rss_mb": 508,
+   "peak_mb": 797
+  }
+ }
+}

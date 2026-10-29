@@ -1,0 +1,56 @@
+#+TITLE: Smaller optimizations
+#+OPTIONS: toc:nil num:t
+
+* Memory-mapped raw coefficients (=658e847=)
+
+Raw coefficient files (headerless float32) were read with =np.fromfile=, which loads the whole file.
+They are now opened with =np.memmap=: the operating system reads the pages from disk when they are
+displayed, and can drop them again under memory pressure (they are backed by the file, not by swap).
+Combined with the visible-slice rendering ([[file:image-rendering.org]]), only the displayed part of a
+large file is read. The dimension is checked against the file size before mapping.
+
+Implementation: [[file:../../spiny/raw_data/extractor.py]].
+
+* Colormaps without matplotlib (=ae18410=)
+
+matplotlib was imported at startup only to look up 10 colormaps. The five perceptually uniform ones
+(viridis, plasma, inferno, magma, cividis) are bundled with pyqtgraph. The five others (binary, gray,
+bone, hot, copper) are piecewise linear in matplotlib: each channel is a list of (position, value)
+breakpoints. =spiny.gui.colormaps= stores these breakpoints and evaluates every channel at the union
+of the breakpoints of the three channels, so that the linear interpolation done by pyqtgraph between
+consecutive stops is exactly matplotlib's.
+
+Implementation: [[file:../../spiny/gui/colormaps.py]].
+
+* Blocking an unused import (=a9bd03a=)
+
+pyqtgraph's gradient editor (in the histogram above each data plot) builds a menu listing the
+colormaps of matplotlib and colorcet, which imports them if they are installed: 54 MB and 0.8 s for
+matplotlib, only to fill a right-click menu. =blocked_imports= temporarily registers the modules as
+=None= in =sys.modules= (which makes =import matplotlib= raise =ImportError=) while the histogram is
+created, then removes these entries, so that the modules can still be imported normally afterwards.
+
+Implementation: [[file:../../spiny/gui/widgets.py]].
+
+* Lazy plugin dependencies (=570e7d5=)
+
+A plugin with a heavy optional dependency (parselmouth) checks at startup that it is installed with
+=importlib.util.find_spec=, without importing it, and imports it when its data is first computed.
+
+* Lighter annotations (=489ec93=)
+
+- =Segment= and =Annotation= are dataclasses with =slots=True=: no per-instance =__dict__=, so an
+  annotation takes about 110 bytes instead of 150 (100 000 annotations: 10.7 MiB instead of
+  14.5 MiB).
+- At each pan or zoom, each tier decides which annotations are wide enough to be drawn (50 pixels).
+  It used to map both ends of every annotation to the screen (two Qt calls per annotation, thousands
+  per frame on a dense tier). The pixel threshold is now converted once into a duration:
+
+  #+begin_example
+  minimum duration = 50 pixels × (x_max − x_min) / view width in pixels
+  #+end_example
+
+  and the test becomes a comparison of floats.
+
+Implementation: [[file:../../spiny/core/segment.py]], [[file:../../spiny/annotations/model.py]],
+[[file:../../spiny/annotations/visualisation.py]].
