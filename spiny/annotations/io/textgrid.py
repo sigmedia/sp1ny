@@ -1,5 +1,3 @@
-from typing import List
-
 import pathlib
 
 # Textgrid utilities
@@ -41,7 +39,6 @@ class TextGridSerialiser(AnnotationSerialiser):
             A dictionary whose values are list of segments. Each segment is represented by a tuple (start, end, label)
 
         """
-        self.segments = dict()
         try:
             the_tgt = tgt.io3.read_textgrid(input_file, encoding="utf-8")
         except UnicodeError:
@@ -49,7 +46,7 @@ class TextGridSerialiser(AnnotationSerialiser):
 
         an_dict = dict()
         for cur_tier in the_tgt.tiers:
-            annotations: List[Annotation] = []
+            annotations: list[Annotation] = []
 
             for an in cur_tier.annotations:
                 annotation: Annotation = Annotation(an.start_time, an.end_time, an.text)
@@ -65,6 +62,15 @@ class TextGridSerialiser(AnnotationSerialiser):
         return annotation_set
 
     def save(self, output_file: pathlib.Path, annotation_set: AnnotationSet) -> None:
+        """Write the annotations as a long-format TextGrid (one interval tier per tier)
+
+        Parameters
+        ----------
+        output_file : pathlib.Path
+            The file
+        annotation_set : AnnotationSet
+            The annotations
+        """
         the_textgrid = tgt.core.TextGrid()
         for tier_name, cur_tier in annotation_set.annotations.items():
             the_tier = tgt.core.IntervalTier(start_time=0, end_time=1, name=tier_name)

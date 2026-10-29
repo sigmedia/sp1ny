@@ -1,30 +1,32 @@
-from typing import Optional, Set
+from __future__ import annotations
+
 import pathlib
-from pyqtgraph import QtCore, QtGui, QtWidgets
-from pyqtgraph.Qt import isQObjectAlive
+from collections.abc import Callable
+from typing import Any
+
 from ipapy import IPA_CHARS
 from ipapy.ipachar import IPAConsonant, IPASuprasegmental, IPADiacritic, IPAVowel
-from collections import OrderedDict
+from pyqtgraph import QtCore, QtGui, QtWidgets
+from pyqtgraph.Qt import isQObjectAlive
 
 from ..gui.widgets import CollapsibleBox
+from .io import AnnotationSerialiser
 from .model import AnnotationSet
-from .visualisation import AnnotationDock
+from .visualisation import AnnotationDock, AnnotationItem
 from .io.htk_lab import HTKLabelSerialiser
 from .io.textgrid import TextGridSerialiser
 from .io.json import JSONSerialiser
 
 # Supported annotation formats: file dialog filter => (extension, serialiser class)
-ANNOTATION_FORMATS = OrderedDict(
-    [
-        ("TextGrid Files (*.TextGrid)", (".TextGrid", TextGridSerialiser)),
-        ("HTK Label Files (*.lab)", (".lab", HTKLabelSerialiser)),
-        ("JSON Files (*.json)", (".json", JSONSerialiser)),
-    ]
-)
+ANNOTATION_FORMATS = {
+    "TextGrid Files (*.TextGrid)": (".TextGrid", TextGridSerialiser),
+    "HTK Label Files (*.lab)": (".lab", HTKLabelSerialiser),
+    "JSON Files (*.json)": (".json", JSONSerialiser),
+}
 ANNOTATION_FILTERS = ";;".join(ANNOTATION_FORMATS.keys())
 
 
-def serialiser_for(annotation_file: pathlib.Path):
+def serialiser_for(annotation_file: pathlib.Path) -> AnnotationSerialiser:
     """Instantiate the serialiser matching the extension of the given file (case insensitive)
 
     Raises
@@ -39,60 +41,70 @@ def serialiser_for(annotation_file: pathlib.Path):
 
 
 class QListWidgetItemHideable(QtWidgets.QListWidgetItem):
-    def __init__(self, *args, **kwargs):
+    """Tier list entry remembering whether its tier is hidden
+
+    Notes
+    -----
+    The state is named "tier hidden" on purpose: QListWidgetItem.isHidden() means that the entry itself is
+    hidden from the list, which is not the case here.
+    """
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self._hidden = False
 
-    def toggleHidden(self):
+    def toggleTierHidden(self) -> None:
+        """Hide the tier if it is shown, show it if it is hidden"""
         self._hidden = not self._hidden
 
-    def isHidden(self):
+    def isTierHidden(self) -> bool:
+        """Tell if the tier is hidden
+
+        Returns
+        -------
+        bool
+            True if the tier is hidden
+        """
         return self._hidden
 
 
 class QLabelClickable(QtWidgets.QLabel):
-    """Clickable label used for IPA labels
-
-    Source:
-    https://stackoverflow.com/questions/74852195/pictures-in-pyqt5-gridlayout-look-stretched-when-window-is-maximized
-    """
+    """Label emitting its text when it is clicked (used by the IPA palettes)"""
 
     clicked = QtCore.Signal(str)
 
-    def __init__(self, parent=None):
-        super(QLabelClickable, self).__init__(parent)
+    def mouseReleaseEvent(self, event: QtGui.QMouseEvent) -> None:
+        """Emit `clicked` with the text of the label
 
-    def mousePressEvent(self, event):
-        self.ultimo = "Clic"
-
-    def mouseReleaseEvent(self, event):
-        if self.ultimo == "Clic":
-            QtCore.QTimer.singleShot(
-                QtWidgets.QApplication.instance().doubleClickInterval(), self.performSingleClickAction
-            )
-        else:
-            # Realizar acción de doble clic.
-            self.clicked.emit(self.text())
-
-    # def mouseDoubleClickEvent(self, event):
-    #     self.ultimo = "Doble Clic"
-
-    def performSingleClickAction(self):
-        if self.ultimo == "Clic":
-            self.clicked.emit(self.text())
+        Parameters
+        ----------
+        event : QtGui.QMouseEvent
+            The mouse event
+        """
+        self.clicked.emit(self.text())
 
 
 class ControlLayout(QtWidgets.QVBoxLayout):
+    """Annotation tab: file loading/saving, tier list, edition of the selected annotation, IPA palettes
+
+    The layout owns the annotation model (an AnnotationSet) and keeps the annotation dock (the view) in
+    sync with it. It is also the owner of the selected annotation, see update_current_annotation.
+
+    Parameters
+    ----------
+    parent : QtWidgets.QWidget or None
+        The parent widget
+    """
 
     UNSELECTED_COLOR = QtGui.QColor.fromRgb(234, 167, 153)
     DEFAULT_COLOR = QtGui.QColor.fromRgb(255, 255, 255)
 
-    def __init__(self, parent):
+    def __init__(self, parent: QtWidgets.QWidget | None) -> None:
         super().__init__(parent)
 
         # View and model
         self._model: AnnotationSet = AnnotationSet({}, set())
-        self._view: Optional[AnnotationDock] = None
+        self._view: AnnotationDock | None = None
         self._list_registered_modules = _registered_modules
 
         # Create the main layout
@@ -106,7 +118,7 @@ class ControlLayout(QtWidgets.QVBoxLayout):
         scroll.setWidgetResizable(True)
 
         # Generate the necessary widgets
-        self._current_annotation = None
+        self._current_annotation: AnnotationItem | None = None
         self._file_box = self._generate_file_box()
         self._info_box = self._generate_general_box()
         self._tier_box = self._generate_tier_box()
@@ -131,13 +143,28 @@ class ControlLayout(QtWidgets.QVBoxLayout):
         self.addWidget(scroll)
 
     @property
-    def list_registered_modules(self) -> Set:
+    def list_registered_modules(self) -> set[Callable[[], None]]:
+        """set(callable): Functions called (without argument) every time the annotation view is reset"""
         return self._list_registered_modules
 
     def setView(self, annotation_dock: AnnotationDock) -> None:
+        """Define the dock rendering the annotations
+
+        Parameters
+        ----------
+        annotation_dock : AnnotationDock
+            The dock
+        """
         self._view = annotation_dock
 
-    def _generate_file_box(self):
+    def _generate_file_box(self) -> QtWidgets.QGroupBox:
+        """Create the box showing the current annotation file, with the load and save buttons
+
+        Returns
+        -------
+        QtWidgets.QGroupBox
+            The box
+        """
         file_box_layout = QtWidgets.QGridLayout()
         file_box_layout.setAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
 
@@ -165,7 +192,16 @@ class ControlLayout(QtWidgets.QVBoxLayout):
 
         return file_box
 
-    def _generate_tier_box(self):
+    def _generate_tier_box(self) -> QtWidgets.QGroupBox:
+        """Create the box listing the tiers, with the add/remove/hide buttons
+
+        The list can be reordered by drag and drop.
+
+        Returns
+        -------
+        QtWidgets.QGroupBox
+            The box
+        """
         tier_box = QtWidgets.QGroupBox("List of tiers")
         tier_box_layout = QtWidgets.QVBoxLayout()
         tier_box_layout.setAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
@@ -195,23 +231,25 @@ class ControlLayout(QtWidgets.QVBoxLayout):
 
         return tier_box
 
-    def _toggle_tier(self):
+    def _toggle_tier(self) -> None:
+        """Hide the selected tiers which are shown and show the selected tiers which are hidden"""
         # Remove from the model
         for idx, item in enumerate(self._list_tiers_widget.selectedItems()):
-            item.toggleHidden()
-            if item.isHidden():
+            item.toggleTierHidden()
+            if item.isTierHidden():
                 item.setBackground(QtGui.QBrush(ControlLayout.UNSELECTED_COLOR))
                 self._model.ignored.add(item.text())
             else:
                 item.setBackground(QtGui.QBrush(ControlLayout.DEFAULT_COLOR))
                 self._model.ignored.discard(item.text())
             if self.view is not None:
-                self.view.tiers_dict[item.text()].setVisible(not item.isHidden())
+                self.view.tiers_dict[item.text()].setVisible(not item.isTierHidden())
 
             item.setSelected(False)
 
-    def _update_order(self):
-        new_order = OrderedDict()
+    def _update_order(self) -> None:
+        """Reorder the tiers of the model as in the list (after a drag and drop) and redraw them"""
+        new_order = dict()
         for item_idx in range(self._list_tiers_widget.count()):
             item = self._list_tiers_widget.item(item_idx)
             new_order[item.text()] = self._model.annotations[item.text()]
@@ -221,7 +259,8 @@ class ControlLayout(QtWidgets.QVBoxLayout):
 
         self.resetView()
 
-    def _remove_tiers(self):
+    def _remove_tiers(self) -> None:
+        """Remove the selected tiers from the model and the list, and redraw the tiers"""
 
         # Remove from the model
         list_index = []
@@ -237,7 +276,8 @@ class ControlLayout(QtWidgets.QVBoxLayout):
 
         self.resetView()
 
-    def _add_tier(self):
+    def _add_tier(self) -> None:
+        """Ask for the name of a new (empty) tier and add it; empty and existing names are refused"""
         tier_name, ok = QtWidgets.QInputDialog.getText(self._tier_box, "New tier", "Enter the name of the tier:")
         if not ok:
             return
@@ -257,7 +297,14 @@ class ControlLayout(QtWidgets.QVBoxLayout):
         self.resetView()
         self._list_tiers_widget.addItem(item)
 
-    def _generate_general_box(self):
+    def _generate_general_box(self) -> QtWidgets.QGroupBox:
+        """Create the box editing the boundaries and the label of the selected annotation
+
+        Returns
+        -------
+        QtWidgets.QGroupBox
+            The box
+        """
         annotation_info_box_layout = QtWidgets.QGridLayout()
         annotation_info_box_layout.setAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
 
@@ -289,7 +336,14 @@ class ControlLayout(QtWidgets.QVBoxLayout):
 
         return annotation_info_box
 
-    def _generate_IPA_box(self):
+    def _generate_IPA_box(self) -> QtWidgets.QGroupBox:
+        """Create the IPA palettes: clicking a symbol inserts it in the label of the selected annotation
+
+        Returns
+        -------
+        QtWidgets.QGroupBox
+            The box containing one collapsible palette per IPA category
+        """
 
         ipa_box_layout = QtWidgets.QVBoxLayout()
         ipa_box_layout.setAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
@@ -309,7 +363,9 @@ class ControlLayout(QtWidgets.QVBoxLayout):
 
         return ipa_box
 
-    def _generate_IPA_palette(self, title, ipa_cls, font=None, nb_columns=8):
+    def _generate_IPA_palette(
+        self, title: str, ipa_cls: type, font: QtGui.QFont | None = None, nb_columns: int = 8
+    ) -> CollapsibleBox:
         """Generate a collapsible grid of clickable labels for the IPA characters of a given class"""
         box = CollapsibleBox(title)
         lay = QtWidgets.QGridLayout()
@@ -317,7 +373,7 @@ class ControlLayout(QtWidgets.QVBoxLayout):
         # setting background color to label when mouse hover over it
         hover_style = "QLabel:hover {{background-color: {}; color: white;}}".format(QtGui.QColor(134, 125, 125).name())
 
-        ipa_chars = [cur_unicode for cur_unicode in IPA_CHARS if type(cur_unicode) is ipa_cls]
+        ipa_chars: list[Any] = [cur_unicode for cur_unicode in IPA_CHARS if type(cur_unicode) is ipa_cls]
         for j, cur_unicode in enumerate(ipa_chars):
             label = QLabelClickable(str(cur_unicode))
             label.clicked.connect(self.onIPAInsert)
@@ -331,7 +387,8 @@ class ControlLayout(QtWidgets.QVBoxLayout):
         box.setContentLayout(lay)
         return box
 
-    def _load_annotation_file(self):
+    def _load_annotation_file(self) -> None:
+        """Ask for an annotation file and load it (errors are shown in a message box)"""
         options = QtWidgets.QFileDialog.Options()
         options |= QtWidgets.QFileDialog.DontUseNativeDialog
         annotation_file, _ = QtWidgets.QFileDialog.getOpenFileName(
@@ -345,7 +402,8 @@ class ControlLayout(QtWidgets.QVBoxLayout):
         except Exception as ex:
             QtWidgets.QMessageBox.critical(self._file_box, "Load annotation file", f"Cannot load the file:\n{ex}")
 
-    def _save_annotation_file(self):
+    def _save_annotation_file(self) -> None:
+        """Ask for a file name and save the annotations; the extension (or the selected filter) gives the format"""
         options = QtWidgets.QFileDialog.Options()
         options |= QtWidgets.QFileDialog.DontUseNativeDialog
         annotation_file, selected_filter = QtWidgets.QFileDialog.getSaveFileName(
@@ -370,7 +428,17 @@ class ControlLayout(QtWidgets.QVBoxLayout):
             return
         self._wCurrentFile.setText(str(annotation_file.absolute()))
 
-    def update_current_annotation(self, new_annotation=None):
+    def update_current_annotation(self, new_annotation: AnnotationItem | None = None) -> None:
+        """Make an annotation the selected one (or clear the selection) and show it in the edition box
+
+        This is the only place where the selection changes: the previous item is unselected and the new one
+        selected (AnnotationItem.setSelectedState).
+
+        Parameters
+        ----------
+        new_annotation : AnnotationItem, optional
+            The item to select, None to clear the selection. (default: None)
+        """
         if self._current_annotation is new_annotation:
             return
 
@@ -394,7 +462,7 @@ class ControlLayout(QtWidgets.QVBoxLayout):
             self._current_annotation = None
             self._info_box.setVisible(False)
 
-    def onTimeEdited(self):
+    def onTimeEdited(self) -> None:
         """Apply the edited boundaries (once editing is finished), or restore the previous ones if they are invalid"""
         if self._current_annotation is None:
             return
@@ -412,45 +480,76 @@ class ControlLayout(QtWidgets.QVBoxLayout):
             self._wStartTime.setText(f"{segment.start_time:.4f}")
             self._wEndTime.setText(f"{segment.end_time:.4f}")
 
-    def onLabelEdited(self):
+    def onLabelEdited(self) -> None:
+        """Apply the edited label to the selected annotation"""
         if self._current_annotation is not None:
             self._current_annotation.updateLabel(self._wLabel.text())
 
-    def onIPAInsert(self, ipa_symbol):
+    def onIPAInsert(self, ipa_symbol: str) -> None:
+        """Insert an IPA symbol at the cursor position of the label field
+
+        Parameters
+        ----------
+        ipa_symbol : str
+            The symbol
+        """
         self._wLabel.insert(ipa_symbol)
 
-    def updateTierList(self):
+    def updateTierList(self) -> None:
+        """Fill the tier list from the model (hidden tiers are highlighted)"""
         self._list_tiers_widget.clear()
         for tier_name in self._model.annotations.keys():
             item = QListWidgetItemHideable(self._list_tiers_widget)
             item.setText(tier_name)
             if tier_name in self._model.ignored:
-                item.toggleHidden()
+                item.toggleTierHidden()
                 item.setBackground(QtGui.QBrush(ControlLayout.UNSELECTED_COLOR))
             else:
                 item.setBackground(QtGui.QBrush(ControlLayout.DEFAULT_COLOR))
             self._list_tiers_widget.addItem(item)
 
     @property
-    def model(self):
+    def model(self) -> AnnotationSet:
+        """AnnotationSet: The annotations being edited"""
         return self._model
 
     @property
-    def view(self):
+    def view(self) -> AnnotationDock | None:
+        """AnnotationDock: The dock rendering the annotations (None until setView is called)"""
         return self._view
 
     def setAnnotationModel(self, annotation_model: AnnotationSet) -> None:
+        """Replace the annotations being edited and redraw them
+
+        Parameters
+        ----------
+        annotation_model : AnnotationSet
+            The new annotations
+        """
         self._model = annotation_model
         self.resetView()
         self.updateTierList()
 
     def loadAnnotations(self, annotation_file: pathlib.Path) -> None:
+        """Load an annotation file (the format is given by its extension) and show it
+
+        Parameters
+        ----------
+        annotation_file : pathlib.Path
+            The file
+
+        Raises
+        ------
+        ValueError
+            if the format is unknown or the file is invalid
+        """
         an_loader = serialiser_for(annotation_file)
         model = an_loader.load(annotation_file)
         self.setAnnotationModel(model)
         self._wCurrentFile.setText(str(annotation_file.absolute()))
 
-    def resetView(self):
+    def resetView(self) -> None:
+        """Redraw every tier from the model and notify the registered modules"""
         for module_handler in self.list_registered_modules:
             module_handler()
         if self._view is not None:
@@ -458,10 +557,10 @@ class ControlLayout(QtWidgets.QVBoxLayout):
             self._view.setModel(self._model, self.update_current_annotation)
 
 
-_controller: Optional[ControlLayout] = None
+_controller: ControlLayout | None = None
 
 # NOTE: kept outside of the controller so that registrations survive a re-creation of the controller
-_registered_modules: Set = set()
+_registered_modules: set[Callable[[], None]] = set()
 
 
 def get_controller() -> ControlLayout:

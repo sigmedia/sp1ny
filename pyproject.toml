@@ -20,26 +20,19 @@ classifiers = [
   'Topic :: Multimedia :: Sound/Audio :: Speech',
   'Topic :: Scientific/Engineering :: Information Analysis',
   'Topic :: Scientific/Engineering :: Visualization',
-  # Pick your license as you wish
   'License :: OSI Approved :: MIT License',
-  # Python version
   'Programming Language :: Python :: 3',
-  'Programming Language :: Python :: 3.8',
-  'Programming Language :: Python :: 3.9',
-  'Programming Language :: Python :: 3.10',
-  'Programming Language :: Python :: 3.11',
-  'Programming Language :: Python :: 3.12',
+  'Programming Language :: Python :: 3.13',
 ]
 
 [tool.poetry.dependencies]
 # Python
-python = ">=3.8, <3.13"
+python = ">=3.13"
 # QT/Plotting
-matplotlib = "*"
-pyqtgraph = ">=0.13.1"
+pyqtgraph = "*"
 PySide6 = "*"
 # Audio
-librosa = ">=0.10.0"
+soundfile = "*"
 sounddevice = "*"
 # Annotations
 tgt = "*"
@@ -64,7 +57,7 @@ dev = ["pre-commit"]
 
 [tool.black]
 line-length = 120
-target-version = ['py38', 'py39', 'py310', 'py311']
+target-version = ['py313']
 include = '\.pyi?$'
 exclude = '''
 /(

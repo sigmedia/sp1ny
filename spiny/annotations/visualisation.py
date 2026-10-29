@@ -1,9 +1,16 @@
+from __future__ import annotations
+
+from collections.abc import Callable
+from typing import Any
+
+from pyqtgraph.GraphicsScene.mouseEvents import HoverEvent, MouseClickEvent
+
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 from pyqtgraph.dockarea import Dock
 
 from spiny.gui.items import SegmentItem
-from .model import Annotation
+from .model import Annotation, AnnotationSet
 from spiny.core import player
 
 
@@ -17,7 +24,7 @@ class AnnotationDock(Dock):
 
     """
 
-    def __init__(self, name, size, wav_plot):
+    def __init__(self, name: str, size: tuple[int, int], wav_plot: pg.PlotWidget) -> None:
         """
         Parameters
         ----------
@@ -49,16 +56,25 @@ class AnnotationDock(Dock):
         self.scroll.setWidgetResizable(True)
         self.scroll.setWidget(self.widget)
 
-        self._tiers_dict = dict()
+        self._tiers_dict: dict[str, TierPlot] = dict()
 
-        self._model = None
+        self._model: AnnotationSet | None = None
 
-    def setModel(self, model, handle_edit_segment):
+    def setModel(self, model: AnnotationSet, handle_edit_segment: Callable[[AnnotationItem | None], None]) -> None:
+        """Define the annotations to render and render them
+
+        Parameters
+        ----------
+        model : spiny.annotations.model.AnnotationSet
+            The annotation set
+        handle_edit_segment : callable
+            Function called with the annotation item to select (or None to clear the selection)
+        """
         self._model = model
         self._handle_segment = handle_edit_segment
         self.plotAnnotation()
 
-    def plotAnnotation(self):
+    def plotAnnotation(self) -> None:
         """Helper to render the annotations"""
         if self._model is None:
             return
@@ -70,16 +86,6 @@ class AnnotationDock(Dock):
                 name="%s_%s" % (self.name(), k), tier_name=k, model=self._model, handle_segment=self._handle_segment
             )
             annotation_plot.getAxis("left").setLabel(k)
-
-            # NOTE: this is kept for record (but will be removed when the tierplot will be finalised)
-            # previous_annotation = None
-            # for i, elt in enumerate(self._model.annotations[k]):
-            #     # Generate region item
-            #     seg = AnnotationItem(elt, handle_edit=self._handle_segment)
-            #     seg._previous_annotation_item = previous_annotation
-            #     if previous_annotation is not None:
-            #         previous_annotation._next_annotation_item = seg
-            #     annotation_plot.addItem(seg)
 
             if len(self._model.annotations[k]) > 0:
                 if T_max < self._model.annotations[k][-1].end_time:
@@ -102,33 +108,67 @@ class AnnotationDock(Dock):
             )
             w.setXLink(self._wav_plot)
             w.getAxis("left").setTicks([])
-            w.getAxis("left").setWidth(50)  # FIXME: hardcoded
+            w.getAxis("left").setWidth(50)  # the same width in every dock, so that the time axes line up
 
     @property
-    def tiers_dict(self):
+    def tiers_dict(self) -> dict[str, TierPlot]:
+        """dict: The tier plots, by tier name"""
         return self._tiers_dict
 
-    def clear(self):
+    def clear(self) -> None:
+        """Remove every tier plot from the dock"""
         for i in reversed(range(self.vbox.count())):
             self.vbox.itemAt(i).widget().setParent(None)
         self._tiers_dict.clear()
 
 
 class TierPlot(pg.PlotWidget):
-    def __init__(self, *args, tier_name="", model=None, handle_segment, **kwargs):
+    """Plot rendering one annotation tier
+
+    Only the annotations which are visible and wide enough (see `threshold`) are rendered, see
+    `updateVisibleRegions`. Clicking twice in an empty area creates a new annotation between the two
+    clicks, and the Delete key removes the selected annotation.
+
+    Parameters
+    ----------
+    args : list
+        Positional arguments passed to pg.PlotWidget
+    tier_name : str
+        The name of the tier in the model
+    model : spiny.annotations.model.AnnotationSet
+        The annotation set containing the tier
+    handle_segment : callable
+        Function called with the annotation item to select (or None to clear the selection)
+    kwargs : keyword arguments
+        Keyword arguments passed to pg.PlotWidget
+
+    Attributes
+    ----------
+    threshold : float
+        The minimum width, in pixels, of a rendered annotation
+    """
+
+    def __init__(
+        self,
+        *args: Any,
+        tier_name: str = "",
+        model: AnnotationSet | None = None,
+        handle_segment: Callable[[AnnotationItem | None], None],
+        **kwargs: Any,
+    ) -> None:
         assert model is not None
         super().__init__(*args, **kwargs)
-        self.getViewBox().setBackgroundColor((0, 0, 0, 25))  # FIXME: harcoded
+        self.getViewBox().setBackgroundColor((0, 0, 0, 25))  # light shade, to tell the tiers apart
         self._tier_name = tier_name
         self._model = model
         self._handle_segment = handle_segment
         self.scene().sigMouseClicked.connect(self.mouse_clicked)
         self._start_pos = None
 
-        self.threshold = 50  # FIXME: hardcoded threshold  # Minimum size in pixels for region to be drawn
+        self.threshold = 50  # minimum width (pixels) of a drawn annotation: narrower ones would be unreadable
 
         # Rendered items, keyed by the id() of the annotation they display
-        self._items = dict()
+        self._items: dict[int, AnnotationItem] = dict()
 
         # Initial rendering
         self.updateVisibleRegions()
@@ -137,11 +177,11 @@ class TierPlot(pg.PlotWidget):
         self.getPlotItem().getViewBox().sigXRangeChanged.connect(self.updateVisibleRegions)
 
     @property
-    def annotation_items(self):
+    def annotation_items(self) -> list[AnnotationItem]:
         """The annotation items currently rendered"""
         return list(self._items.values())
 
-    def updateVisibleRegions(self):
+    def updateVisibleRegions(self) -> None:
         """Reconcile the rendered items with the model for the current view
 
         Only the missing items are created and only the items which are not visible (or too small)
@@ -152,15 +192,16 @@ class TierPlot(pg.PlotWidget):
         vb = self.getPlotItem().getViewBox()
         x_min, x_max = vb.viewRange()[0]
 
+        # Minimum duration of a drawn region: the pixel threshold converted once to seconds
+        # (instead of mapping both ends of every annotation to the scene)
+        min_duration = self.threshold * (x_max - x_min) / max(vb.width(), 1.0)
+
         # Check which regions are visible and meet the size threshold
-        visible = dict()
-        for an in self._model.annotations[self._tier_name]:
-            if an.end_time >= x_min and an.start_time <= x_max:  # Check if within visible range
-                region_width = (
-                    vb.mapViewToScene(pg.Point(an.end_time, 0)).x() - vb.mapViewToScene(pg.Point(an.start_time, 0)).x()
-                )
-                if region_width >= self.threshold:  # Check if region is above the size threshold
-                    visible[id(an)] = an
+        visible = {
+            id(an): an
+            for an in self._model.annotations[self._tier_name]
+            if an.end_time >= x_min and an.start_time <= x_max and an.end_time - an.start_time >= min_duration
+        }
 
         # Remove the items which are not visible anymore (the selected one is kept alive)
         for key in list(self._items.keys()):
@@ -174,13 +215,20 @@ class TierPlot(pg.PlotWidget):
                 self.addItem(region)
                 self._items[key] = region
 
-    def keyPressEvent(self, event):
+    def keyPressEvent(self, event: QtGui.QKeyEvent) -> None:
+        """Delete the selected annotation on Delete, otherwise use the default behaviour
+
+        Parameters
+        ----------
+        event : QtGui.QKeyEvent
+            The key event
+        """
         if event.key() == QtCore.Qt.Key_Delete:
             self.deleteSelectedAnnotation()
         else:
             super().keyPressEvent(event)
 
-    def deleteSelectedAnnotation(self):
+    def deleteSelectedAnnotation(self) -> None:
         """Remove the selected annotation of this tier (if any) from the view and from the model"""
         selected = [key for key, item in self._items.items() if item.isSelected()]
         if not selected:
@@ -198,10 +246,14 @@ class TierPlot(pg.PlotWidget):
                 del tier[i]
                 break
 
-    def mouse_clicked(self, ev):
-        # if (event.modifiers() & QtCore.Qt.ControlModifier) and
-        # (event.button() == QtCore.Qt.LeftButton):
+    def mouse_clicked(self, ev: MouseClickEvent) -> None:
+        """Create an annotation from two successive clicks in an empty area of the tier
 
+        Parameters
+        ----------
+        ev : pyqtgraph.GraphicsScene.mouseEvents.MouseClickEvent
+            The click event
+        """
         is_void = True
         items = self.scene().items(ev.scenePos())
         for x in items:
@@ -250,19 +302,26 @@ class AnnotationItem(SegmentItem):
 
     """
 
-    def __init__(self, annotation, showLabel=True, handle_edit=None):
+    _segment: Annotation  # NOTE: an annotation item always renders an Annotation (a labelled Segment)
+
+    def __init__(
+        self,
+        annotation: Annotation,
+        showLabel: bool = True,
+        handle_edit: Callable[[AnnotationItem | None], None] | None = None,
+    ) -> None:
         """
         Parameters
         ----------
-        seg_infos : tuple(float, float, str)
-            the segment information (start, end, label)
-
-        wav : tuple(np.array, int), optional
-            The signal information as loaded using librosa.
-            The tuple contain an array of samples and the sample rate. (default: None)
+        annotation : spiny.annotations.model.Annotation
+            the annotation to render (it is modified in place when the item is moved or edited)
 
         showLabel : bool, optional
             Show the label (or not). (default: True)
+
+        handle_edit : callable, optional
+            Function called with the item to select (or None to clear the selection); without it the
+            item cannot be selected. (default: None)
         """
         super().__init__(annotation, movable=True)
 
@@ -288,7 +347,7 @@ class AnnotationItem(SegmentItem):
             self._text.setPos((self._segment.start_time + self._segment.end_time) / 2, 0.5)
             self._text.setParentItem(self)
 
-    def hoverEvent(self, ev):
+    def hoverEvent(self, ev: HoverEvent) -> None:
         """Override hoverEvent to relax some conditions
 
         Parameters
@@ -302,11 +361,18 @@ class AnnotationItem(SegmentItem):
         else:
             self.setMouseHover(False)
 
-    def _update_bounds(self, ev):
+    def _update_bounds(self, ev: pg.LinearRegionItem) -> None:
+        """Update the segment from the lines and move the label to the middle of the segment
+
+        Parameters
+        ----------
+        ev : AnnotationItem
+            The item whose region changed (sent by sigRegionChangeFinished)
+        """
         super()._update_bounds(ev)
         self._text.setPos((self._segment.start_time + self._segment.end_time) / 2, 0.5)
 
-    def mouseClickEvent(self, ev):
+    def mouseClickEvent(self, ev: MouseClickEvent) -> None:
         """The click event handler.
 
         Parameters
@@ -338,7 +404,7 @@ class AnnotationItem(SegmentItem):
             ev.accept()
             self.requestSelection()
 
-    def requestSelection(self):
+    def requestSelection(self) -> None:
         """Ask the controller to make this item the current annotation (or to unselect it if it already is)
 
         The controller is the only owner of the selection: it calls setSelectedState() on the
@@ -348,7 +414,7 @@ class AnnotationItem(SegmentItem):
             return
         self._handle_edit(None if self._selected else self)
 
-    def setSelectedState(self, selected):
+    def setSelectedState(self, selected: bool) -> None:
         """Update the visual selection state (does not notify the controller)"""
         self._selected = selected
         if selected:
@@ -357,17 +423,40 @@ class AnnotationItem(SegmentItem):
             self.setBrush(self._default_brush)
         self.update()
 
-    def updateLabel(self, label):
+    def updateLabel(self, label: str) -> None:
+        """Change the label of the annotation
+
+        Parameters
+        ----------
+        label : str
+            The new label
+        """
         self._segment.label = label
         self._text.setText(label)
         self._text.setPos((self._segment.start_time + self._segment.end_time) / 2, 0.5)
 
-    def setBounds(self, start_time, end_time):
+    def setBounds(self, start_time: float, end_time: float) -> None:
+        """Move the boundaries of the annotation
+
+        Parameters
+        ----------
+        start_time : float
+            The new start time in seconds
+        end_time : float
+            The new end time in seconds
+        """
         self._segment.start_time = start_time
         self.lines[0].setPos(self._segment.start_time)
         self._segment.end_time = end_time
         self.lines[1].setPos(self._segment.end_time)
         self._text.setPos((self._segment.start_time + self._segment.end_time) / 2, 0.5)
 
-    def isSelected(self):
+    def isSelected(self) -> bool:
+        """Indicate if the annotation is the current (selected) one
+
+        Returns
+        -------
+        bool
+            True if the annotation is selected
+        """
         return self._selected

@@ -1,3 +1,10 @@
+from __future__ import annotations
+
+from collections.abc import Sequence
+from typing import Any
+
+from pyqtgraph.GraphicsScene.mouseEvents import MouseClickEvent, MouseDragEvent
+
 from typing import Optional
 from spiny.core.segment import Segment
 import pyqtgraph as pg
@@ -11,7 +18,7 @@ from spiny.core import player
 class SelectablePlotItem(pg.PlotItem):
     """PlotItem using a SelectableViewBox instead of a standard pg.ViewBox"""
 
-    def __init__(self, lock_y_axis=False, **kwargs):
+    def __init__(self, lock_y_axis: bool = False, **kwargs: Any) -> None:
         """
         Parameters
         ----------
@@ -27,21 +34,31 @@ class SelectablePlotItem(pg.PlotItem):
 
 
 class LinkedInfiniteLine(pg.InfiniteLine):
+    """Infinite line which can be linked to another one (the link is mutual)
+
+    Parameters
+    ----------
+    linked_line : LinkedInfiniteLine, optional
+        The line to link to. (default: None)
+    pos, angle, pen, movable, bounds, hoverPen, label, labelOpts, span, markers, name
+        See pg.InfiniteLine
+    """
+
     def __init__(
         self,
-        linked_line=None,
-        pos=None,
-        angle=90,
-        pen=None,
-        movable=False,
-        bounds=None,
-        hoverPen=None,
-        label=None,
-        labelOpts=None,
-        span=(0, 1),
-        markers=None,
-        name=None,
-    ):
+        linked_line: LinkedInfiniteLine | None = None,
+        pos: Any = None,
+        angle: float = 90,
+        pen: Any = None,
+        movable: bool = False,
+        bounds: Sequence[float] | None = None,
+        hoverPen: Any = None,
+        label: str | None = None,
+        labelOpts: dict | None = None,
+        span: tuple[float, float] = (0, 1),
+        markers: list | None = None,
+        name: str | None = None,
+    ) -> None:
         super().__init__(pos, angle, pen, movable, bounds, hoverPen, label, labelOpts, span, markers, name)
 
         self._linked_line = linked_line
@@ -67,16 +84,16 @@ class SegmentItem(pg.LinearRegionItem):
 
     def __init__(
         self,
-        segment,
-        movable=True,
-        related=None,
-        span=(0, 1),
-        swapMode="sort",
-        clipItem=None,
-        pen=None,
-        hoverPen=None,
-        bounds=None,
-    ):
+        segment: Segment,
+        movable: bool = True,
+        related: Sequence[SegmentItem] | None = None,
+        span: tuple[float, float] = (0, 1),
+        swapMode: str | None = "sort",
+        clipItem: pg.GraphicsObject | None = None,
+        pen: Any = None,
+        hoverPen: Any = None,
+        bounds: Sequence[float] | None = None,
+    ) -> None:
         """
         Parameters
         ----------
@@ -137,7 +154,7 @@ class SegmentItem(pg.LinearRegionItem):
         self.lines[1].sigPositionChanged.connect(self._line1Moved)
         self.sigRegionChangeFinished.connect(self._update_bounds)
 
-    def setRegion(self, bounds):
+    def setRegion(self, bounds: Sequence[float]) -> None:
         """Set the values for the edges of the region. If related items have been specified, they are
         updated with the same bound values.
 
@@ -161,7 +178,7 @@ class SegmentItem(pg.LinearRegionItem):
         for s in self._related:
             s.setRegion(bounds)
 
-    def mouseClickEvent(self, ev):
+    def mouseClickEvent(self, ev: MouseClickEvent) -> None:
         """The click event handler.
 
 
@@ -187,7 +204,14 @@ class SegmentItem(pg.LinearRegionItem):
                 self.parentWidget().setXRange(self._segment.start_time, self._segment.end_time)
                 self._is_zoomed_in = not self._is_zoomed_in
 
-    def _update_bounds(self, ev):
+    def _update_bounds(self, ev: pg.LinearRegionItem) -> None:
+        """Update the segment from the positions of the lines
+
+        Parameters
+        ----------
+        ev : SegmentItem
+            The item whose region changed (sent by sigRegionChangeFinished)
+        """
         self._segment.start_time = self.lines[0].getXPos()
         self._segment.end_time = self.lines[1].getXPos()
 
@@ -197,10 +221,6 @@ class SelectableViewBox(pg.ViewBox):
 
     Attributes
     ----------
-    wav : tuple(np.array, int)
-        The signal information as loaded using librosa.
-        The tuple contain an array of samples and the sample rate.
-
     _select : bool
         flag to indicate used to avoid conflicts between region selection and other mouse events
 
@@ -208,15 +228,18 @@ class SelectableViewBox(pg.ViewBox):
         Handle to save the highlighted region
     """
 
-    def __init__(self, lock_y_axis=False, *args, **kwargs):
+    def __init__(self, lock_y_axis: bool = False, *args: Any, **kwargs: Any) -> None:
         """
         Parameters
         ----------
-        args : TODO
-            remaining arguments
+        lock_y_axis : bool, optional
+            If True, the y axis cannot be zoomed or panned with the mouse. (default: False)
+
+        args : list
+            remaining positional arguments, passed to pg.ViewBox
 
         kwargs : keyword arguments
-            Used to transmit values to pg.plotItem. *The keyword viewBox is ignored*
+            remaining keyword arguments, passed to pg.ViewBox
         """
 
         super().__init__(*args, **kwargs)
@@ -226,7 +249,7 @@ class SelectableViewBox(pg.ViewBox):
         self.setMouseEnabled(x=True, y=not lock_y_axis)
         self._lock_y_axis = lock_y_axis
 
-    def mouseDragEvent(self, ev):
+    def mouseDragEvent(self, ev: MouseDragEvent) -> None:
         """The item dragging event handler.
 
         It adds the creation of an highlighted region if shift is activated.
@@ -289,7 +312,9 @@ class SelectableViewBox(pg.ViewBox):
         # Indicate that the event has been accepted and everything has been done
         ev.accept()
 
-    def scaleBy(self, s=None, center=None, x=None, y=None):
+    def scaleBy(
+        self, s: Sequence[float] | None = None, center: Any = None, x: float | None = None, y: float | None = None
+    ) -> None:
         """
         Scale by *s* around given center point (or center of view).
         *s* may be a pg.Point or tuple (x, y).
@@ -330,6 +355,7 @@ class SelectableViewBox(pg.ViewBox):
         else:
             self.setRange(QtCore.QRectF(tl, br), padding=0)
 
-    def removeSegment(self):
+    def removeSegment(self) -> None:
+        """Remove the highlighted region"""
         self.parentWidget().removeItem(self._dragPoint)
         self._dragPoint = None

@@ -7,6 +7,8 @@ AUTHOR
 
 DESCRIPTION
 
+    Command line entry point of Sp1NY: parses the options, loads the inputs and starts the GUI.
+
 LICENSE
     MIT License, see the LICENSE file at the root of the repository
     Created: 17 January 2023
@@ -14,6 +16,7 @@ LICENSE
 
 # System/default
 import os
+from typing import Any
 
 # Arguments
 import argparse
@@ -39,7 +42,7 @@ LEVEL = [logging.WARNING, logging.INFO, logging.DEBUG]
 ###############################################################################
 # Functions
 ###############################################################################
-def configure_logger(args) -> logging.Logger:
+def configure_logger(args: argparse.Namespace) -> logging.Logger:
     """Setup the global logging configurations and instanciate a specific logger for the current script
 
     Parameters
@@ -61,7 +64,7 @@ def configure_logger(args) -> logging.Logger:
         # logging.warning("verbosity level is too high, I'm gonna assume you're taking the highest (%d)" % log_level)
 
     # Define the default logger configuration
-    logging_config = dict(
+    logging_config: dict[str, Any] = dict(
         version=1,
         # NOTE: keep the loggers created at import time (e.g. the player's), otherwise their messages are lost
         disable_existing_loggers=False,
@@ -144,14 +147,38 @@ def define_argument_parser() -> argparse.ArgumentParser:
     parser.add_argument("-f", "--frameshift", default=5, type=float, help="The frameshift in milliseconds")
     parser.add_argument("--dark", action="store_true", help="Use the dark theme")
     parser.add_argument(
-        "-w", "--wav-file", "--wav_file", dest="wav_file", required=True, type=str, help="The wave file"
+        "-w",
+        "--wav-file",
+        "--wav_file",
+        dest="wav_file",
+        default="",
+        type=str,
+        help="The audio file (if not given, a file dialog asks for it at startup)",
     )
 
     # Return parser
     return parser
 
 
-def main():
+def ask_audio_file() -> str:
+    """Ask the user for the audio file to open (used when no file is given on the command line)
+
+    Returns
+    -------
+    str
+        The selected file, or an empty string if the dialog was cancelled
+    """
+    filename, _ = QtWidgets.QFileDialog.getOpenFileName(
+        None,
+        "Sp1NY - Open an audio file",
+        "",
+        "Audio files (*.wav *.flac *.ogg *.aif *.aiff *.mp3);;All files (*)",
+    )
+    return filename
+
+
+def main() -> None:
+    """Entry point of the spiny command (and of the standalone application)"""
     # Initialization
     arg_parser = define_argument_parser()
     args = arg_parser.parse_args()
@@ -168,6 +195,12 @@ def main():
 
     # Create the application before any widget (controllers and plugins are created lazily)
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication(["SpINY"])
+
+    # Without a file on the command line (e.g. the application was started from a file manager), ask for it
+    if not args.wav_file:
+        args.wav_file = ask_audio_file()
+        if not args.wav_file:
+            return
 
     # Load waves
     logger.info("Loading wav")
@@ -186,7 +219,7 @@ def main():
 
     # Generate window
     logger.info("Rendering")
-    build_gui(app, args.frameshift, args.dark)
+    build_gui(app, args.dark)
 
 
 ###############################################################################

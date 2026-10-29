@@ -1,12 +1,16 @@
+from __future__ import annotations
+
+import types
+from collections.abc import Iterator
+
+import os
 import sys
 
 # Logging
 import logging
 
 # Plotting
-import matplotlib as mpl
 from pyqtgraph.dockarea import DockArea
-import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 
 # GUI
@@ -15,12 +19,12 @@ import pkgutil
 
 # spiny internal packages
 from .gui.theme import define_palette
-from .gui.utils import cmapToColormap
+from .gui.colormaps import COLORMAP_NAMES, colormap_ticks
 from .gui.helpers.widgets import ExtendedComboBox
 from .core.wav.visualisation import WavDock
 from .core.wav import get_controller as get_audio_controller
 from .annotations.visualisation import AnnotationDock
-from .core import DataDock
+from .core import DataController, DataDock
 from .core import player
 from .core.wav import PlayerControllerWidget
 from .core import plugin_entry_dict
@@ -34,78 +38,62 @@ import spiny.plugins  # NOTE: we can't use relative import as the prefix is used
 
 
 class VisualisationArea(DockArea):
-    """DockArea filled with a plot containing a waveform and a give data (matrix only for now) as well
-    as optional annotations.
+    """Area of the main window stacking the data plot, the annotation tiers and the waveform
 
-    Attributes
-    ----------
-
-    ticks : TODO
-        The color map ticks
+    Every plot shares the time axis of the waveform plot.
     """
 
-    def __init__(self, frameshift):
-        """
-        Parameters
-        ----------
-        frameshift : float
-           The frameshift used to extract the coefficients from the waveform
-        """
-        # Superclass initialisation
+    def __init__(self) -> None:
         DockArea.__init__(self)
 
-        self.logger = logging.getLogger("VisualisationArea")
-        self.frameshift = frameshift
-
-        # - Generate color map
-        self.__fill()
-
-    def updateColorMap(self, cmap_name):
-        self.logger.debug("Generate ticks for data plotting")
-        cmap_cls = mpl.colormaps[cmap_name]
-        pos, rgba_colors = zip(*cmapToColormap(cmap_cls))
-        cmap = pg.ColorMap(pos, rgba_colors)
-        lut = cmap.getLookupTable(0.0, 1.0, 10)
-        ticks = list(enumerate(lut))
-        self.ticks = [(ticks[i][0] / ticks[-1][0], ticks[i][1]) for i in range(len(ticks))]
-        if self._dock_coef._data_plot is not None:
-            self._dock_coef._data_plot.setTicks(self.ticks)
-
-    def __fill(self):
-        """Helper to fill the dock area"""
-        # Generate wav part
-        self.logger.debug("Plot waveform part")
+        # NOTE: the sizes are only initial proportions, the docks can be resized by the user
         self._dock_wav = WavDock("Signal", (950, 20))
-
-        # Generate data part
-        self.logger.debug("Plot coefficient part")
-        self._dock_coef = DataDock(
-            (950, 200),
-        )
-
-        # Generate annotation part
-        self.logger.debug("Plot annotation part")
-        self._dock_annotation = AnnotationDock(
-            "Annotations", (950, 20), self._dock_wav.wav_plot
-        )  # Size doesn't seem to affect anything
-
-        # Define the label on wav plots
         self._dock_wav.wav_plot.setLabel("bottom", "Time", units="s")
+        self._dock_coef = DataDock((950, 200))
+        self._dock_annotation = AnnotationDock("Annotations", (950, 20), self._dock_wav.wav_plot)
 
-        # - Add docks
-        self.logger.debug("Add docks to the area")
         self.addDock(self._dock_wav, "left")
         self.addDock(self._dock_annotation, "top", self._dock_wav)
         self.addDock(self._dock_coef, "top", self._dock_annotation)
 
-    def selectPlugin(self, controller):
+    def updateColorMap(self, cmap_name: str) -> None:
+        """Apply a colormap to the data plot
+
+        Parameters
+        ----------
+        cmap_name : str
+            The colormap name (one of spiny.gui.colormaps.COLORMAP_NAMES)
+        """
+        if self._dock_coef._data_plot is not None:
+            self._dock_coef._data_plot.setTicks(colormap_ticks(cmap_name))
+
+    def selectPlugin(self, controller: DataController) -> None:
+        """Extract the data of a plugin and show its widget in the data dock
+
+        Parameters
+        ----------
+        controller : spiny.core.DataController
+            The plugin controller
+        """
         controller.setWavPlot(self._dock_wav.wav_plot)
         controller.extract()
         self._dock_coef.setWidget(controller.widget, controller.name)
 
 
 # Discover plugins
-def iter_namespace(ns_pkg):
+def iter_namespace(ns_pkg: types.ModuleType) -> Iterator[pkgutil.ModuleInfo]:
+    """List the modules of a namespace package
+
+    Parameters
+    ----------
+    ns_pkg : module
+        The package
+
+    Returns
+    -------
+    iterator(pkgutil.ModuleInfo)
+        The modules, with absolute names (so that they can be imported directly)
+    """
     # Specifying the second argument (prefix) to iter_modules makes the
     # returned name an absolute name instead of a relative one. This allows
     # import_module to work without having to do additional modification to
@@ -113,7 +101,7 @@ def iter_namespace(ns_pkg):
     return pkgutil.iter_modules(ns_pkg.__path__, ns_pkg.__name__ + ".")
 
 
-def discover_plugins():
+def discover_plugins() -> dict[str, types.ModuleType]:
     """Import every plugin package of spiny.plugins
 
     A plugin which fails to import (missing optional dependency, incompatible version, bug, ...) is
@@ -131,146 +119,116 @@ def discover_plugins():
 
 
 class GUIVisu(QtWidgets.QMainWindow):
-    def __init__(self, frameshift):
+    """Main window: player toolbar, plots (data, annotations, waveform) on the left, control tabs on the right"""
+
+    def __init__(self) -> None:
         super().__init__()
+        self._createMenuBar()
+        self.addToolBar("Player").addWidget(PlayerControllerWidget())
+        self._filename_label = QtWidgets.QLabel(str(player.filename or ""))
+        self.statusBar().addPermanentWidget(self._filename_label)
 
-        ##########################################
-        # Setup the Menubar
-        ##########################################
-        menuBar = self.menuBar()
-        file_menu = QtWidgets.QMenu("&File", self)
-
-        # Add open shortcut
-        self.openAction = QtGui.QAction("&Open wav...", self)
-        self.openAction.triggered.connect(self.openFile)
-        self.openAction.setShortcut("Ctrl+o")
-        file_menu.addAction(self.openAction)
-
-        # Add exit shortcut!
-        self.exitAction = QtGui.QAction(("E&xit"), self)
-        self.exitAction.setShortcut(QtGui.QKeySequence("Ctrl+Q"))
-        self.addAction(self.exitAction)
-        self.exitAction.triggered.connect(self.close)
-        file_menu.addAction(self.exitAction)
-        menuBar.addMenu(file_menu)
-
-        ##########################################
-        # Setup the toolbar
-        ##########################################
-        player_toolbar = self.addToolBar("Player")
-        player_widget = PlayerControllerWidget()
-        player_toolbar.addWidget(player_widget)
-
-        ##########################################
-        # Setup the status bar
-        ##########################################
-        self.statusbar = self.statusBar()
-        self._filename_label = QtWidgets.QLabel(player.filename)
-        self.statusbar.addPermanentWidget(self._filename_label)
-
-        ##########################################
-        # Define the left part of the window
-        ##########################################
-        self._visualisation_area = VisualisationArea(frameshift)
-        left_layout = QtWidgets.QVBoxLayout()
-        left_layout.addWidget(self._visualisation_area)
-
-        ##########################################
-        # Define the right part of the window
-        ##########################################
-        right_layout = QtWidgets.QVBoxLayout()
-
-        # Initialize tab screen
+        self._visualisation_area = VisualisationArea()
         tabs = QtWidgets.QTabWidget()
-        tab1 = QtWidgets.QWidget()
-        tabs.addTab(tab1, "Data/Visualization")
-        self._control_layout = QtWidgets.QVBoxLayout()
+        tabs.addTab(self._createDataTab(), "Data/Visualization")
+        tabs.addTab(self._createAnnotationTab(), "Annotations")
+        tabs.addTab(self._createAudioTab(), "Audio")
 
-        # Populate the list of plugins
+        main_layout = QtWidgets.QHBoxLayout()
+        main_layout.addWidget(self._visualisation_area, 9)
+        main_layout.addWidget(tabs, 3)
+        central_widget = QtWidgets.QWidget()
+        central_widget.setLayout(main_layout)
+        self.setCentralWidget(central_widget)
+
+        # Show the default plugin with the default colormap
+        self.selectPlugin(self._plugin_list.currentText())
+        self.selectColorMap(self._cmap_list.currentText())
+
+    def _createMenuBar(self) -> None:
+        """Create the File menu (open an audio file, quit)"""
+        file_menu = self.menuBar().addMenu("&File")
+
+        open_action = QtGui.QAction("&Open wav...", self)
+        open_action.setShortcut("Ctrl+O")
+        open_action.triggered.connect(self.openFile)
+        file_menu.addAction(open_action)
+
+        exit_action = QtGui.QAction("E&xit", self)
+        exit_action.setShortcut("Ctrl+Q")
+        exit_action.triggered.connect(self.close)
+        file_menu.addAction(exit_action)
+
+    def _createDataTab(self) -> QtWidgets.QWidget:
+        """Create the tab choosing the data plugin and the colormap; the plugin panel is added below them
+
+        Returns
+        -------
+        QtWidgets.QWidget
+            The tab
+        """
         self._plugin_list = ExtendedComboBox(self)
-        for elt in plugin_entry_dict:
-            self._plugin_list.addItem(elt)
-
-        # NOTE: Raw DATA is a joker
-        if "Raw DATA" in plugin_entry_dict:
+        self._plugin_list.addItems(list(plugin_entry_dict))
+        if "Raw DATA" in plugin_entry_dict:  # coefficients given on the command line are shown first
             self._plugin_list.setCurrentText("Raw DATA")
-
+        self._current_controller: DataController | None = None
         self._plugin_list.currentTextChanged.connect(self.selectPlugin)
 
-        # Populate the list of plugins
         self._cmap_list = ExtendedComboBox(self)
-        cmaps = [
-            # Uniform
-            "viridis",
-            "plasma",
-            "inferno",
-            "magma",
-            "cividis",
-            # Sequential
-            "binary",
-            "gray",
-            "bone",
-            "hot",
-            "copper",
-        ]
-        for elt in cmaps:
-            self._cmap_list.addItem(elt)
+        self._cmap_list.addItems(list(COLORMAP_NAMES))
         self._cmap_list.currentTextChanged.connect(self.selectColorMap)
 
         general_box_layout = QtWidgets.QGridLayout()
         general_box_layout.setAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
-        l1 = QtWidgets.QLabel("Plugin")
-        l2 = QtWidgets.QLabel("Colormap")
-        general_box_layout.addWidget(l1, 0, 0)
-        general_box_layout.addWidget(l2, 1, 0)
+        general_box_layout.addWidget(QtWidgets.QLabel("Plugin"), 0, 0)
         general_box_layout.addWidget(self._plugin_list, 0, 1)
+        general_box_layout.addWidget(QtWidgets.QLabel("Colormap"), 1, 0)
         general_box_layout.addWidget(self._cmap_list, 1, 1)
-
         general_box = QtWidgets.QGroupBox("General Data Visualization")
         general_box.setLayout(general_box_layout)
+
+        # NOTE: selectPlugin replaces the last item of this layout by the panel of the plugin: the empty
+        #       layout added here is that place holder until a plugin is selected
+        self._control_layout = QtWidgets.QVBoxLayout()
         self._control_layout.addWidget(general_box)
+        self._control_layout.addLayout(QtWidgets.QVBoxLayout())
 
-        place_holder = QtWidgets.QVBoxLayout()
-        self._control_layout.addLayout(place_holder)
-        tab1.setLayout(self._control_layout)
+        tab = QtWidgets.QWidget()
+        tab.setLayout(self._control_layout)
+        return tab
 
-        # self._annotation_layout.setParent(self)
-        tab2 = QtWidgets.QWidget()
-        tabs.addTab(tab2, "Annotations")
+    def _createAnnotationTab(self) -> QtWidgets.QWidget:
+        """Create the annotation tab, connected to the annotation dock
+
+        Returns
+        -------
+        QtWidgets.QWidget
+            The tab
+        """
         self._annotation_layout = get_annotation_controller()
         self._annotation_layout.setView(self._visualisation_area._dock_annotation)
         self._annotation_layout.resetView()
-        tab2.setLayout(self._annotation_layout)
+        tab = QtWidgets.QWidget()
+        tab.setLayout(self._annotation_layout)
+        return tab
 
-        tab3 = QtWidgets.QWidget()
-        tabs.addTab(tab3, "Audio")
+    def _createAudioTab(self) -> QtWidgets.QWidget:
+        """Create the audio tab (current file, equalizer)
+
+        Returns
+        -------
+        QtWidgets.QWidget
+            The tab
+        """
         self._audio_layout = get_audio_controller()
         self._audio_layout.setLoadHandler(self.openFile)
-        self._audio_layout.setCurrentFile(player.filename or "")
-        tab3.setLayout(self._audio_layout)
+        self._audio_layout.setCurrentFile(str(player.filename or ""))
+        tab = QtWidgets.QWidget()
+        tab.setLayout(self._audio_layout)
+        return tab
 
-        right_layout.addWidget(tabs)
-
-        ##########################################
-        # Finalize the main part layout
-        ##########################################
-        main_layout = QtWidgets.QHBoxLayout()
-        main_layout.addLayout(left_layout, 9)
-        main_layout.addLayout(right_layout, 3)
-
-        ##########################################
-        # Set the window layout
-        ##########################################
-        cent_widget = QtWidgets.QWidget()
-        cent_widget.setLayout(main_layout)
-        self.setCentralWidget(cent_widget)
-
-        # Show the default plugin and the default colormap
-        # NOTE: think about a configuration bit?
-        self.selectPlugin(self._plugin_list.currentText())
-        self.selectColorMap(self._cmap_list.currentText())
-
-    def openFile(self):
+    def openFile(self) -> None:
+        """Ask for an audio file and load it (see `loadWav`)"""
         options = QtWidgets.QFileDialog.Options()
         options |= QtWidgets.QFileDialog.DontUseNativeDialog
         # NOTE: how to concatente filters: "All Files (*);;Wav Files (*.wav)"
@@ -280,7 +238,7 @@ class GUIVisu(QtWidgets.QMainWindow):
         if filename:
             self.loadWav(filename)
 
-    def loadWav(self, filename):
+    def loadWav(self, filename: str) -> None:
         """Load a new signal and refresh every view depending on it"""
         try:
             player.loadNewWav(filename)
@@ -294,12 +252,27 @@ class GUIVisu(QtWidgets.QMainWindow):
         self._annotation_layout.resetView()
         self.selectPlugin(self._plugin_list.currentText())  # Re-extract the data from the new signal
 
-    def selectPlugin(self, current):
+    def selectPlugin(self, current: str) -> None:
+        """Show the plugin of the given name (its control panel and its data)
+
+        The data of the previously shown plugin is released.
+
+        Parameters
+        ----------
+        current : str
+            The plugin name (ignored if it is not a registered plugin, e.g. while typing in the combo box)
+        """
         # NOTE: this is here because we lack a better way to avoid issues during completion
         if current not in plugin_entry_dict:
             return
 
         controller = plugin_entry_dict[current]
+
+        # The previous plugin is not displayed anymore: free its data (it is re-extracted when selected again)
+        if (self._current_controller is not None) and (self._current_controller is not controller):
+            self._current_controller.release()
+        self._current_controller = controller
+
         i = self._control_layout.count() - 1
         cur_widget = self._control_layout.itemAt(i).widget()
         if cur_widget is not None:
@@ -312,15 +285,35 @@ class GUIVisu(QtWidgets.QMainWindow):
         self._visualisation_area.selectPlugin(controller)
         self.selectColorMap(self._cmap_list.currentText())
 
-    def selectColorMap(self, cmap_name):
+    def selectColorMap(self, cmap_name: str) -> None:
+        """Apply a colormap to the data plot
+
+        Parameters
+        ----------
+        cmap_name : str
+            The colormap name (one of spiny.gui.colormaps.COLORMAP_NAMES)
+        """
         self._visualisation_area.updateColorMap(cmap_name)
 
 
-def install_exception_hook(parent=None):
+def install_exception_hook(parent: QtWidgets.QWidget | None = None) -> None:
     """Report the exceptions raised in Qt slots in a dialog (and in the log) instead of only on stderr"""
     logger = logging.getLogger("spiny")
 
-    def hook(exc_type, exc_value, exc_traceback):
+    def hook(
+        exc_type: type[BaseException], exc_value: BaseException, exc_traceback: types.TracebackType | None
+    ) -> None:
+        """Log an unhandled exception and show it in a dialog
+
+        Parameters
+        ----------
+        exc_type : type
+            The exception class
+        exc_value : BaseException
+            The exception
+        exc_traceback : traceback
+            The traceback
+        """
         if issubclass(exc_type, KeyboardInterrupt):
             sys.__excepthook__(exc_type, exc_value, exc_traceback)
             return
@@ -332,19 +325,33 @@ def install_exception_hook(parent=None):
     sys.excepthook = hook
 
 
-def build_gui(app, frameshift, dark_activated=False):
+def build_gui(app: QtWidgets.QApplication, dark_activated: bool = False) -> None:
+    """Create the main window and run the application (blocks until the window is closed)
 
+    Parameters
+    ----------
+    app : QtWidgets.QApplication
+        The application
+    dark_activated : bool, optional
+        Use the dark theme. (default: False)
+    """
     # Generate application
     define_palette(app, dark_activated)
     app.aboutToQuit.connect(player.stop)
 
     # Plugins create widgets, so they are discovered only now that the application exists
     discover_plugins()
-    win = GUIVisu(frameshift)
+    win = GUIVisu()
     win.setWindowTitle("SpINY")
     install_exception_hook(win)
 
     # Start the application
     win.show()
+
+    # NOTE: automated checks of the packaged application set SPINY_AUTOQUIT_MS to quit once the GUI is up
+    autoquit = os.environ.get("SPINY_AUTOQUIT_MS")
+    if autoquit:
+        QtCore.QTimer.singleShot(int(autoquit), app.quit)
+
     if (sys.flags.interactive != 1) or not hasattr(QtCore, "PYQT_VERSION"):
         app.exec()

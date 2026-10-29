@@ -1,6 +1,6 @@
 # Regular expression
+import pathlib
 import re
-from typing import List
 
 # Import abstract class
 from ..model import AnnotationSet, Annotation
@@ -31,7 +31,7 @@ class HTKLabelSerialiser(AnnotationSerialiser):
 
     """
 
-    def load(self, htk_file) -> AnnotationSet:
+    def load(self, htk_file: str | pathlib.Path) -> AnnotationSet:
         """Annotation extraction method.
 
         Each non-empty line follows the HTK label format "[start [end]] label [score] ...".
@@ -52,7 +52,7 @@ class HTKLabelSerialiser(AnnotationSerialiser):
         ValueError
             If a line has no start time or no label
         """
-        entries: List[list] = []
+        entries: list[list] = []
 
         with open(htk_file, encoding="utf-8") as f:
             for line_number, line in enumerate(f, start=1):
@@ -80,7 +80,7 @@ class HTKLabelSerialiser(AnnotationSerialiser):
             if entry[1] is None:
                 entry[1] = entries[i + 1][0] if i + 1 < len(entries) else entry[0]
 
-        annotations: List[Annotation] = [Annotation(start, end, label) for start, end, label in entries]
+        annotations: list[Annotation] = [Annotation(start, end, label) for start, end, label in entries]
         an_dict = dict()
         an_dict["default"] = annotations
         annotation_set: AnnotationSet = AnnotationSet(an_dict, set())
@@ -94,7 +94,7 @@ class HTKLabelSerialiser(AnnotationSerialiser):
             return m.group(1)
         return label
 
-    def save(self, output_file, annotation_set: AnnotationSet) -> None:
+    def save(self, output_file: str | pathlib.Path, annotation_set: AnnotationSet) -> None:
         """Save the first visible tier as an HTK label file (HTK labels contain only one tier)
 
         Raises

@@ -1,5 +1,9 @@
 # Python
+from __future__ import annotations
+
+from collections.abc import Callable
 from platform import system
+from typing import Any
 
 # Python SoundDevice
 import sounddevice as sd
@@ -10,12 +14,18 @@ from .player import player
 
 
 class PlayerControllerWidget(QtWidgets.QWidget):
-    """ """
+    """Player toolbar: play/pause/stop/loop, output device and volume
+
+    Parameters
+    ----------
+    parent : QtWidgets.QWidget, optional
+        The parent widget. (default: None)
+    """
 
     BUTTON_GLYPHS = ("▶", "⏯", "⏹", "Loop") if system() != "Windows" else ("▶️", "⏯️", "⏹️", "Loop️")
 
-    def __init__(self, parent=None, background="default", **kwargs):
-        super().__init__(parent, **kwargs)
+    def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
+        super().__init__(parent)
 
         # Define play button
         self._bPlay = QtWidgets.QPushButton(PlayerControllerWidget.BUTTON_GLYPHS[0], self)
@@ -94,14 +104,16 @@ class PlayerControllerWidget(QtWidgets.QWidget):
         player_layout.addWidget(self._lVolume)
         self.setLayout(player_layout)
 
-    def play(self):
+    def play(self) -> None:
+        """Play the whole signal (a message box reports a device which cannot play it)"""
         # Play subpart
         try:
             player.play()
         except sd.PortAudioError as ex:
             QtWidgets.QMessageBox.warning(self, "Playback error", f"The audio device cannot play this signal:\n{ex}")
 
-    def pause(self):
+    def pause(self) -> None:
+        """Pause or resume the playback"""
         # Play subpart
         player.pauseResume()
         if player.is_paused:
@@ -109,18 +121,27 @@ class PlayerControllerWidget(QtWidgets.QWidget):
         else:
             self._bPause.setFlat(False)
 
-    def stop(self):
+    def stop(self) -> None:
+        """Stop the playback"""
         self._bPause.setFlat(False)
         player.stop()
 
-    def loop(self):
+    def loop(self) -> None:
+        """Toggle the loop mode (the button turns green when it is activated)"""
         player.toggleLoop()
         if player.loop_activated:
             self._bLoop.setStyleSheet("background-color: #B3EDB1;")
         else:
             self._bLoop.setStyleSheet("background-color: #EAA799;")
 
-    def device_changed(self, name):
+    def device_changed(self, name: str) -> None:
+        """Use the selected output device; a device which cannot play the signal is refused and the previous one kept
+
+        Parameters
+        ----------
+        name : str
+            The name of the device
+        """
         index = self._devices[name]
         try:
             player.setDevice(index)
@@ -130,7 +151,19 @@ class PlayerControllerWidget(QtWidgets.QWidget):
             self._boxDevices.setCurrentText(self._deviceName(player.device))
             self._boxDevices.blockSignals(False)
 
-    def _deviceName(self, index):
+    def _deviceName(self, index: int | None) -> str:
+        """Find the name of an output device
+
+        Parameters
+        ----------
+        index : int or None
+            The device index (None for the default output device)
+
+        Returns
+        -------
+        str
+            The name, or an empty string if the device is not in the list
+        """
         if index is None:
             index = sd.default.device[1]
         for name, cur_index in self._devices.items():
@@ -138,13 +171,22 @@ class PlayerControllerWidget(QtWidgets.QWidget):
                 return name
         return ""
 
-    def volume_changed(self):
+    def volume_changed(self) -> None:
+        """Apply the volume of the slider to the player"""
         player.volume = self._sVolume.value() / 100
         self._lVolume.setText(f"{self._sVolume.value()}%")
 
 
 class ControlLayout(QtWidgets.QVBoxLayout):
-    def __init__(self, parent):
+    """Audio tab: current file (with the load button) and the equalizer place holder
+
+    Parameters
+    ----------
+    parent : QtWidgets.QWidget or None
+        The parent widget
+    """
+
+    def __init__(self, parent: QtWidgets.QWidget | None) -> None:
         super().__init__(parent)
 
         # Create the main layout
@@ -159,7 +201,7 @@ class ControlLayout(QtWidgets.QVBoxLayout):
 
         # Generate the necessary widgets
         self._file_box = self._generate_file_box()
-        self._eq_widget = EqWidget(None, (9, 1))  # FIXME: place holder, the equalizer is not implemented
+        self._eq_widget = EqWidget(None, (9, 1))  # NOTE: place holder, the equalizer is not implemented yet
         self._eq_widget.setEnabled(False)
         self._eq_widget.setToolTip("The equalizer is not implemented yet")
 
@@ -176,7 +218,14 @@ class ControlLayout(QtWidgets.QVBoxLayout):
         self.setAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
         self.addWidget(scroll)
 
-    def _generate_file_box(self):
+    def _generate_file_box(self) -> QtWidgets.QGroupBox:
+        """Create the box showing the current audio file, with the load and save buttons
+
+        Returns
+        -------
+        QtWidgets.QGroupBox
+            The box
+        """
         file_box_layout = QtWidgets.QGridLayout()
         file_box_layout.setAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
 
@@ -205,17 +254,34 @@ class ControlLayout(QtWidgets.QVBoxLayout):
 
         return file_box
 
-    def setLoadHandler(self, handler):
+    def setLoadHandler(self, handler: Callable[[], None]) -> None:
         """Define the function called by the "Load File" button"""
         self._bLoadFile.clicked.connect(handler)
         self._bLoadFile.setEnabled(True)
 
-    def setCurrentFile(self, filename):
+    def setCurrentFile(self, filename: str) -> None:
+        """Show the name of the current audio file
+
+        Parameters
+        ----------
+        filename : str
+            The file name
+        """
         self._wCurrentFile.setText(filename)
 
 
 class EqWidget(QtWidgets.QGroupBox):
-    def __init__(self, parent, wav):
+    """Equalizer (place holder: the sliders are shown but not applied yet)
+
+    Parameters
+    ----------
+    parent : QtWidgets.QWidget or None
+        The parent widget
+    wav : tuple(Any, Any)
+        The (signal, sampling rate) to equalize (unused for now)
+    """
+
+    def __init__(self, parent: QtWidgets.QWidget | None, wav: tuple[Any, Any]) -> None:
         super().__init__(title="Equalizer", parent=parent)
 
         self._signal = wav[0]
@@ -228,10 +294,16 @@ class EqWidget(QtWidgets.QGroupBox):
         overall_layout.addWidget(self._apply_button)
         self.setLayout(overall_layout)
 
-    def _define_sliders(self):
+    def _define_sliders(self) -> QtWidgets.QHBoxLayout:
+        """Create one slider per frequency band
+
+        Returns
+        -------
+        QtWidgets.QHBoxLayout
+            The layout of the sliders
+        """
 
         self._frequencies = [50, 200, 1000, 2000, 4000, 8000, 16000]
-        self._slider_array = []
 
         layout = QtWidgets.QHBoxLayout()
 
@@ -246,7 +318,19 @@ class EqWidget(QtWidgets.QGroupBox):
 
 
 class EqSlider(QtWidgets.QWidget):
-    def __init__(self, lower_freq, upper_freq, parent=None):
+    """Vertical gain slider (-120 to 0 dB) of one equalizer band
+
+    Parameters
+    ----------
+    lower_freq : float
+        The lower bound of the band, in Hz
+    upper_freq : float
+        The upper bound of the band, in Hz
+    parent : QtWidgets.QWidget, optional
+        The parent widget. (default: None)
+    """
+
+    def __init__(self, lower_freq: float, upper_freq: float, parent: QtWidgets.QWidget | None = None) -> None:
         super().__init__(parent=parent)
         self._verticalLayout = QtWidgets.QVBoxLayout(self)
         self._label = QtWidgets.QLabel(self)
@@ -266,14 +350,21 @@ class EqSlider(QtWidgets.QWidget):
         self._slider.setMaximum(0)
         self._slider.setValue(0)
         self._slider.setTickPosition(QtWidgets.QSlider.TicksBelow)
-        self._slider.setTickInterval(10)  # FIXME: hardcoded
+        self._slider.setTickInterval(10)  # one tick every 10 dB
 
         self._lower_freq = lower_freq
         self._upper_freq = upper_freq
 
         self.setLabelValue(upper_freq)
 
-    def setLabelValue(self, upper_freq):
+    def setLabelValue(self, upper_freq: float) -> None:
+        """Show the upper bound of the band (in kHz above 1 kHz)
+
+        Parameters
+        ----------
+        upper_freq : float
+            The upper bound, in Hz
+        """
         if upper_freq >= 1000:
             self._label.setText(f"< {int(upper_freq/1000):2d}k")
         else:

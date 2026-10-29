@@ -1,8 +1,15 @@
 import pyqtgraph as pg
-from pyqtgraph.Qt import QtCore, QtGui
+from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 
 
-def define_dark_palette(app):
+def define_dark_palette() -> QtGui.QPalette:
+    """Build the dark palette
+
+    Returns
+    -------
+    QtGui.QPalette
+        The palette
+    """
     palette = QtGui.QPalette()
 
     palette.setColor(QtGui.QPalette.Window, QtGui.QColor(53, 53, 53))
@@ -22,7 +29,14 @@ def define_dark_palette(app):
     return palette
 
 
-def define_light_palette(app):
+def define_light_palette() -> QtGui.QPalette:
+    """Build the light palette (and set the matching pyqtgraph background and foreground)
+
+    Returns
+    -------
+    QtGui.QPalette
+        The palette
+    """
     pg.setConfigOption("background", "w")
     pg.setConfigOption("foreground", "k")
 
@@ -32,13 +46,22 @@ def define_light_palette(app):
     return palette
 
 
-def define_palette(app, dark_activated=False):
+def define_palette(app: QtWidgets.QApplication, dark_activated: bool = False) -> None:
+    """Apply the Fusion style, the light or dark palette and the tooltip style to the application
+
+    Parameters
+    ----------
+    app : QtWidgets.QApplication
+        The application
+    dark_activated : bool, optional
+        Use the dark palette. (default: False)
+    """
     app.setStyle("Fusion")
 
     if dark_activated:
-        palette = define_dark_palette(app)
+        palette = define_dark_palette()
     else:
-        palette = define_light_palette(app)
+        palette = define_light_palette()
 
     app.setPalette(palette)
     app.setStyleSheet("""

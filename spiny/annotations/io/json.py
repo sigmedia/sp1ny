@@ -1,7 +1,9 @@
-from collections import OrderedDict
-import pathlib
+from __future__ import annotations
+
 import dataclasses
 import json
+import pathlib
+from typing import Any
 
 # Import abstract class
 from ..model import AnnotationSet, Annotation
@@ -9,8 +11,22 @@ from . import AnnotationSerialiser
 
 
 class EnhancedJSONEncoder(json.JSONEncoder):
-    def default(self, o):
-        if dataclasses.is_dataclass(o):
+    """JSON encoder also accepting dataclasses (as dicts) and sets (as lists)"""
+
+    def default(self, o: Any) -> Any:
+        """Convert the objects the standard encoder does not know
+
+        Parameters
+        ----------
+        o : Any
+            The object
+
+        Returns
+        -------
+        Any
+            A JSON-serialisable equivalent
+        """
+        if dataclasses.is_dataclass(o) and not isinstance(o, type):
             return dataclasses.asdict(o)
 
         if isinstance(o, set):
@@ -62,7 +78,7 @@ class JSONSerialiser(AnnotationSerialiser):
         if version > self.VERSION:
             raise ValueError(f'"{input_file}" uses format version {version}, only <= {self.VERSION} is supported')
 
-        tiers = OrderedDict()
+        tiers = dict()
         for tier_name, json_annotations in json_content["annotations"].items():
             annotations = []
             for i, cur_json_an in enumerate(json_annotations):
@@ -78,6 +94,15 @@ class JSONSerialiser(AnnotationSerialiser):
         return AnnotationSet(tiers, set(json_content.get("ignored", [])))
 
     def save(self, output_file: pathlib.Path, annotation_set: AnnotationSet) -> None:
+        """Write the annotations in the spiny JSON format (see the class documentation)
+
+        Parameters
+        ----------
+        output_file : pathlib.Path
+            The file
+        annotation_set : AnnotationSet
+            The annotations
+        """
         content = {
             "version": self.VERSION,
             "annotations": annotation_set.annotations,

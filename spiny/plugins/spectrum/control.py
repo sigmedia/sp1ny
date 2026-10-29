@@ -1,17 +1,34 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from pyqtgraph.Qt import QtWidgets, QtCore
 from spiny.core import DataController
+from .extractor import WINDOWS, SpectrumExtractor
+
+if TYPE_CHECKING:
+    from .visualisation import SpectrogramPlotWidget
 
 
 class SpectrumController(DataController):
-    def __init__(self, extractor, widget):
-        self._name = "Spectrogram"
-        self._extractor = extractor
-        self._widget = widget
+    """Controller of the "Spectrogram" plugin
 
-    def setWavPlot(self, wav_plot):
-        self._wav_plot = wav_plot
+    Parameters
+    ----------
+    extractor : SpectrumExtractor
+        The spectrogram extractor
+    widget : SpectrogramPlotWidget
+        The widget rendering the spectrogram
+    """
 
-    def extract(self):
+    def __init__(self, extractor: SpectrumExtractor, widget: SpectrogramPlotWidget) -> None:
+        super().__init__("Spectrogram", extractor, widget)
+
+    def extract(self) -> None:
+        """Copy the panel parameters to the extractor, extract the spectrogram and refresh the rendering
+
+        Inconsistent parameters are reported in a message box (and nothing is extracted).
+        """
         self._extractor._cutoff = (self._wMinFreq.value(), self._wMaxFreq.value())
         self._extractor._threshold_amp = (self._wMinAmp.value(), self._wMaxAmp.value())
         self._extractor._frameshift = self._wFrameshift.value()
@@ -26,15 +43,39 @@ class SpectrumController(DataController):
         self.refresh()
 
     @staticmethod
-    def _spinBox(minimum, maximum, value, suffix=""):
+    def _spinBox(minimum: int, maximum: int, value: int, suffix: str = "") -> QtWidgets.QSpinBox:
+        """Create an integer spin box
+
+        Parameters
+        ----------
+        minimum : int
+            The minimum value
+        maximum : int
+            The maximum value
+        value : int
+            The initial value
+        suffix : str, optional
+            The unit displayed after the value. (default: "")
+
+        Returns
+        -------
+        QtWidgets.QSpinBox
+            The spin box
+        """
         box = QtWidgets.QSpinBox()
         box.setRange(minimum, maximum)
         box.setValue(value)
         box.setSuffix(suffix)
         return box
 
-    def setControlPanel(self, panel):
+    def setControlPanel(self, panel: QtWidgets.QLayout) -> None:
+        """Add the spectrogram configuration panel
 
+        Parameters
+        ----------
+        panel : QtWidgets.QLayout
+            The layout receiving the panel
+        """
         # Refresh
         refresh_box_layout = QtWidgets.QGridLayout()
         refresh_box_layout.setAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
@@ -81,8 +122,7 @@ class SpectrumController(DataController):
 
         l1 = QtWidgets.QLabel("Window")
         self._wWindow = QtWidgets.QComboBox()
-        self._wWindow.setEditable(True)  # any scipy.signal.get_window name is accepted
-        self._wWindow.addItems(["hamming", "hann", "blackman", "blackmanharris", "boxcar"])
+        self._wWindow.addItems(list(WINDOWS))
         extract_box_layout.addWidget(l1, 7, 0)
         extract_box_layout.addWidget(self._wWindow, 7, 1)
 
@@ -95,8 +135,7 @@ class SpectrumController(DataController):
         main_layout.addWidget(refresh_box)
         main_layout.addWidget(extract_box)
 
-        # Don't forget to add the extract button
-        # TODO: for now everything needs to be extracted
+        # NOTE: every parameter (including the "refresh" ones) is applied by a new extraction
         bExtract = QtWidgets.QPushButton("Extract")
         bExtract.clicked.connect(self.extract)
         bExtract.setDefault(False)
