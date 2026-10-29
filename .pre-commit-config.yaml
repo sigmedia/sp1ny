@@ -2,13 +2,13 @@
 # See https://pre-commit.com/hooks.html for more hooks
 repos:
   - repo: https://github.com/psf/black
-    rev: 22.6.0
+    rev: 26.10.1
     hooks:
       - id: black
         args: [--safe]
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.3.0
+    rev: v6.0.0
     hooks:
       - id: trailing-whitespace
       - id: end-of-file-fixer
@@ -19,7 +19,7 @@ repos:
         language_version: python3
 
   - repo: https://github.com/PyCQA/flake8
-    rev: 4.0.1
+    rev: 7.4.1
     hooks:
       - id: flake8
         language_version: python3
