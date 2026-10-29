@@ -1,7 +1,9 @@
 from __future__ import annotations
 
-from pyqtgraph.Qt.QtCore import QAbstractItemModel, QSortFilterProxyModel, Qt
-from pyqtgraph.Qt.QtWidgets import QComboBox, QCompleter, QWidget
+from collections.abc import Callable
+
+from pyqtgraph.Qt.QtCore import QAbstractItemModel, QSortFilterProxyModel, Qt, Signal
+from pyqtgraph.Qt.QtWidgets import QComboBox, QCompleter, QHBoxLayout, QLabel, QSlider, QWidget
 
 
 class ExtendedComboBox(QComboBox):
@@ -72,3 +74,83 @@ class ExtendedComboBox(QComboBox):
         self._completer.setCompletionColumn(column)
         self.pFilterModel.setFilterKeyColumn(column)
         super(ExtendedComboBox, self).setModelColumn(column)
+
+
+class LabelledSlider(QWidget):
+    """Horizontal slider showing its current value next to it
+
+    Parameters
+    ----------
+    minimum : int
+        The smallest value
+    maximum : int
+        The largest value
+    value : int
+        The initial value
+    formatter : callable, optional
+        Converts a value into the text of the label. (default: str)
+    step : int, optional
+        The change made by the arrow keys (ten times more with Page Up/Down). (default: 1)
+    parent : QWidget, optional
+        The parent widget. (default: None)
+    """
+
+    #: Emitted with the new value every time it changes (also while dragging)
+    valueChanged = Signal(int)
+
+    def __init__(
+        self,
+        minimum: int,
+        maximum: int,
+        value: int,
+        formatter: Callable[[int], str] = str,
+        step: int = 1,
+        parent: QWidget | None = None,
+    ) -> None:
+        super().__init__(parent)
+        self._formatter = formatter
+
+        self._slider = QSlider(Qt.Orientation.Horizontal)
+        self._slider.setRange(minimum, maximum)
+        self._slider.setSingleStep(step)
+        self._slider.setPageStep(10 * step)
+        self._slider.setValue(value)
+        self._label = QLabel(formatter(value))
+        self._label.setMinimumWidth(110)  # room for the longest text, so that the slider does not move
+
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(self._slider, 1)
+        layout.addWidget(self._label)
+        self._slider.valueChanged.connect(self._onValueChanged)
+
+    def value(self) -> int:
+        """Return the current value
+
+        Returns
+        -------
+        int
+            The value
+        """
+        return self._slider.value()
+
+    def setValue(self, value: int) -> None:
+        """Change the value (valueChanged is emitted if it changes)
+
+        Parameters
+        ----------
+        value : int
+            The new value (clipped to the range of the slider)
+        """
+        self._slider.setValue(value)
+
+    def _onValueChanged(self, value: int) -> None:
+        """Update the label and forward the new value
+
+        Parameters
+        ----------
+        value : int
+            The new value
+        """
+        self._label.setText(self._formatter(value))
+        self.valueChanged.emit(value)

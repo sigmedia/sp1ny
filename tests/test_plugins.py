@@ -3,27 +3,74 @@ import pytest
 from pyqtgraph.Qt import QtWidgets
 
 
-def build_panel(controller, monkeypatch):
+def build_panel(controller, monkeypatch):  # used by the wavelet test
     holder = QtWidgets.QWidget()
     controller.setControlPanel(QtWidgets.QVBoxLayout(holder))
     monkeypatch.setattr(controller, "refresh", lambda: None)  # rendering is covered by the GUI test
     return holder
 
 
-def test_spectrum_parameters_are_validated(player, no_dialogs, monkeypatch):
+def wait_until(condition, timeout=20.0):
+    """Process the Qt events until the condition is true (or the timeout expires)"""
+    import time
+
+    end = time.time() + timeout
+    while not condition() and time.time() < end:
+        QtWidgets.QApplication.processEvents()
+        time.sleep(0.01)
+    return condition()
+
+
+@pytest.fixture
+def spectrogram(player, monkeypatch):
+    """The spectrogram controller with its panel built, a spectrogram extracted, and refresh() counted"""
     from spiny.plugins.spectrum import controller
 
-    holder = build_panel(controller, monkeypatch)  # noqa: F841 (keeps the panel alive)
+    holder = QtWidgets.QWidget()  # keeps the panel alive
+    controller.setControlPanel(QtWidgets.QVBoxLayout(holder))
+    refreshes = []
+    monkeypatch.setattr(controller, "refresh", lambda: refreshes.append(True))  # rendering: see test_gui.py
     controller.extract()
-    assert controller._extractor._spectrum.ndim == 2
+    refreshes.clear()
+    yield controller, refreshes
+    controller.release()
 
-    controller._wFramelength.setValue(500)  # longer than the FFT
-    controller.extract()
-    controller._wFramelength.setValue(30)
-    controller._wMinAmp.setValue(0)  # empty amplitude range
-    controller.extract()
-    controller._wMinAmp.setValue(-70)
-    assert len(no_dialogs) == 2
+
+def test_display_settings_are_applied_without_analysis(spectrogram, monkeypatch):
+    controller, refreshes = spectrogram
+    widget = controller.widget
+    analyses = []
+    monkeypatch.setattr(controller._analysis_timer, "start", lambda: analyses.append(True))
+
+    controller._max_level.setValue(-10)
+    controller._dynamic_range.setValue(30)
+    controller._max_frequency.setValue(3000)
+    controller._min_frequency.setValue(500)
+
+    assert widget.db_range == (-40, -10) and widget.frequency_range == (500, 3000)
+    assert widget._plotItem.getViewBox().viewRange()[1] == pytest.approx([500, 3000])
+    assert analyses == [] and refreshes == []
+
+    controller._min_frequency.setValue(3000)  # crossing the other bound pushes it
+    assert widget.frequency_range == (3000, 3050)
+
+
+def test_analysis_settings_update_the_spectrogram_in_the_background(spectrogram):
+    controller, refreshes = spectrogram
+    controller._window_length.setValue(10)
+    controller._window_length.setValue(12)  # a second change before the delay: a single analysis
+    assert wait_until(lambda: refreshes and not controller._running)
+    assert len(refreshes) == 1
+    assert controller._extractor.settings.framelength == 12
+
+
+def test_outdated_analyses_are_dropped(spectrogram):
+    controller, refreshes = spectrogram
+    controller._time_step.setValue(10)
+    controller._analysis_timer.timeout.emit()  # start now, without waiting for the delay
+    controller.release()  # e.g. another plugin is selected while the analysis is running
+    assert wait_until(lambda: not controller._running)
+    assert refreshes == [] and controller._extractor._spectrum.shape == (10, 10)
 
 
 def test_spectrum_of_silence_is_the_lowest_level(player):
@@ -35,28 +82,36 @@ def test_spectrum_of_silence_is_the_lowest_level(player):
 
 
 def test_spectrum_matches_librosa(player):
-    """The numpy STFT reproduces the former librosa-based computation (up to one 8-bit code)"""
+    """The numpy STFT reproduces librosa's stft + amplitude_to_db (up to one 8-bit code)"""
     librosa = pytest.importorskip("librosa")
-    from spiny.plugins.spectrum.extractor import SpectrumExtractor
+    from spiny.plugins.spectrum.extractor import SpectrogramSettings, SpectrumExtractor
 
-    extractor = SpectrumExtractor(fft_length=1024, frameshift=5, framelength=25, window="hann", cutoff=(100, 4000))
-    spectrum = extractor.extract().astype(int)
+    settings = SpectrogramSettings(frameshift=5, framelength=25, window="hann", max_frequency=4000)
+    spectrum = SpectrumExtractor(settings).extract().astype(int)
 
-    sr, n_fft = player.sampling_rate, 2048
+    n_fft = 4096  # fft_length() of a 400-sample window
     sp = np.abs(
         librosa.stft(player.signal[:, 0], n_fft=n_fft, hop_length=80, win_length=400, window="hann", center=True)
     )
-    sp = librosa.amplitude_to_db(sp / sp.max()).T[:, int(100 * n_fft / sr) : int(4000 * n_fft / sr)]
-    expected = np.rint((np.clip(sp, -40, 0) + 40) * 255 / 40).astype(int)
+    sp = librosa.amplitude_to_db(sp / sp.max(), top_db=80).T[:, : int(4000 * n_fft / player.sampling_rate) + 1]
+    expected = np.rint((np.clip(sp, -80, 0) + 80) * 255 / 80).astype(int)
     assert spectrum.shape == expected.shape
     assert np.abs(spectrum - expected).max() <= 1
 
 
-def test_spectrum_rejects_unknown_windows(player):
-    from spiny.plugins.spectrum.extractor import SpectrumExtractor
+@pytest.mark.parametrize(
+    "settings, error",
+    [
+        ({"window": "nope"}, "supported windows"),
+        ({"frameshift": 0.01}, "time step"),
+        ({"max_frequency": 0}, "positive"),
+    ],
+)
+def test_spectrum_rejects_invalid_settings(player, settings, error):
+    from spiny.plugins.spectrum.extractor import SpectrogramSettings, SpectrumExtractor
 
-    with pytest.raises(ValueError, match="supported windows"):
-        SpectrumExtractor(window="nope").extract()
+    with pytest.raises(ValueError, match=error):
+        SpectrumExtractor(SpectrogramSettings(**settings)).extract()
 
 
 def test_praat_spectrum_of_silence(player):

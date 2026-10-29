@@ -53,3 +53,22 @@ def test_short_and_empty_signals(waveform):
         item.setSignal(signal, 16000)
         QtWidgets.QApplication.processEvents()
         plot.grab()
+
+
+def test_zoomed_out_segments_are_one_pixel_apart(waveform, monkeypatch):
+    """One segment per pixel column, evenly spaced: no column is left empty whatever the zoom"""
+    import pyqtgraph as pg
+
+    plot, item = waveform
+    drawn = []
+    real_array_to_path = pg.arrayToQPath
+    monkeypatch.setattr(pg, "arrayToQPath", lambda x, y, **kw: drawn.append(x) or real_array_to_path(x, y, **kw))
+    item.setSignal(np.zeros(9_600_000, dtype=np.float32), 16000)  # 10 minutes: the case which showed gaps
+    for x_range in [(0, 600), (13.7, 211.3)]:
+        drawn.clear()
+        plot.setXRange(*x_range, padding=0)
+        QtWidgets.QApplication.processEvents()
+        plot.grab()
+        x = drawn[-1][::2]  # one x per segment
+        pixel = (x_range[1] - x_range[0]) / item.getViewBox().width()
+        assert np.diff(x) == pytest.approx(pixel, rel=0.02)

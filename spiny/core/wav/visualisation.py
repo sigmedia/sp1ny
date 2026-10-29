@@ -200,8 +200,10 @@ class WaveformItem(pg.GraphicsObject):
             x = np.arange(first, last) / self._sampling_rate
             path = pg.arrayToQPath(x, self._signal[first:last], connect="all")
         else:
-            positions, mins, maxs = self._visibleEnvelope(first, last, nb_columns)
-            x = np.repeat(positions / self._sampling_rate, 2)
+            _, mins, maxs = self._visibleEnvelope(first, last, nb_columns)
+            # Draw each segment at the centre of its pixel column: evenly spaced, so no pixel column stays empty
+            centres = first + (np.arange(mins.shape[0]) + 0.5) * (last - first) / nb_columns
+            x = np.repeat(centres / self._sampling_rate, 2)
             y = np.stack([mins, maxs], axis=1).ravel()
             path = pg.arrayToQPath(x, y, connect="pairs")
 

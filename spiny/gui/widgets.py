@@ -266,6 +266,31 @@ class DataWidget(pg.GraphicsLayoutWidget):
             maxYRange=y_max - y_min,
         )
 
+    def setLevels(self, levels: tuple[float, float]) -> None:
+        """Change the values mapped to the ends of the colormap, without touching the data
+
+        Parameters
+        ----------
+        levels : tuple(float, float)
+            The (min, max) values
+        """
+        self._levels = levels
+        self._imageItem.setLevels(levels)
+        self._histItem.setLevels(*levels)
+
+    def setYView(self, y_min: float, y_max: float) -> None:
+        """Show (only) the given part of the y axis, e.g. a frequency range
+
+        Parameters
+        ----------
+        y_min : float
+            The bottom of the view
+        y_max : float
+            The top of the view
+        """
+        self._plotItem.setLimits(yMin=y_min, yMax=y_max, minYRange=0, maxYRange=y_max - y_min)
+        self._plotItem.setYRange(y_min, y_max, padding=0)
+
     def setTicks(self, ticks: Ticks) -> None:
         """Apply a colormap (it is kept when the data changes)
 
