@@ -20,30 +20,32 @@ class ExtendedComboBox(QComboBox):
         self.pFilterModel.setSourceModel(self.model())
 
         # add a completer, which uses the filter model
-        self.completer = QCompleter(self.pFilterModel, self)
+        # NOTE: not named "completer" to avoid shadowing QComboBox.completer()
+        self._completer = QCompleter(self.pFilterModel, self)
         # always show all (filtered) completions
-        self.completer.setCompletionMode(QCompleter.UnfilteredPopupCompletion)
-        self.setCompleter(self.completer)
+        self._completer.setCompletionMode(QCompleter.UnfilteredPopupCompletion)
+        self.setCompleter(self._completer)
 
         # connect signals
         self.lineEdit().textEdited.connect(self.pFilterModel.setFilterFixedString)
-        self.completer.activated.connect(self.on_completer_activated)
+        self._completer.activated.connect(self.on_completer_activated)
 
     # on selection of an item from the completer, select the corresponding item from combobox
     def on_completer_activated(self, text):
         if text:
             index = self.findText(text)
             self.setCurrentIndex(index)
-            self.activated[str].emit(self.itemText(index))
+            # NOTE: Qt6 removed the activated(QString) overload, textActivated is its replacement
+            self.textActivated.emit(self.itemText(index))
 
     # on model change, update the models of the filter and completer as well
     def setModel(self, model):
         super(ExtendedComboBox, self).setModel(model)
         self.pFilterModel.setSourceModel(model)
-        self.completer.setModel(self.pFilterModel)
+        self._completer.setModel(self.pFilterModel)
 
     # on model column change, update the model column of the filter and completer as well
     def setModelColumn(self, column):
-        self.completer.setCompletionColumn(column)
+        self._completer.setCompletionColumn(column)
         self.pFilterModel.setFilterKeyColumn(column)
         super(ExtendedComboBox, self).setModelColumn(column)

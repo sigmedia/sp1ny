@@ -1,7 +1,7 @@
-from pyqtgraph.Qt import QtWidgets, QtCore
+from pyqtgraph.Qt import QtWidgets, QtCore, QtGui
 from spiny.core import DataController
 
-from spiny.annotations import controller as annotation_controller
+from spiny.annotations import get_controller as get_annotation_controller
 
 
 class WaveletController(DataController):
@@ -9,14 +9,49 @@ class WaveletController(DataController):
         self._name = "Wavelet"
         self._extractor = extractor
         self._widget = widget
-        annotation_controller.list_registered_modules.add(self._tier_list_updated)
+        self._panel_built = False
+        get_annotation_controller().list_registered_modules.add(self._tier_list_updated)
 
     def setWavPlot(self, wav_plot):
         self._wav_plot = wav_plot
 
     def extract(self):
+        if self._panel_built:
+            try:
+                self._updateExtractorParameters()
+            except ValueError as ex:
+                QtWidgets.QMessageBox.warning(None, "Wavelet configuration", str(ex))
+                return
         self._extractor.extract()
         self.refresh()
+
+    def _updateExtractorParameters(self):
+        """Copy the values of the control panel to the extractor
+
+        Raises
+        ------
+        ValueError
+            if a value is missing or inconsistent
+        """
+
+        def read(widget, name):
+            try:
+                return float(widget.text())
+            except ValueError:
+                raise ValueError(f'{name} must be a number (got "{widget.text()}")')
+
+        min_f0 = read(self.min_f0, "min F0")
+        max_f0 = read(self.max_f0, "max F0")
+        if not 0 < min_f0 < max_f0:
+            raise ValueError(f"F0 limits must satisfy 0 < min F0 < max F0 (got {min_f0} and {max_f0})")
+
+        self._extractor._min_f0 = min_f0
+        self._extractor._max_f0 = max_f0
+        self._extractor._voicing = float(self.voicing.value())
+        self._extractor._harmonics = float(self.harmonics.value())
+        self._extractor._weight_f0 = read(self.wF0, "F0 weight")
+        self._extractor._weight_energy = read(self.wEnergy, "Energy weight")
+        self._extractor._combination = "product" if self.mul_feats.isChecked() else "sum"
 
     def setControlPanel(self, panel):
 
@@ -32,6 +67,12 @@ class WaveletController(DataController):
         # box_layout.addWidget(self.weight())
         box_layout.addWidget(self.signalTiers())
         box_layout.addWidget(self.createTierList())
+
+        bExtract = QtWidgets.QPushButton("Extract")
+        bExtract.clicked.connect(self.extract)
+        bExtract.setDefault(False)
+        bExtract.setAutoDefault(False)
+        box_layout.addWidget(bExtract)
 
         scroll = QtWidgets.QScrollArea()
         # scroll.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOn)
@@ -51,6 +92,7 @@ class WaveletController(DataController):
         main_group_box.setLayout(main_layout)
         panel.addWidget(main_group_box)
 
+        self._panel_built = True
         self.populateTierList()
 
     def setF0Limits(self):
@@ -68,27 +110,25 @@ class WaveletController(DataController):
         """
 
         # Min F0
-        self.min_f0 = QtWidgets.QLineEdit("min F0")
-        self.min_f0.setText("50.0")  # str(self.configuration["f0"]["min_f0"]))
-        self.min_f0.setInputMask("000")
-        # self.min_f0.textChanged.connect(self.onF0Changed)
+        self.min_f0 = QtWidgets.QLineEdit(str(self._extractor._min_f0))
+        self.min_f0.setValidator(QtGui.QDoubleValidator(1.0, 2000.0, 1, self.min_f0))
+        self.min_f0.setPlaceholderText("min F0 (Hz)")
 
         # Max F0
-        self.max_f0 = QtWidgets.QLineEdit("max F0")
-        self.max_f0.setText("400.0")  # str(self.configuration["f0"]["max_f0"]))
-        self.max_f0.setInputMask("000")
-        # self.max_f0.textChanged.connect(self.onF0Changed)
+        self.max_f0 = QtWidgets.QLineEdit(str(self._extractor._max_f0))
+        self.max_f0.setValidator(QtGui.QDoubleValidator(1.0, 2000.0, 1, self.max_f0))
+        self.max_f0.setPlaceholderText("max F0 (Hz)")
 
         # Voicing
         self.voicing = QtWidgets.QSlider(QtCore.Qt.Horizontal)
-        self.voicing.setSliderPosition(50)  # self.configuration["f0"]["voicing_threshold"])
-        # self.voicing.valueChanged.connect(self.onF0Changed)
+        self.voicing.setRange(0, 100)
+        self.voicing.setSliderPosition(int(self._extractor._voicing))
 
         # Harmonics
         self.harmonics = QtWidgets.QSlider(QtCore.Qt.Horizontal)
-        self.harmonics.setSliderPosition(50)
+        self.harmonics.setRange(0, 100)
+        self.harmonics.setSliderPosition(int(self._extractor._harmonics))
         self.harmonics.setVisible(False)
-        # self.harmonics.valueChanged.connect(self.onF0Changed)
 
         # Setup groupbox
         hbox = QtWidgets.QVBoxLayout()
@@ -122,25 +162,19 @@ class WaveletController(DataController):
 
         # F0 widgets
         l1 = QtWidgets.QLabel("F0")
-        self.wF0 = QtWidgets.QLineEdit("1.0")  # str(self.configuration["feature_combination"]["weights"]["f0"]))
-        self.wF0.setInputMask("0.0")
-        self.wF0.setMaxLength(3)
+        self.wF0 = QtWidgets.QLineEdit(str(self._extractor._weight_f0))
+        self.wF0.setValidator(QtGui.QDoubleValidator(0.0, 10.0, 2, self.wF0))
 
         # Energy widgets
         l2 = QtWidgets.QLabel("Energy")
-        self.wEnergy = QtWidgets.QLineEdit(
-            "1.0"
-        )  # str(self.configuration["feature_combination"]["weights"]["energy"]))
-        self.wEnergy.setInputMask("0.0")
-        self.wEnergy.setMaxLength(3)
+        self.wEnergy = QtWidgets.QLineEdit(str(self._extractor._weight_energy))
+        self.wEnergy.setValidator(QtGui.QDoubleValidator(0.0, 10.0, 2, self.wEnergy))
 
         # Duration widgets
         l3 = QtWidgets.QLabel("Duration")
-        self.wDuration = QtWidgets.QLineEdit(
-            "0.0"
-        )  # str(self.configuration["feature_combination"]["weights"]["duration"]))
-        self.wDuration.setInputMask("0.0")
-        self.wDuration.setMaxLength(3)
+        self.wDuration = QtWidgets.QLineEdit("0.0")
+        self.wDuration.setEnabled(False)  # TODO: duration signal not implemented yet
+        self.wDuration.setToolTip("The duration signal is not implemented yet")
 
         # Setup the groupbox
         box = QtWidgets.QGridLayout()
@@ -170,9 +204,9 @@ class WaveletController(DataController):
         """
 
         # Signal tier
-        self.signalTiers = QtWidgets.QListWidget()
-        self.signalTiers.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
-        # NOTE: self.signalTiers.clicked.connect(self.onSignalRate)
+        self._signal_tiers_list = QtWidgets.QListWidget()
+        self._signal_tiers_list.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
+        # NOTE: self._signal_tiers_list.clicked.connect(self.onSignalRate)
 
         # Signal rate
         self.signalRate = QtWidgets.QCheckBox("Estimate speech rate from signal")
@@ -196,17 +230,15 @@ class WaveletController(DataController):
 
         # Setup the group box
         box = QtWidgets.QVBoxLayout()
-        box.addWidget(self.signalTiers)
+        box.addWidget(self._signal_tiers_list)
         box.addWidget(self.diffDur)
         box.addWidget(self.signalRate)
         box.addWidget(self.bump)
         groupBox = QtWidgets.QGroupBox("Tier(s) for Duration Signal")
         # groupBox.setMaximumSize(400, 150)  # FIXME: see for not having hardcoded size
         groupBox.setLayout(box)
-        groupBox.setToolTip(
-            "Generate duration signal from a tier or as a sum of two or more tiers.\n"
-            + "Shift-click to multi-select, Ctrl-click to de-select"
-        )
+        groupBox.setToolTip("The duration signal is not implemented yet")
+        groupBox.setEnabled(False)  # TODO: duration signal not implemented yet
 
         return groupBox
 
@@ -224,14 +256,11 @@ class WaveletController(DataController):
 
         # clear selection
         self.tierlist.clear()
-        self.signalTiers.clear()
+        self._signal_tiers_list.clear()
 
-        if annotation_controller.model is None:
-            return
-
-        for k in annotation_controller.model.annotations.keys():
+        for k in get_annotation_controller().model.annotations.keys():
             self.tierlist.addItem(k)
-            self.signalTiers.addItem(k)
+            self._signal_tiers_list.addItem(k)
 
     def _tier_list_updated(self):
         try:
@@ -244,11 +273,11 @@ class WaveletController(DataController):
         groupBox.setToolTip(
             "Interpolation between Mexican Hat wavelet (left) and Gaussian filter / scale-space (right)."
         )
-        self.weight = QtWidgets.QSlider(QtCore.Qt.Horizontal)
-        self.weight.sliderReleased.connect(self.onWeightChanged)
+        self._weight_slider = QtWidgets.QSlider(QtCore.Qt.Horizontal)
+        self._weight_slider.sliderReleased.connect(self.onWeightChanged)
 
         hbox = QtWidgets.QVBoxLayout()
-        hbox.addWidget(self.weight)
+        hbox.addWidget(self._weight_slider)
         groupBox.setLayout(hbox)
         groupBox.setVisible(False)
         return groupBox
@@ -257,14 +286,16 @@ class WaveletController(DataController):
 
         groupBox = QtWidgets.QGroupBox("Feature Combination Method")
 
-        combination_method = QtWidgets.QButtonGroup()  # Number group
+        # NOTE: parented to the group box, otherwise the button group is garbage collected
+        self._combination_method = QtWidgets.QButtonGroup(groupBox)
 
         self.sum_feats = QtWidgets.QRadioButton("sum")
         self.mul_feats = QtWidgets.QRadioButton("product")
-        self.mul_feats.setChecked(True)
+        self.sum_feats.setChecked(self._extractor._combination == "sum")
+        self.mul_feats.setChecked(self._extractor._combination == "product")
 
-        combination_method.addButton(self.sum_feats)
-        combination_method.addButton(self.mul_feats)
+        self._combination_method.addButton(self.sum_feats)
+        self._combination_method.addButton(self.mul_feats)
 
         # self.sum_feats.clicked.connect(self.onSignalRate)
         # self.mul_feats.clicked.connect(self.onSignalRate)

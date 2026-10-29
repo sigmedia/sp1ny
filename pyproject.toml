@@ -7,12 +7,13 @@ name = "SpINY"
 version = "0.1"
 authors = [
   "Sébastien Le Maguer <lemagues@tcd.ie>",
-  "Mark Anderson <lemagues@tcd.ie>"
+  "Mark Anderson <andersm3@tcd.ie>"
 ]
 description = "Speech vIsualisation and aNnotation in pYthon"
 readme = "README.md"
+license = "MIT"
 classifiers = [
-  'Development Status :: 4 - Beta',
+  'Development Status :: 3 - Alpha',
   # Audience
   'Intended Audience :: Science/Research',
   # Topics
@@ -21,32 +22,32 @@ classifiers = [
   'Topic :: Scientific/Engineering :: Visualization',
   # Pick your license as you wish
   'License :: OSI Approved :: MIT License',
-  # Python version (FIXME: fix the list of python version based on travis results)
+  # Python version
   'Programming Language :: Python :: 3',
-  'Programming Language :: Python :: 3.7',
   'Programming Language :: Python :: 3.8',
   'Programming Language :: Python :: 3.9',
   'Programming Language :: Python :: 3.10',
   'Programming Language :: Python :: 3.11',
+  'Programming Language :: Python :: 3.12',
 ]
 
 [tool.poetry.dependencies]
 # Python
-python = ">=3.8, <3.12"
+python = ">=3.8, <3.13"
 # QT/Plotting
 matplotlib = "*"
 pyqtgraph = ">=0.13.1"
 PySide6 = "*"
 # Audio
 librosa = ">=0.10.0"
-pyaudio = "*"
 sounddevice = "*"
 # Annotations
 tgt = "*"
 ipapy = "*"
 # Plugins
 praat-parselmouth = { version = "*", optional = true }
-wavelet_prosody_toolkit = { git = "https://github.com/asuni/wavelet_prosody_toolkit", optional = true }
+# NOTE: pinned to a commit for reproducibility (and to avoid pulling unreviewed upstream changes)
+wavelet_prosody_toolkit = { git = "https://github.com/asuni/wavelet_prosody_toolkit", rev = "a19fa7c87ff6cd2bb7072b673c8f20bf91aef6d7", optional = true }
 # Dev
 pre-commit = { version = "*", optional = true }
 
@@ -57,9 +58,9 @@ spiny = "spiny.main:main"
 plugins = ["praat-parselmouth", "wavelet_prosody_toolkit"]
 dev = ["pre-commit"]
 
-[project.urls]
-"Homepage" = "https://github.com/sigmedia/spiny-toolkit"
-"Bug Tracker" = "https://github.com/sigmedia/spiny-toolkit/issues"
+[tool.poetry.urls]
+"Homepage" = "https://github.com/sigmedia/sp1ny"
+"Bug Tracker" = "https://github.com/sigmedia/sp1ny/issues"
 
 [tool.black]
 line-length = 120
@@ -75,6 +76,3 @@ exclude = '''
   |Jenkinfile
 )/
 '''
-
-[tool.flake8]
-max-line-length = 120

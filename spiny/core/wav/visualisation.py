@@ -3,7 +3,7 @@ import numpy as np
 
 # PyQTGraph
 import pyqtgraph as pg
-from pyqtgraph.Qt import QtGui, QtWidgets
+from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 from pyqtgraph.dockarea import Dock
 
 # SpINY
@@ -16,41 +16,25 @@ from .player import player
 
 
 class WavPlotWidget(pg.PlotWidget):
-    """Image plot widget allowing to highlight some regions
+    """Waveform plot of the signal loaded in the player, with region selection and a playback cursor
 
     Attributes
     ----------
-    _wav : tuple(np.array, int)
-        The signal information as loaded using librosa. The tuple contain an array of samples and the sample rate.
-
     plotItem : spiny.gui.items.SelectablePlotItem
         The plot item contained in the widget
-
     """
 
     def __init__(self, parent=None, **kwargs):
         """
         Parameters
         ----------
-        wav : tuple(np.array, int)
-            The signal information as loaded using librosa. The tuple contain an array of samples and the sample rate.
-        ticks: TODO
-            color map ticks
-
-        parent: pg.GraphicsObject
-            the parent object
-
-        background: str
-            the background of the plot
+        parent: QWidget
+            the parent widget
 
         kwargs: kwargs
-            arguments passed to pg.PlotWidget
-
+            arguments passed to spiny.gui.items.SelectablePlotItem
         """
         super().__init__(parent=parent)
-
-        # Save reference to wav
-        x = np.arange(player._wav.shape[0]) / player._sampling_rate
 
         # Prepare plot item
         self.plotItem = SelectablePlotItem(
@@ -61,12 +45,25 @@ class WavPlotWidget(pg.PlotWidget):
         )
         self.setCentralItem(self.plotItem)
         color = QtWidgets.QApplication.instance().palette().color(QtGui.QPalette.Text)
-        self.plotItem.plot(
-            x, player._wav.squeeze(), pen=color
-        )  # FIXME: duplicate things, find a way to get rid of this!
+        self._curve = self.plotItem.plot(pen=color)
+        self.refresh()
+
+        self._v_bar = pg.InfiniteLine(pos=0, movable=False, angle=90, pen=pg.mkPen({"color": "#F00", "width": 2}))
+        self.plotItem.addItem(self._v_bar)
+
+        # Poll the player position from the GUI thread (the audio thread must never touch Qt objects)
+        self._position_timer = QtCore.QTimer(self)
+        self._position_timer.setInterval(30)
+        self._position_timer.timeout.connect(self._update_position)
+        self._position_timer.start()
+
+    def refresh(self):
+        """(Re)draw the waveform of the signal currently loaded in the player"""
+        x = np.arange(player.signal.shape[0]) / player.sampling_rate
+        self._curve.setData(x, player.signal.squeeze())  # FIXME: duplicate things, find a way to get rid of this!
 
         # Define the limits to constraint the zoom
-        T = player._wav.shape[0] / player._sampling_rate
+        T = player.duration
         self.plotItem.setLimits(
             yMin=-1,
             yMax=1,
@@ -75,32 +72,21 @@ class WavPlotWidget(pg.PlotWidget):
             minXRange=0,
             maxXRange=T,
         )
+        self.plotItem.setXRange(0, T, padding=0)
 
-        v_bar = pg.InfiniteLine(pos=0, movable=False, angle=90, pen=pg.mkPen({"color": "#F00", "width": 2}))
-
-        def _update_position_handler(position):
-            v_bar.setValue(position)
-
-        player.add_position_handler(_update_position_handler)
-        self.plotItem.addItem(v_bar)
+    def _update_position(self):
+        position = player.position
+        if self._v_bar.value() != position:
+            self._v_bar.setValue(position)
 
 
 class WavDock(Dock):
-    """Dock containing a data surface plot (matrix data for now) and the corresponding waveform
+    """Dock containing the waveform of the signal loaded in the player
 
     Attributes
     ----------
-    data : np.array
-        matrix containing the data to render
-
-    wav : tuple(np.array, int)
-        The signal information as loaded using librosa. The tuple contain an array of samples and the sample rate.
-
-    data_plot :
-        The plot item rendering the data part
-
-    wav_plot :
-        The plot item rendering the waveform
+    wav_plot : WavPlotWidget
+        The widget rendering the waveform
     """
 
     def __init__(self, name, size):
@@ -110,22 +96,8 @@ class WavDock(Dock):
         name : string
             The name of the dock
 
-        size : TODO
-            The size of the widget
-
-        data : np.array
-            The data to render
-
-        wav : tuple(np.array, int)
-            The signal information as loaded using librosa.
-            The tuple contain an array of samples and the sample rate.
-
-        frameshift : float
-            The frameshift used to extract the data from the signal
-
-        ticks : TODO
-            The color map ticks
-
+        size : tuple(int, int)
+            The default size of the dock
         """
         Dock.__init__(self, name=name, size=size)
         self.__plotWav()
@@ -134,14 +106,6 @@ class WavDock(Dock):
         self.wav_plot.getAxis("left").setWidth(50)
 
     def __plotWav(self):
-        """Helper to plot the waveform
-
-        Parameters
-        ----------
-        max_dur : float
-          The maximum duration in seconds. It is mainly used in the case
-          that the annotations require more space than the waveform
-        """
-
+        """Helper to create the waveform widget"""
         self.wav_plot = WavPlotWidget(name="%s waveform" % self.name)
         self.addWidget(self.wav_plot)

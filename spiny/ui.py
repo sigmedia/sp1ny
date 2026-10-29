@@ -18,16 +18,15 @@ from .gui.theme import define_palette
 from .gui.utils import cmapToColormap
 from .gui.helpers.widgets import ExtendedComboBox
 from .core.wav.visualisation import WavDock
-from .core.wav import controller as audio_controller
+from .core.wav import get_controller as get_audio_controller
 from .annotations.visualisation import AnnotationDock
 from .core import DataDock
 from .core import player
 from .core.wav import PlayerControllerWidget
 from .core import plugin_entry_dict
-from .annotations import controller as annotation_controller
+from .annotations import get_controller as get_annotation_controller
 
 import spiny.plugins  # NOTE: we can't use relative import as the prefix is used to validate the plugins
-
 
 #####################################################################################################
 # Classes
@@ -102,7 +101,7 @@ class VisualisationArea(DockArea):
     def selectPlugin(self, controller):
         controller.setWavPlot(self._dock_wav.wav_plot)
         controller.extract()
-        self._dock_coef.setWidget(controller._widget, controller._name)
+        self._dock_coef.setWidget(controller.widget, controller.name)
 
 
 # Discover plugins
@@ -114,10 +113,21 @@ def iter_namespace(ns_pkg):
     return pkgutil.iter_modules(ns_pkg.__path__, ns_pkg.__name__ + ".")
 
 
-discovered_plugins = {name: importlib.import_module(name) for finder, name, ispkg in iter_namespace(spiny.plugins)}
+def discover_plugins():
+    """Import every plugin package of spiny.plugins
 
-# Interpret image data as row-major instead of col-major
-pg.setConfigOptions(imageAxisOrder="row-major")
+    A plugin which fails to import (missing optional dependency, incompatible version, bug, ...) is
+    reported and skipped: it must never prevent the application from starting.
+    """
+    logger = logging.getLogger(__name__)
+    plugins = dict()
+    for _, name, _ in iter_namespace(spiny.plugins):
+        try:
+            plugins[name] = importlib.import_module(name)
+        except Exception as ex:
+            logger.warning('The plugin "%s" is not available: %s', name, ex)
+            logger.debug("Plugin import failure", exc_info=True)
+    return plugins
 
 
 class GUIVisu(QtWidgets.QMainWindow):
@@ -155,7 +165,7 @@ class GUIVisu(QtWidgets.QMainWindow):
         # Setup the status bar
         ##########################################
         self.statusbar = self.statusBar()
-        self._filename_label = QtWidgets.QLabel(player._filename)
+        self._filename_label = QtWidgets.QLabel(player.filename)
         self.statusbar.addPermanentWidget(self._filename_label)
 
         ##########################################
@@ -174,7 +184,7 @@ class GUIVisu(QtWidgets.QMainWindow):
         tabs = QtWidgets.QTabWidget()
         tab1 = QtWidgets.QWidget()
         tabs.addTab(tab1, "Data/Visualization")
-        self._control_layout = QtWidgets.QVBoxLayout(self)
+        self._control_layout = QtWidgets.QVBoxLayout()
 
         # Populate the list of plugins
         self._plugin_list = ExtendedComboBox(self)
@@ -227,14 +237,16 @@ class GUIVisu(QtWidgets.QMainWindow):
         # self._annotation_layout.setParent(self)
         tab2 = QtWidgets.QWidget()
         tabs.addTab(tab2, "Annotations")
-        self._annotation_layout = annotation_controller
+        self._annotation_layout = get_annotation_controller()
         self._annotation_layout.setView(self._visualisation_area._dock_annotation)
         self._annotation_layout.resetView()
         tab2.setLayout(self._annotation_layout)
 
         tab3 = QtWidgets.QWidget()
         tabs.addTab(tab3, "Audio")
-        self._audio_layout = audio_controller
+        self._audio_layout = get_audio_controller()
+        self._audio_layout.setLoadHandler(self.openFile)
+        self._audio_layout.setCurrentFile(player.filename or "")
         tab3.setLayout(self._audio_layout)
 
         right_layout.addWidget(tabs)
@@ -263,10 +275,24 @@ class GUIVisu(QtWidgets.QMainWindow):
         options |= QtWidgets.QFileDialog.DontUseNativeDialog
         # NOTE: how to concatente filters: "All Files (*);;Wav Files (*.wav)"
         filename, _ = QtWidgets.QFileDialog.getOpenFileName(
-            self, "Loading wav file", "", "Wav Files (*.wav)", options=options
+            self, "Loading wav file", "", "Wav Files (*.wav);;All Files (*)", options=options
         )
         if filename:
-            self._filename_label.setText(filename)
+            self.loadWav(filename)
+
+    def loadWav(self, filename):
+        """Load a new signal and refresh every view depending on it"""
+        try:
+            player.loadNewWav(filename)
+        except Exception as ex:
+            QtWidgets.QMessageBox.critical(self, "Loading wav file", f'Cannot load "{filename}":\n{ex}')
+            return
+
+        self._filename_label.setText(filename)
+        self._audio_layout.setCurrentFile(filename)
+        self._visualisation_area._dock_wav.wav_plot.refresh()
+        self._annotation_layout.resetView()
+        self.selectPlugin(self._plugin_list.currentText())  # Re-extract the data from the new signal
 
     def selectPlugin(self, current):
         # NOTE: this is here because we lack a better way to avoid issues during completion
@@ -277,7 +303,10 @@ class GUIVisu(QtWidgets.QMainWindow):
         i = self._control_layout.count() - 1
         cur_widget = self._control_layout.itemAt(i).widget()
         if cur_widget is not None:
-            cur_widget.setParent(None)
+            # NOTE: deferred deletion, destroying the panel synchronously (setParent(None)) can crash
+            self._control_layout.removeWidget(cur_widget)
+            cur_widget.hide()
+            cur_widget.deleteLater()
 
         controller.setControlPanel(self._control_layout)
         self._visualisation_area.selectPlugin(controller)
@@ -287,12 +316,33 @@ class GUIVisu(QtWidgets.QMainWindow):
         self._visualisation_area.updateColorMap(cmap_name)
 
 
-def build_gui(app, frameshift):
+def install_exception_hook(parent=None):
+    """Report the exceptions raised in Qt slots in a dialog (and in the log) instead of only on stderr"""
+    logger = logging.getLogger("spiny")
+
+    def hook(exc_type, exc_value, exc_traceback):
+        if issubclass(exc_type, KeyboardInterrupt):
+            sys.__excepthook__(exc_type, exc_value, exc_traceback)
+            return
+        logger.error("Unhandled exception", exc_info=(exc_type, exc_value, exc_traceback))
+        QtWidgets.QMessageBox.critical(
+            parent, "Unexpected error", f"{exc_type.__name__}: {exc_value}\n\nSee the log for the details."
+        )
+
+    sys.excepthook = hook
+
+
+def build_gui(app, frameshift, dark_activated=False):
 
     # Generate application
-    define_palette(app)
+    define_palette(app, dark_activated)
+    app.aboutToQuit.connect(player.stop)
+
+    # Plugins create widgets, so they are discovered only now that the application exists
+    discover_plugins()
     win = GUIVisu(frameshift)
     win.setWindowTitle("SpINY")
+    install_exception_hook(win)
 
     # Start the application
     win.show()

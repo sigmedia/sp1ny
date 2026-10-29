@@ -1,6 +1,7 @@
 from typing import Optional, Set
 import pathlib
 from pyqtgraph import QtCore, QtGui, QtWidgets
+from pyqtgraph.Qt import isQObjectAlive
 from ipapy import IPA_CHARS
 from ipapy.ipachar import IPAConsonant, IPASuprasegmental, IPADiacritic, IPAVowel
 from collections import OrderedDict
@@ -12,7 +13,29 @@ from .io.htk_lab import HTKLabelSerialiser
 from .io.textgrid import TextGridSerialiser
 from .io.json import JSONSerialiser
 
-# from . import HTKAnnotation, TGTAnnotation
+# Supported annotation formats: file dialog filter => (extension, serialiser class)
+ANNOTATION_FORMATS = OrderedDict(
+    [
+        ("TextGrid Files (*.TextGrid)", (".TextGrid", TextGridSerialiser)),
+        ("HTK Label Files (*.lab)", (".lab", HTKLabelSerialiser)),
+        ("JSON Files (*.json)", (".json", JSONSerialiser)),
+    ]
+)
+ANNOTATION_FILTERS = ";;".join(ANNOTATION_FORMATS.keys())
+
+
+def serialiser_for(annotation_file: pathlib.Path):
+    """Instantiate the serialiser matching the extension of the given file (case insensitive)
+
+    Raises
+    ------
+    ValueError
+        if the extension is not supported
+    """
+    for extension, serialiser_cls in ANNOTATION_FORMATS.values():
+        if annotation_file.suffix.lower() == extension.lower():
+            return serialiser_cls()
+    raise ValueError(f'The annotation format of "{annotation_file}" is unknown')
 
 
 class QListWidgetItemHideable(QtWidgets.QListWidgetItem):
@@ -70,7 +93,7 @@ class ControlLayout(QtWidgets.QVBoxLayout):
         # View and model
         self._model: AnnotationSet = AnnotationSet({}, set())
         self._view: Optional[AnnotationDock] = None
-        self._list_registered_modules = set()
+        self._list_registered_modules = _registered_modules
 
         # Create the main layout
         box_layout = QtWidgets.QVBoxLayout()
@@ -169,7 +192,6 @@ class ControlLayout(QtWidgets.QVBoxLayout):
         self._list_tiers_widget.model().rowsMoved.connect(self._update_order)
         tier_box_layout.addWidget(self._list_tiers_widget)
         tier_box.setLayout(tier_box_layout)
-        self._list_tiers_widget.itemSelectionChanged.connect(self._tiers_list_updated)
 
         return tier_box
 
@@ -180,11 +202,11 @@ class ControlLayout(QtWidgets.QVBoxLayout):
             if item.isHidden():
                 item.setBackground(QtGui.QBrush(ControlLayout.UNSELECTED_COLOR))
                 self._model.ignored.add(item.text())
-                self.view.tiers_dict[item.text()].plotItem.setVisible(False)
             else:
                 item.setBackground(QtGui.QBrush(ControlLayout.DEFAULT_COLOR))
-                self._model.ignored.remove(item.text())
-                self.view.tiers_dict[item.text()].plotItem.setVisible(True)
+                self._model.ignored.discard(item.text())
+            if self.view is not None:
+                self.view.tiers_dict[item.text()].setVisible(not item.isHidden())
 
             item.setSelected(False)
 
@@ -204,10 +226,10 @@ class ControlLayout(QtWidgets.QVBoxLayout):
         # Remove from the model
         list_index = []
         for item in self._list_tiers_widget.selectedItems():
-            print("===========")
-            print(item.text())
             del self._model.annotations[item.text()]
+            self._model.ignored.discard(item.text())
             list_index.append(self._list_tiers_widget.row(item))
+        list_index.sort()
 
         while list_index:
             idx = list_index.pop()
@@ -217,25 +239,23 @@ class ControlLayout(QtWidgets.QVBoxLayout):
 
     def _add_tier(self):
         tier_name, ok = QtWidgets.QInputDialog.getText(self._tier_box, "New tier", "Enter the name of the tier:")
-
-        if ok:
-            self._model.annotations[tier_name] = []
-            item = QListWidgetItemHideable(self._list_tiers_widget)
-            item.setText(tier_name)
-            item.setBackground(QtGui.QBrush(ControlLayout.DEFAULT_COLOR))
-            self.resetView()
-            self._list_tiers_widget.addItem(item)
-
-    # TODO: this is hardcore for nothing
-    #       needs to just find the item which changed instead of going through everything
-    def _tiers_list_updated(self, *arg):
-        if self._view is None:
+        if not ok:
             return
 
-        for i_item in range(self._list_tiers_widget.count()):
-            item = self._list_tiers_widget.item(i_item)
-            cur_name = item.text()
-            self._view._tiers_dict[cur_name].setVisible(True)
+        tier_name = tier_name.strip()
+        if not tier_name:
+            QtWidgets.QMessageBox.warning(self._tier_box, "New tier", "The name of the tier cannot be empty.")
+            return
+        if tier_name in self._model.annotations:
+            QtWidgets.QMessageBox.warning(self._tier_box, "New tier", f'A tier named "{tier_name}" already exists.')
+            return
+
+        self._model.annotations[tier_name] = []
+        item = QListWidgetItemHideable(self._list_tiers_widget)
+        item.setText(tier_name)
+        item.setBackground(QtGui.QBrush(ControlLayout.DEFAULT_COLOR))
+        self.resetView()
+        self._list_tiers_widget.addItem(item)
 
     def _generate_general_box(self):
         annotation_info_box_layout = QtWidgets.QGridLayout()
@@ -244,16 +264,16 @@ class ControlLayout(QtWidgets.QVBoxLayout):
         # Start time
         l1 = QtWidgets.QLabel("Start Time (s)")
         self._wStartTime = QtWidgets.QLineEdit("-1")
-        # self._wStartTime.setEnabled(False)
-        self._wStartTime.textEdited.connect(self.onTimeEdited)
+        self._wStartTime.setValidator(QtGui.QDoubleValidator(0.0, float("inf"), 4, self._wStartTime))
+        self._wStartTime.editingFinished.connect(self.onTimeEdited)
         annotation_info_box_layout.addWidget(l1, 1, 0)
         annotation_info_box_layout.addWidget(self._wStartTime, 1, 1)
 
         # End time
         l2 = QtWidgets.QLabel("End Time (s)")
         self._wEndTime = QtWidgets.QLineEdit("-1")
-        # self._wEndTime.setEnabled(False)
-        self._wEndTime.textEdited.connect(self.onTimeEdited)
+        self._wEndTime.setValidator(QtGui.QDoubleValidator(0.0, float("inf"), 4, self._wEndTime))
+        self._wEndTime.editingFinished.connect(self.onTimeEdited)
         annotation_info_box_layout.addWidget(l2, 2, 0)
         annotation_info_box_layout.addWidget(self._wEndTime, 2, 1)
 
@@ -274,137 +294,92 @@ class ControlLayout(QtWidgets.QVBoxLayout):
         ipa_box_layout = QtWidgets.QVBoxLayout()
         ipa_box_layout.setAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
 
-        # ###
-        # # Add consonnants
-        # ################################################################
-        box = CollapsibleBox("Consonnants")
-        lay = QtWidgets.QGridLayout()
-
-        for j, cur_unicode in enumerate(IPA_CHARS):
-            if type(cur_unicode) == IPAConsonant:
-                label = QLabelClickable("{}".format(cur_unicode))
-                label.clicked.connect(self.onIPAInsert)
-                label.setAlignment(QtCore.Qt.AlignCenter)
-                label.setToolTip(" ".join(cur_unicode.descriptors))
-
-                # setting background color to label when mouse hover over it
-                color = QtGui.QColor(134, 125, 125)
-                label.setStyleSheet("QLabel:hover {{background-color: {}; color: white;}}".format(color.name()))
-                lay.addWidget(label, j // 8, j % 8)
-
-        box.setContentLayout(lay)
-        ipa_box_layout.addWidget(box)
-
-        # ###
-        # # Add vowels
-        # ################################################################
-        box = CollapsibleBox("Vowels")
-        lay = QtWidgets.QGridLayout()
-
-        j = -1
-        for cur_unicode in IPA_CHARS:
-            if type(cur_unicode) == IPAVowel:
-                j += 1
-                label = QLabelClickable("{}".format(cur_unicode))
-                label.clicked.connect(self.onIPAInsert)
-                label.setAlignment(QtCore.Qt.AlignCenter)
-                label.setToolTip(" ".join(cur_unicode.descriptors))
-
-                # setting background color to label when mouse hover over it
-                color = QtGui.QColor(134, 125, 125)
-                label.setStyleSheet("QLabel:hover {{background-color: {}; color: white;}}".format(color.name()))
-                lay.addWidget(label, j // 8, j % 8)
-
-        box.setContentLayout(lay)
-        ipa_box_layout.addWidget(box)
-
-        # ###
-        # # Add diacritics
-        # ################################################################
-        box = CollapsibleBox("Diacritics")
-        lay = QtWidgets.QGridLayout()
-
-        j = -1
-        for cur_unicode in IPA_CHARS:
-            if type(cur_unicode) == IPADiacritic:
-                j += 1
-                label = QLabelClickable("{}".format(cur_unicode))
-                label.clicked.connect(self.onIPAInsert)
-                label.setFont(QtGui.QFont("Arial", 16))
-                label.setAlignment(QtCore.Qt.AlignCenter)
-                label.setToolTip(" ".join(cur_unicode.descriptors))
-
-                # setting background color to label when mouse hover over it
-                color = QtGui.QColor(134, 125, 125)
-                label.setStyleSheet("QLabel:hover {{background-color: {}; color: white;}}".format(color.name()))
-                lay.addWidget(label, j // 8, j % 8)
-
-        box.setContentLayout(lay)
-        ipa_box_layout.addWidget(box)
-
-        # ###
-        # # Add supra-segmental markers
-        # ################################################################
-        box = CollapsibleBox("Suprasegmental")
-        lay = QtWidgets.QGridLayout()
-
-        j = -1
-        for cur_unicode in IPA_CHARS:
-            if type(cur_unicode) == IPASuprasegmental:
-                j += 1
-                label = QLabelClickable("{}".format(cur_unicode))
-                label.clicked.connect(self.onIPAInsert)
-                label.setFont(QtGui.QFont("Arial", 16))
-                label.setAlignment(QtCore.Qt.AlignCenter)
-                label.setToolTip(" ".join(cur_unicode.descriptors))
-
-                # setting background color to label when mouse hover over it
-                color = QtGui.QColor(134, 125, 125)
-                label.setStyleSheet("QLabel:hover {{background-color: {}; color: white;}}".format(color.name()))
-                lay.addWidget(label, j // 8, j % 8)
-
-        box.setContentLayout(lay)
-        ipa_box_layout.addWidget(box)
+        # One collapsible palette per IPA category: (title, IPA class, font (None = default))
+        categories = [
+            ("Consonnants", IPAConsonant, None),
+            ("Vowels", IPAVowel, None),
+            ("Diacritics", IPADiacritic, QtGui.QFont("Arial", 16)),
+            ("Suprasegmental", IPASuprasegmental, QtGui.QFont("Arial", 16)),
+        ]
+        for title, ipa_cls, font in categories:
+            ipa_box_layout.addWidget(self._generate_IPA_palette(title, ipa_cls, font))
 
         ipa_box = QtWidgets.QGroupBox("IPA Helpers")
-
         ipa_box.setLayout(ipa_box_layout)
 
         return ipa_box
+
+    def _generate_IPA_palette(self, title, ipa_cls, font=None, nb_columns=8):
+        """Generate a collapsible grid of clickable labels for the IPA characters of a given class"""
+        box = CollapsibleBox(title)
+        lay = QtWidgets.QGridLayout()
+
+        # setting background color to label when mouse hover over it
+        hover_style = "QLabel:hover {{background-color: {}; color: white;}}".format(QtGui.QColor(134, 125, 125).name())
+
+        ipa_chars = [cur_unicode for cur_unicode in IPA_CHARS if type(cur_unicode) is ipa_cls]
+        for j, cur_unicode in enumerate(ipa_chars):
+            label = QLabelClickable(str(cur_unicode))
+            label.clicked.connect(self.onIPAInsert)
+            if font is not None:
+                label.setFont(font)
+            label.setAlignment(QtCore.Qt.AlignCenter)
+            label.setToolTip(" ".join(cur_unicode.descriptors))
+            label.setStyleSheet(hover_style)
+            lay.addWidget(label, j // nb_columns, j % nb_columns)
+
+        box.setContentLayout(lay)
+        return box
 
     def _load_annotation_file(self):
         options = QtWidgets.QFileDialog.Options()
         options |= QtWidgets.QFileDialog.DontUseNativeDialog
         annotation_file, _ = QtWidgets.QFileDialog.getOpenFileName(
-            self._file_box,
-            "Load annotation file",
-            "",
-            "TextGrid Files (*.TextGrid);;HTK Label Files (*.lab);;JSON Files (*.json)",
+            self._file_box, "Load annotation file", "", ANNOTATION_FILTERS, options=options
         )
-        self._wCurrentFile.setText(annotation_file)
-        self.loadAnnotations(pathlib.Path(annotation_file))
+        if not annotation_file:  # Cancelled
+            return
+
+        try:
+            self.loadAnnotations(pathlib.Path(annotation_file))
+        except Exception as ex:
+            QtWidgets.QMessageBox.critical(self._file_box, "Load annotation file", f"Cannot load the file:\n{ex}")
 
     def _save_annotation_file(self):
         options = QtWidgets.QFileDialog.Options()
         options |= QtWidgets.QFileDialog.DontUseNativeDialog
-        annotation_file, _ = QtWidgets.QFileDialog.getSaveFileName(
-            self._file_box,
-            "Save annotation file",
-            "",
-            "TextGrid Files (*.TextGrid);;HTK Label Files (*.lab);;JSON Files (*.json)",
+        annotation_file, selected_filter = QtWidgets.QFileDialog.getSaveFileName(
+            self._file_box, "Save annotation file", "", ANNOTATION_FILTERS, options=options
         )
-        an_loader = JSONSerialiser()
-        self._wCurrentFile.setText(annotation_file)
-        an_loader.save(annotation_file, self._model)
+        if not annotation_file:  # Cancelled
+            return
+
+        # The extension decides the format; without a known extension, use the one of the selected filter
+        annotation_file = pathlib.Path(annotation_file)
+        try:
+            serialiser = serialiser_for(annotation_file)
+        except ValueError:
+            extension, serialiser_cls = ANNOTATION_FORMATS.get(selected_filter, (".json", JSONSerialiser))
+            annotation_file = annotation_file.with_name(annotation_file.name + extension)
+            serialiser = serialiser_cls()
+
+        try:
+            serialiser.save(annotation_file, self._model)
+        except Exception as ex:
+            QtWidgets.QMessageBox.critical(self._file_box, "Save annotation file", f"Cannot save the file:\n{ex}")
+            return
+        self._wCurrentFile.setText(str(annotation_file.absolute()))
 
     def update_current_annotation(self, new_annotation=None):
-        if self._current_annotation == new_annotation:
+        if self._current_annotation is new_annotation:
             return
 
         # If there is already a selected annotation => unselect it
         if self._current_annotation is not None:
-            self._current_annotation.select()
+            self._current_annotation.setSelectedState(False)
         self._current_annotation = new_annotation
+        if self._current_annotation is not None:
+            self._current_annotation.setSelectedState(True)
 
         # Update infobox base on the information of the new annotation
         if self._current_annotation is not None:
@@ -420,8 +395,22 @@ class ControlLayout(QtWidgets.QVBoxLayout):
             self._info_box.setVisible(False)
 
     def onTimeEdited(self):
-        if self._current_annotation is not None:
-            self._current_annotation.setBounds(float(self._wStartTime.text()), float(self._wEndTime.text()))
+        """Apply the edited boundaries (once editing is finished), or restore the previous ones if they are invalid"""
+        if self._current_annotation is None:
+            return
+
+        segment = self._current_annotation._segment
+        try:
+            start_time = float(self._wStartTime.text())
+            end_time = float(self._wEndTime.text())
+        except ValueError:
+            start_time, end_time = -1.0, -1.0
+
+        if 0 <= start_time < end_time:
+            self._current_annotation.setBounds(start_time, end_time)
+        else:
+            self._wStartTime.setText(f"{segment.start_time:.4f}")
+            self._wEndTime.setText(f"{segment.end_time:.4f}")
 
     def onLabelEdited(self):
         if self._current_annotation is not None:
@@ -435,6 +424,11 @@ class ControlLayout(QtWidgets.QVBoxLayout):
         for tier_name in self._model.annotations.keys():
             item = QListWidgetItemHideable(self._list_tiers_widget)
             item.setText(tier_name)
+            if tier_name in self._model.ignored:
+                item.toggleHidden()
+                item.setBackground(QtGui.QBrush(ControlLayout.UNSELECTED_COLOR))
+            else:
+                item.setBackground(QtGui.QBrush(ControlLayout.DEFAULT_COLOR))
             self._list_tiers_widget.addItem(item)
 
     @property
@@ -451,15 +445,7 @@ class ControlLayout(QtWidgets.QVBoxLayout):
         self.updateTierList()
 
     def loadAnnotations(self, annotation_file: pathlib.Path) -> None:
-
-        if annotation_file.name.endswith(".lab"):
-            an_loader = HTKLabelSerialiser()
-        elif annotation_file.name.endswith(".TextGrid"):
-            an_loader = TextGridSerialiser()
-        elif annotation_file.name.endswith(".json"):
-            an_loader = JSONSerialiser()
-        else:
-            raise Exception("The annotation cannot be parsed, format is unknown")
+        an_loader = serialiser_for(annotation_file)
         model = an_loader.load(annotation_file)
         self.setAnnotationModel(model)
         self._wCurrentFile.setText(str(annotation_file.absolute()))
@@ -472,4 +458,19 @@ class ControlLayout(QtWidgets.QVBoxLayout):
             self._view.setModel(self._model, self.update_current_annotation)
 
 
-controller = ControlLayout(None)
+_controller: Optional[ControlLayout] = None
+
+# NOTE: kept outside of the controller so that registrations survive a re-creation of the controller
+_registered_modules: Set = set()
+
+
+def get_controller() -> ControlLayout:
+    """Return the annotation controller, creating it on first use (a QApplication must exist)
+
+    The controller is also re-created if its Qt object has been deleted (e.g. when the window owning it was closed).
+    """
+    global _controller
+    # NOTE: the layout wrapper can outlive the widgets it manages, so check one of them too
+    if (_controller is None) or (not isQObjectAlive(_controller)) or (not isQObjectAlive(_controller._file_box)):
+        _controller = ControlLayout(None)
+    return _controller

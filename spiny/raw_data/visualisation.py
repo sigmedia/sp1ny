@@ -51,7 +51,7 @@ class RawDataPlotWidget(DataWidget):
         tr.scale(self._data_extractor._frameshift * 0.001, 1)
 
         # Generate image item
-        self._imageItem.setImage(self._data_extractor._data.T)
+        self._imageItem.setImage(self._data_extractor._data)
         self._imageItem.setTransform(tr)
 
         # Set the limits to focus the rendering

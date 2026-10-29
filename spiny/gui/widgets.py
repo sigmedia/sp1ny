@@ -10,78 +10,19 @@ DESCRIPTION
     Module providing some specific items for annotation and highlight purpose.
 
 LICENSE
+    MIT License, see the LICENSE file at the root of the repository
 """
 
 # PyQTGraph
 import pyqtgraph as pg
-from pyqtgraph.Qt import QtWidgets, QtGui, QtCore
+from pyqtgraph.Qt import QtWidgets, QtCore
 
 # SpINY
 from spiny.gui.items import SelectablePlotItem
 
-
 ###############################################################################
 # Classes
 ###############################################################################
-
-
-class MAPPlotWidget(pg.PlotWidget):
-    """Image plot widget allowing to highlight some regions
-
-    Attributes
-    ----------
-    _data : np.array
-        matrix containing the data rendered
-
-    plotItem : spiny.gui.items.SelectablePlotItem
-        The plot item contained in the widget
-
-    hist : pg.HistogramLUTWidget
-        The histogram widget to control the image colorimetrie
-    """
-
-    def __init__(self, data, frameshift, ticks, parent=None, **kwargs):
-        """
-        Parameters
-        ----------
-        data: np.array
-            matrix containing the data to render
-
-        frameshift: float
-            frameshift in seconds
-
-        ticks: TODO
-            color map ticks
-
-        parent: pg.GraphicsObject
-            the parent object
-
-        kwargs: kwargs
-            arguments passed to pg.PlotWidget
-
-        """
-        pg.GraphicsView.__init__(self, parent)
-        self.setSizePolicy(QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Expanding)
-        self.enableMouse(False)
-
-        # Save reference to data
-        self._data = data
-        self._y_scale = 16e03  # FIXME: find a way to improve this!
-
-        # Generate image data
-        img = pg.ImageItem()
-        img.setImage(self._data.T)
-        img.setTransform(QtGui.QTransform.fromScale(frameshift, 1.0 / (self._data.shape[1] / self._y_scale)))
-
-        # Define and assign histogram
-        self.hist = pg.HistogramLUTWidget()
-        self.hist.setImageItem(img)
-        self.hist.gradient.restoreState({"mode": "rgb", "ticks": ticks})
-
-        # Generate plot
-        self.plotItem = SelectablePlotItem(**kwargs)
-        self.plotItem.getViewBox().addItem(img)
-        self.setCentralItem(self.plotItem)
 
 
 class CollapsibleBox(QtWidgets.QWidget):
@@ -170,11 +111,13 @@ class DataWidget(pg.GraphicsLayoutWidget):
         self.ci.layout.setSpacing(0)
 
         # A _plotItem area (ViewBox + axes) for displaying the image
-        self._plotItem = SelectablePlotItem()
+        # NOTE: the frequency/dimension axis is locked, only time can be zoomed/panned
+        self._plotItem = SelectablePlotItem(lock_y_axis=True)
         self._plotItem.setContentsMargins(0, 0, 0, 0)
 
-        # Item for displaying image data
-        self._imageItem = pg.ImageItem()
+        # Item for displaying image data: data is always given as (time, dimension), whatever the global
+        # imageAxisOrder option is when the widget is created
+        self._imageItem = pg.ImageItem(axisOrder="col-major")
         self._plotItem.addItem(self._imageItem)
 
         # Contrast/color control

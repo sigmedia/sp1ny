@@ -20,17 +20,20 @@ class EnhancedJSONEncoder(json.JSONEncoder):
 
 
 class JSONSerialiser(AnnotationSerialiser):
-    """Class to load annotations from TextGrid files
+    """Class to load/save annotations from/to the spiny JSON format
 
-    Attributes
-    ----------
-    segments : dict
-        A dictionary whose values are list of segments. Each segment is represented by a tuple (start, end, label)
+    The format is::
 
-    reference : list
-        The reference tier (so a list of segments!)
+        {
+          "version": 1,
+          "annotations": {"<tier>": [{"start_time": 0.0, "end_time": 0.1, "label": "a"}, ...], ...},
+          "ignored": ["<tier>", ...]
+        }
 
+    "version" and "ignored" are optional when loading.
     """
+
+    VERSION = 1
 
     def load(self, input_file: pathlib.Path) -> AnnotationSet:
         """Annotation extraction method.
@@ -38,28 +41,47 @@ class JSONSerialiser(AnnotationSerialiser):
         Parameters
         ----------
         input_file : str
-            The TextGrid file containing the annotations
+            The JSON file containing the annotations
 
         Returns
         -------
-        dict
-            A dictionary whose values are list of segments. Each segment is represented by a tuple (start, end, label)
+        AnnotationSet
+            The loaded annotation set
 
+        Raises
+        ------
+        ValueError
+            If the content does not follow the format described in the class documentation
         """
-        with open(input_file) as f_in:
+        with open(input_file, encoding="utf-8") as f_in:
             json_content = json.load(f_in)
+
+        if not isinstance(json_content, dict) or not isinstance(json_content.get("annotations"), dict):
+            raise ValueError(f'"{input_file}" is not a spiny annotation file (no "annotations" object)')
+        version = json_content.get("version", self.VERSION)
+        if version > self.VERSION:
+            raise ValueError(f'"{input_file}" uses format version {version}, only <= {self.VERSION} is supported')
 
         tiers = OrderedDict()
         for tier_name, json_annotations in json_content["annotations"].items():
             annotations = []
-            for cur_json_an in json_annotations:
-                cur_annotation = Annotation(cur_json_an["start_time"], cur_json_an["end_time"], cur_json_an["label"])
+            for i, cur_json_an in enumerate(json_annotations):
+                try:
+                    cur_annotation = Annotation(
+                        float(cur_json_an["start_time"]), float(cur_json_an["end_time"]), str(cur_json_an["label"])
+                    )
+                except (KeyError, TypeError, ValueError) as ex:
+                    raise ValueError(f'"{input_file}": invalid annotation #{i} in tier "{tier_name}" ({ex!r})')
                 annotations.append(cur_annotation)
             tiers[tier_name] = annotations
 
-        return AnnotationSet(tiers, set(json_content["ignored"]))
+        return AnnotationSet(tiers, set(json_content.get("ignored", [])))
 
     def save(self, output_file: pathlib.Path, annotation_set: AnnotationSet) -> None:
-        # Generat
-        with open(output_file, "w") as f_out:
-            json.dump(annotation_set, f_out, indent=2, cls=EnhancedJSONEncoder)
+        content = {
+            "version": self.VERSION,
+            "annotations": annotation_set.annotations,
+            "ignored": sorted(annotation_set.ignored),
+        }
+        with open(output_file, "w", encoding="utf-8") as f_out:
+            json.dump(content, f_out, indent=2, cls=EnhancedJSONEncoder, ensure_ascii=False)

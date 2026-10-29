@@ -9,7 +9,7 @@ def define_dark_palette(app):
     palette.setColor(QtGui.QPalette.WindowText, QtCore.Qt.white)
     palette.setColor(QtGui.QPalette.Base, QtGui.QColor(25, 25, 25))
     palette.setColor(QtGui.QPalette.AlternateBase, QtGui.QColor(53, 53, 53))
-    palette.setColor(QtGui.QPalette.ToolTipBase, QtCore.Qt.white)
+    palette.setColor(QtGui.QPalette.ToolTipBase, QtGui.QColor(42, 130, 218))
     palette.setColor(QtGui.QPalette.ToolTipText, QtCore.Qt.white)
     palette.setColor(QtGui.QPalette.Text, QtCore.Qt.white)
     palette.setColor(QtGui.QPalette.Button, QtGui.QColor(53, 53, 53))
@@ -41,16 +41,15 @@ def define_palette(app, dark_activated=False):
         palette = define_light_palette(app)
 
     app.setPalette(palette)
-    app.setStyleSheet(
-        """
+    app.setStyleSheet("""
         QToolTip { color: #ffffff; background-color: #2a82da; border: 1px solid white; }
-        # QLabel{font-size: 18pt;}
-        # QLineEdit{font-size: 18pt;}
-        # QButton{font-size: 18pt;}
-        # QPushButton{font-size: 18pt;}
-        # QGroupBox{font-size: 18pt;}
-        # QComboBox{font-size: 18pt;}
-        # QTabWidget{font-size: 18pt;}
-        # QToolButton{font-size: 18pt;}
-        """
-    )
+        /* Uncomment to enlarge the fonts (e.g. for demos)
+        QLabel{font-size: 18pt;}
+        QLineEdit{font-size: 18pt;}
+        QPushButton{font-size: 18pt;}
+        QGroupBox{font-size: 18pt;}
+        QComboBox{font-size: 18pt;}
+        QTabWidget{font-size: 18pt;}
+        QToolButton{font-size: 18pt;}
+        */
+        """)

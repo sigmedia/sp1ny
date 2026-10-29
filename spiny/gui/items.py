@@ -69,7 +69,7 @@ class SegmentItem(pg.LinearRegionItem):
         self,
         segment,
         movable=True,
-        related=[],
+        related=None,
         span=(0, 1),
         swapMode="sort",
         clipItem=None,
@@ -86,13 +86,13 @@ class SegmentItem(pg.LinearRegionItem):
             (default: False)
 
         related : list
-            List of related segments (instances of SegmentItem). (default: [])
+            List of related segments (instances of SegmentItem). (default: None, i.e. no related segment)
         """
 
         pg.GraphicsObject.__init__(self)
 
         self._segment = segment
-        self._related = related
+        self._related = list(related) if related is not None else []
         self._is_zoomed_in = False
 
         self.orientation = "vertical"
@@ -223,7 +223,7 @@ class SelectableViewBox(pg.ViewBox):
         self._dragPoint: Optional[SegmentItem] = None
         self._select = False
 
-        self.setMouseEnabled(x=True, y=lock_y_axis)
+        self.setMouseEnabled(x=True, y=not lock_y_axis)
         self._lock_y_axis = lock_y_axis
 
     def mouseDragEvent(self, ev):

@@ -63,11 +63,9 @@ class AnnotationDock(Dock):
         if self._model is None:
             return
 
-        T_max = player._wav.shape[0] / player._sampling_rate
+        T_max = player.duration
         for k in self._model.annotations:
-            if k in self._model.ignored:
-                continue
-
+            # NOTE: hidden (ignored) tiers are built too, only hidden, so that they can be shown again
             annotation_plot = TierPlot(
                 name="%s_%s" % (self.name(), k), tier_name=k, model=self._model, handle_segment=self._handle_segment
             )
@@ -88,6 +86,7 @@ class AnnotationDock(Dock):
                     T_max = self._model.annotations[k][-1].end_time
 
             self.vbox.addWidget(annotation_plot)
+            annotation_plot.setVisible(k not in self._model.ignored)
             self._tiers_dict[k] = annotation_plot
 
         # Link axes
@@ -112,24 +111,24 @@ class AnnotationDock(Dock):
     def clear(self):
         for i in reversed(range(self.vbox.count())):
             self.vbox.itemAt(i).widget().setParent(None)
+        self._tiers_dict.clear()
 
 
 class TierPlot(pg.PlotWidget):
-    keyPressed = QtCore.Signal(QtCore.QEvent)
-
     def __init__(self, *args, tier_name="", model=None, handle_segment, **kwargs):
         assert model is not None
         super().__init__(*args, **kwargs)
-        self.getViewBox().setBackgroundColor((0, 0, 0, 25)) # FIXME: harcoded
+        self.getViewBox().setBackgroundColor((0, 0, 0, 25))  # FIXME: harcoded
         self._tier_name = tier_name
         self._model = model
         self._handle_segment = handle_segment
-        self.keyPressed.connect(self.on_key)
         self.scene().sigMouseClicked.connect(self.mouse_clicked)
         self._start_pos = None
 
-        self.threshold = 50 # FIXME: hardcoded threshold  # Minimum size in pixels for region to be drawn
-        self.linear_regions = []
+        self.threshold = 50  # FIXME: hardcoded threshold  # Minimum size in pixels for region to be drawn
+
+        # Rendered items, keyed by the id() of the annotation they display
+        self._items = dict()
 
         # Initial rendering
         self.updateVisibleRegions()
@@ -137,60 +136,67 @@ class TierPlot(pg.PlotWidget):
         # Connect the rangeChanged signal to update visible regions
         self.getPlotItem().getViewBox().sigXRangeChanged.connect(self.updateVisibleRegions)
 
-    def updateVisibleRegions(self):
-        # Clear previous regions
-        for region in self.linear_regions:
-            self.removeItem(region)
-        self.linear_regions.clear()
+    @property
+    def annotation_items(self):
+        """The annotation items currently rendered"""
+        return list(self._items.values())
 
+    def updateVisibleRegions(self):
+        """Reconcile the rendered items with the model for the current view
+
+        Only the missing items are created and only the items which are not visible (or too small)
+        anymore are removed, so that the selected item and the items created by the user survive
+        panning and zooming.
+        """
         # Get the current visible range
-        view_range = self.getPlotItem().getViewBox().viewRange()
-        x_min, x_max = view_range[0]
+        vb = self.getPlotItem().getViewBox()
+        x_min, x_max = vb.viewRange()[0]
 
         # Check which regions are visible and meet the size threshold
-        tier = self._model.annotations[self._tier_name]
-        for an in tier:
-            start = an.start_time
-            end = an.end_time
-
-            if end >= x_min and start <= x_max:  # Check if within visible range
-                region_width = self.getPlotItem().vb.mapViewToScene(pg.Point(end, 0)).x() - \
-                               self.getPlotItem().vb.mapViewToScene(pg.Point(start, 0)).x()
+        visible = dict()
+        for an in self._model.annotations[self._tier_name]:
+            if an.end_time >= x_min and an.start_time <= x_max:  # Check if within visible range
+                region_width = (
+                    vb.mapViewToScene(pg.Point(an.end_time, 0)).x() - vb.mapViewToScene(pg.Point(an.start_time, 0)).x()
+                )
                 if region_width >= self.threshold:  # Check if region is above the size threshold
-                    region = AnnotationItem(an, showLabel=True)
-                    self.addItem(region)
-                    self.linear_regions.append(region)
+                    visible[id(an)] = an
+
+        # Remove the items which are not visible anymore (the selected one is kept alive)
+        for key in list(self._items.keys()):
+            if (key not in visible) and (not self._items[key].isSelected()):
+                self.removeItem(self._items.pop(key))
+
+        # Add the newly visible ones
+        for key, an in visible.items():
+            if key not in self._items:
+                region = AnnotationItem(an, showLabel=True, handle_edit=self._handle_segment)
+                self.addItem(region)
+                self._items[key] = region
 
     def keyPressEvent(self, event):
-        super(TierPlot, self).keyPressEvent(event)
-        self.keyPressed.emit(event)
-
-    def on_key(self, event):
         if event.key() == QtCore.Qt.Key_Delete:
-            print(self._tier_name)
-            handle_item = None
-            # Remove item from the view
-            for item in self.items():
-                if item.isSelected():
-                    handle_item = item
-                    self.removeItem(item)
-                    break
-
-            # Delete annotation from model
-            tier = self._model.annotations[self._tier_name]
-            for an in tier:
-                if an == handle_item._segment:
-                    tier.remove(an)
-                    break
-
+            self.deleteSelectedAnnotation()
         else:
             super().keyPressEvent(event)
 
-        # if event.key() == QtCore.Qt.Key_Enter and self.ui.continueButton.isEnabled():
-        #     self.proceed()  # this is called whenever the continue button is pressed
-        # elif event.key() == QtCore.Qt.Key_Q:
-        #     print("Killing")
-        #     self.deleteLater()  # a test I implemented to see if pressing 'Q' would close the window
+    def deleteSelectedAnnotation(self):
+        """Remove the selected annotation of this tier (if any) from the view and from the model"""
+        selected = [key for key, item in self._items.items() if item.isSelected()]
+        if not selected:
+            return
+        item = self._items.pop(selected[0])
+
+        # Clear the selection first so that the controller does not keep a reference to a deleted item
+        self._handle_segment(None)
+        self.removeItem(item)
+
+        # Delete annotation from model (by identity: two annotations can be equal)
+        tier = self._model.annotations[self._tier_name]
+        for i, an in enumerate(tier):
+            if an is item._segment:
+                del tier[i]
+                break
 
     def mouse_clicked(self, ev):
         # if (event.modifiers() & QtCore.Qt.ControlModifier) and
@@ -222,12 +228,13 @@ class TierPlot(pg.PlotWidget):
                 if self._tier_name not in self._model.annotations:
                     self._model.annotations[self._tier_name] = []
                 self._model.annotations[self._tier_name].append(annotation)
-                sorted(self._model.annotations[self._tier_name], key=lambda x: x.start_time)
+                self._model.annotations[self._tier_name].sort(key=lambda x: x.start_time)
 
                 # Now add the item
                 an_item = AnnotationItem(annotation, True, self._handle_segment)
                 self.addItem(an_item)
-                an_item.select()
+                self._items[id(annotation)] = an_item
+                an_item.requestSelection()
                 self._start_pos = None
 
 
@@ -307,8 +314,9 @@ class AnnotationItem(SegmentItem):
         ev : pg.QMouseEvent
 
         """
-        # NOTE: bypass segment to avoid issue with "remove the segment" -> go straight to "grandpa" class
-        super(type(self).__bases__[0], self).mouseClickEvent(ev)
+        # NOTE: deliberately skip SegmentItem.mouseClickEvent (its Shift+double-click "remove the segment"
+        #       only makes sense in a SelectableViewBox); naming the class explicitly keeps this correct for subclasses
+        pg.LinearRegionItem.mouseClickEvent(self, ev)
 
         # Check which key is pressed
         modifier_pressed = ev.modifiers()
@@ -328,23 +336,25 @@ class AnnotationItem(SegmentItem):
 
         elif (ev.buttons() == QtCore.Qt.LeftButton) and (not ev.double()):
             ev.accept()
-            self.select()
+            self.requestSelection()
 
-    def select(self):
+    def requestSelection(self):
+        """Ask the controller to make this item the current annotation (or to unselect it if it already is)
+
+        The controller is the only owner of the selection: it calls setSelectedState() on the
+        previous and the new current items.
+        """
         if self._handle_edit is None:
             return
+        self._handle_edit(None if self._selected else self)
 
-        # Toggle the selected flag
-        self._selected = not self._selected
-
-        # Update the brush
-        if self._selected:
-            brush = QtGui.QBrush(QtGui.QColor(255, 0, 0, 50))
-            self._handle_edit(self)
+    def setSelectedState(self, selected):
+        """Update the visual selection state (does not notify the controller)"""
+        self._selected = selected
+        if selected:
+            self.setBrush(QtGui.QBrush(QtGui.QColor(255, 0, 0, 50)))
         else:
-            brush = self._default_brush
-            self._handle_edit(None)
-        self.setBrush(brush)
+            self.setBrush(self._default_brush)
         self.update()
 
     def updateLabel(self, label):

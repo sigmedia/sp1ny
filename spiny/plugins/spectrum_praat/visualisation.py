@@ -1,51 +1,33 @@
 # PyQTGraph
-import pyqtgraph as pg
 from pyqtgraph.Qt import QtGui, QtWidgets
 
 # SpINY
-from spiny.gui.items import SelectablePlotItem
+from spiny.gui.widgets import DataWidget
 
 
-class SpectrogramPraatPlotWidget(pg.PlotWidget):
-    """Image plot widget allowing to highlight some regions
+class SpectrogramPraatPlotWidget(DataWidget):
+    """Plot widget rendering the spectrogram computed by Praat (parselmouth)
 
     Attributes
     ----------
-    _data : np.array
-        matrix containing the data rendered
-
-    plotItem : spiny.gui.items.SelectablePlotItem
-        The plot item contained in the widget
-
-    hist : pg.HistogramLUTWidget
-        The histogram widget to control the image colorimetrie
+    _spectrum_extractor : SpectrumPraatExtractor
+        The extractor providing the spectrum (frames x frequency bins), the frameshift (in seconds)
+        and the frequency range
     """
 
     def __init__(self, spectrum_extractor, parent=None, **kwargs):
         """
         Parameters
         ----------
-        data: np.array
-            matrix containing the data to render
+        spectrum_extractor: SpectrumPraatExtractor
+            The extractor providing the data to render
 
-        frameshift: float
-            frameshift in senconds
-
-        ticks: TODO
-            color map ticks
-
-        parent: pg.GraphicsObject
-            the parent object
-
-        background: str
-            the background of the plot
-
-        kwargs: kwargs
-            arguments passed to pg.PlotWidget
-
+        parent: QWidget
+            the parent widget
         """
+        super().__init__(parent)
         color = QtWidgets.QApplication.instance().palette().color(QtGui.QPalette.Base)
-        pg.GraphicsView.__init__(self, parent, background=color)
+        self.setBackground(color)
         self.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
         self.enableMouse(False)
 
@@ -55,32 +37,36 @@ class SpectrogramPraatPlotWidget(pg.PlotWidget):
         self._ticks = None
 
     def refresh(self):
-        self._img = pg.ImageItem()
-        self._img.setImage(self._spectrum_extractor._spectrum.T)
+        spectrum = self._spectrum_extractor._spectrum
 
         # 1. translate to the minimal frequency
         tr = QtGui.QTransform()
         min_y = self._spectrum_extractor._cutoff[0]
         tr.translate(0, min_y)
 
-        # 2. scale
+        # 2. scale (the Praat frameshift is already in seconds)
         y_scale = self._spectrum_extractor._cutoff[1] - self._spectrum_extractor._cutoff[0]
-        y_scale /= self._spectrum_extractor._spectrum.shape[1]
+        y_scale /= spectrum.shape[1]
         tr.scale(self._spectrum_extractor._frameshift, y_scale)
 
-        self._img.setTransform(tr)
+        # Update the image item
+        self._imageItem.setImage(spectrum)
+        self._imageItem.setTransform(tr)
 
-        # Generate plot
-        self.plotItem = SelectablePlotItem()
-        self.plotItem.getViewBox().addItem(self._img)
-        self.setCentralItem(self.plotItem)
+        # Set the limits to focus the rendering
+        self._plotItem.setLimits(
+            minYRange=0,
+            maxYRange=min_y + spectrum.shape[1] * y_scale,
+            yMin=0,
+            yMax=min_y + spectrum.shape[1] * y_scale,
+            xMin=0,
+            xMax=self._spectrum_extractor._frameshift * spectrum.shape[0],
+        )
 
+        # Update the ticks and the histogram
         if self._ticks is not None:
             self.setTicks(self._ticks)
 
     def setTicks(self, ticks):
         self._ticks = ticks
-        # Define and assign histogram
-        self.hist = pg.HistogramLUTWidget()
-        self.hist.setImageItem(self._img)
-        self.hist.gradient.restoreState({"mode": "rgb", "ticks": ticks})
+        self._histItem.gradient.restoreState({"mode": "rgb", "ticks": ticks})

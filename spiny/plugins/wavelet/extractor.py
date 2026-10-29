@@ -1,3 +1,5 @@
+import logging
+
 import numpy as np
 
 # Wavelet part
@@ -22,91 +24,80 @@ class WaveletExtractor:
     def __init__(
         self,
     ):
+        self.logger = logging.getLogger(self.__class__.__name__)
         self._wavelet = np.zeros((10, 10))
         self._frameshift = 1 / 200.0
 
         self._num_scales = 34
         self._scale_distance = 0.25
 
+        # Parameters controlled by the GUI (defaults reproduce the previous hard-coded behaviour)
+        self._min_f0 = 50.0
+        self._max_f0 = 400.0
+        self._harmonics = 50.0
+        self._voicing = 80.0
+        self._weight_f0 = 1.0
+        self._weight_energy = 1.0
+        self._combination = "sum"  # "sum" or "product"
+
     def extract(self):
         self.energy = energy_processing.extract_energy(
-            player._wav[:, 0],
-            player._sampling_rate,
+            player.signal[:, 0],
+            player.sampling_rate,
             200,  # self.configuration["energy"]["band_min"],
             5000,  # self.configuration["energy"]["band_max"],
             "rms",  # self.configuration["energy"]["calculation_method"],
         )
+        self.energy_smooth = smooth_and_interp.peak_smooth(self.energy, 30, 3)  # FIXME: 30? 3?
 
-        if True:  # self.configuration["energy"]["smooth_energy"]:
-            self.energy_smooth = smooth_and_interp.peak_smooth(self.energy, 30, 3)  # FIXME: 30? 3?
-        else:
-            self.energy_smooth = self.energy
-
-        min_f0 = 50.0  # float(str(self.min_f0.text()))
-        max_f0 = 400.0  # float(str(self.max_f0.text()))
-        max_f0 = np.max([max_f0, 10.0])
-        min_f0 = np.min([max_f0 - 1.0, min_f0])
+        max_f0 = max(self._max_f0, 10.0)
+        min_f0 = min(max_f0 - 1.0, self._min_f0)
 
         raw_pitch = f0_processing.extract_f0(
-            player._wav[:, 0],
-            player._sampling_rate,
+            player.signal[:, 0],
+            player.sampling_rate,
             min_f0,
             max_f0,
-            50.0,  # float(self.harmonics.value()),
-            80.0,  # float(self.voicing.value()),
+            self._harmonics,
+            self._voicing,
             "inst_freq",  # self.configuration["f0"]["pitch_tracker"],
         )
 
-        # FIXME: fix errors, smooth and interpolate
         try:
             self.pitch = f0_processing.process(raw_pitch)
         except Exception as ex:
-            raise ex
-            # f0_processing.process crashes if raw_pitch is all zeros, kludge
+            # f0_processing.process crashes if raw_pitch is all zeros (e.g. no voiced frame)
+            self.logger.warning("F0 post-processing failed (%s), using the raw F0", ex)
             self.pitch = raw_pitch
 
-        nb_frames = np.min([self.pitch.shape[0], self.energy.shape[0]])
-        if False:  # self.mul_feats.isChecked():
-            duration = np.ones(nb_frames)
-
-            if float(1.0) > 0 and np.std(self.pitch) > 0:
-                pitch = misc.normalize_minmax(self.pitch[:nb_frames]) + float(1.0)
-            if float(1.0) > 0 and np.std(self.energy_smooth) > 0:
-                energy = misc.normalize_minmax(self.energy_smooth[:nb_frames]) + float(1.0)
-            # if float(self.wDuration.text()) > 0 and np.std(self.rate)>0:
-            #     duration = misc.normalize_minmax(self.rate) + float(self.wDuration.text())
-            duration *= 0
-
-            params = pitch * energy * duration
+        nb_frames = min(self.pitch.shape[0], self.energy.shape[0])
+        pitch = self.pitch[:nb_frames]
+        energy = self.energy_smooth[:nb_frames]
+        if self._combination == "product":
+            # Each feature contributes (normalised + weight); a null weight (or a flat signal) contributes 1
+            params = np.ones(nb_frames)
+            if self._weight_f0 > 0 and np.std(pitch) > 0:
+                params *= misc.normalize_minmax(pitch) + self._weight_f0
+            if self._weight_energy > 0 and np.std(energy) > 0:
+                params *= misc.normalize_minmax(energy) + self._weight_energy
         else:
-
-            params = misc.normalize_std(self.pitch[:nb_frames]) * float(1.0) + misc.normalize_std(
-                self.energy_smooth[:nb_frames]
-            ) * float(
-                1.0
-            )  # + \
-            # misc.normalize_std(self.rate) * float(self.wDuration.text())
+            params = misc.normalize_std(pitch) * self._weight_f0 + misc.normalize_std(energy) * self._weight_energy
 
         # if self.configuration["feature_combination"]["detrend"]:
-        if True:
-            params = smooth_and_interp.remove_bias(params, 800)  # FIXME: 800?
-
+        params = smooth_and_interp.remove_bias(params, 800)  # FIXME: 800?
         params = misc.normalize_std(params)
 
-        (self.cwt, self.scales, self.freqs) = cwt_utils.cwt_analysis(
+        self.cwt, self.scales, self.freqs = cwt_utils.cwt_analysis(
             params,
             mother_name="mexican_hat",  # self.configuration["wavelet"]["mother_wavelet"],
             period=3,  # self.configuration["wavelet"]["period"],
             first_freq=32,
-            num_scales=34,  # self.configuration["wavelet"]["num_scales"],
-            scale_distance=0.25,  # self.configuration["wavelet"]["scale_distance"],
+            num_scales=self._num_scales,
+            scale_distance=self._scale_distance,
             apply_coi=False,
         )
 
-        if False:  # self.configuration["wavelet"]["magnitude"]:
-            # self.cwt = np.log(np.abs(self.cwt)+1.)
-            self._wavelet = np.abs(self.cwt).T
-        else:
-            self._wavelet = np.real(self.cwt).T
+        # NOTE: magnitude rendering (np.abs) is not exposed yet
+        self._wavelet = np.real(self.cwt).T
 
         return self._wavelet

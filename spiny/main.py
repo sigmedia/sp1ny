@@ -8,12 +8,12 @@ AUTHOR
 DESCRIPTION
 
 LICENSE
-    This script is in the public domain, free from copyrights or restrictions.
+    MIT License, see the LICENSE file at the root of the repository
     Created: 17 January 2023
 """
 
 # System/default
-import sys
+import os
 
 # Arguments
 import argparse
@@ -22,21 +22,13 @@ import argparse
 import logging
 from logging.config import dictConfig
 
-# PyQtGraph & create application
+# PyQtGraph
 from pyqtgraph.Qt import QtWidgets
 
-if not QtWidgets.QApplication.instance():
-    APP = QtWidgets.QApplication(["SpINY"])
-else:
-    APP = QtWidgets.QApplication.instance()
-
-try:
-    from spiny.annotations import load_annotations
-    from spiny.ui import build_gui
-    from spiny.core import player
-except Exception as ex:
-    raise ex
-
+# SpINY
+from spiny.annotations import load_annotations
+from spiny.ui import build_gui
+from spiny.core import player
 
 ###############################################################################
 # global constants
@@ -71,7 +63,8 @@ def configure_logger(args) -> logging.Logger:
     # Define the default logger configuration
     logging_config = dict(
         version=1,
-        disable_existing_logger=True,
+        # NOTE: keep the loggers created at import time (e.g. the player's), otherwise their messages are lost
+        disable_existing_loggers=False,
         formatters={
             "f": {
                 "format": "[%(asctime)s] [%(levelname)s] — [%(name)s — %(funcName)s:%(lineno)d] %(message)s",
@@ -113,10 +106,11 @@ def define_argument_parser() -> argparse.ArgumentParser:
     --------
     The argument parser: argparse.ArgumentParser
     """
-    parser = argparse.ArgumentParser(description="")
+    parser = argparse.ArgumentParser(description="Sp1NY - Speech vIsualisation and aNnotation in pYthon")
 
     # Add Logging dedicated options
-    parser.add_argument("-l", "--log_file", default=None, help="Logger file")
+    # NOTE: the underscore spellings are kept for backward compatibility
+    parser.add_argument("-l", "--log-file", "--log_file", dest="log_file", default=None, help="Logger file")
     parser.add_argument(
         "-v",
         "--verbosity",
@@ -131,9 +125,15 @@ def define_argument_parser() -> argparse.ArgumentParser:
         "--annotation-file",
         default="",
         type=str,
-        help="The annotation file (HTK label or TextGrid)",
+        help="The annotation file (HTK label, TextGrid or JSON)",
     )
-    parser.add_argument("-c", "--coefficient-file", default="", type=str, help="The coefficient file")
+    parser.add_argument(
+        "-c",
+        "--coefficient-file",
+        default="",
+        type=str,
+        help="The coefficient file (headerless binary float32, requires --dimension)",
+    )
     parser.add_argument(
         "-d",
         "--dimension",
@@ -142,7 +142,10 @@ def define_argument_parser() -> argparse.ArgumentParser:
         help="The dimension of the coefficient vector (negative shape is assumed to be (-1, d), positive (d, -1))",
     )
     parser.add_argument("-f", "--frameshift", default=5, type=float, help="The frameshift in milliseconds")
-    parser.add_argument("-w", "--wav_file", default="", required=True, type=str, help="The wave file")
+    parser.add_argument("--dark", action="store_true", help="Use the dark theme")
+    parser.add_argument(
+        "-w", "--wav-file", "--wav_file", dest="wav_file", required=True, type=str, help="The wave file"
+    )
 
     # Return parser
     return parser
@@ -152,14 +155,19 @@ def main():
     # Initialization
     arg_parser = define_argument_parser()
     args = arg_parser.parse_args()
+    for option, filename in [
+        ("--wav-file", args.wav_file),
+        ("--annotation-file", args.annotation_file),
+        ("--coefficient-file", args.coefficient_file),
+    ]:
+        if filename and not os.path.isfile(filename):
+            arg_parser.error(f'{option}: "{filename}" does not exist or is not a file')
+    if args.coefficient_file and args.dimension == 0:
+        arg_parser.error("--dimension (-d) is required (and cannot be 0) when a coefficient file is given")
     logger = configure_logger(args)
 
-    if (args.annotation_file == "") and (args.wav_file == "") and (args.coefficient_file == ""):
-        logger.error(
-            "You need to give an annotation file (-a, --annotation-file), "
-            + "a coefficient file (-c, --coefficient-file) and/or a wav file (-w, --wav-file)"
-        )
-        sys.exit(-1)
+    # Create the application before any widget (controllers and plugins are created lazily)
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication(["SpINY"])
 
     # Load waves
     logger.info("Loading wav")
@@ -178,7 +186,7 @@ def main():
 
     # Generate window
     logger.info("Rendering")
-    build_gui(APP, args.frameshift)
+    build_gui(app, args.frameshift, args.dark)
 
 
 ###############################################################################

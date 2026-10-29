@@ -12,14 +12,26 @@ class SpectrumController(DataController):
         self._wav_plot = wav_plot
 
     def extract(self):
-        self._extractor._cutoff = (int(self._wMinFreq.text()), int(self._wMaxFreq.text()))
-        self._extractor._threshold_amp = (int(self._wMinAmp.text()), int(self._wMaxAmp.text()))
-        self._extractor._frameshift = int(self._wFrameshift.text())
-        self._extractor._framelength = int(self._wFramelength.text())
-        self._extractor._fft_length = int(self._wFFTLength.text())
-        self._extractor._window = self._wWindow.text()
-        self._extractor.extract()
+        self._extractor._cutoff = (self._wMinFreq.value(), self._wMaxFreq.value())
+        self._extractor._threshold_amp = (self._wMinAmp.value(), self._wMaxAmp.value())
+        self._extractor._frameshift = self._wFrameshift.value()
+        self._extractor._framelength = self._wFramelength.value()
+        self._extractor._fft_length = self._wFFTLength.value()
+        self._extractor._window = self._wWindow.currentText()
+        try:
+            self._extractor.extract()
+        except ValueError as ex:  # Inconsistent parameters (or unknown window)
+            QtWidgets.QMessageBox.warning(None, "Spectrogram configuration", str(ex))
+            return
         self.refresh()
+
+    @staticmethod
+    def _spinBox(minimum, maximum, value, suffix=""):
+        box = QtWidgets.QSpinBox()
+        box.setRange(minimum, maximum)
+        box.setValue(value)
+        box.setSuffix(suffix)
+        return box
 
     def setControlPanel(self, panel):
 
@@ -28,9 +40,9 @@ class SpectrumController(DataController):
         refresh_box_layout.setAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
 
         l1 = QtWidgets.QLabel("Min Freq.")
-        self._wMinFreq = QtWidgets.QLineEdit("0")
+        self._wMinFreq = self._spinBox(0, 96000, 0, " Hz")
         l2 = QtWidgets.QLabel("Max Freq.")
-        self._wMaxFreq = QtWidgets.QLineEdit("5000")
+        self._wMaxFreq = self._spinBox(1, 96000, 5000, " Hz")
         refresh_box_layout.addWidget(l1, 0, 0)
         refresh_box_layout.addWidget(l2, 1, 0)
         refresh_box_layout.addWidget(self._wMinFreq, 0, 1)
@@ -38,9 +50,9 @@ class SpectrumController(DataController):
 
         # Amplitude widgets
         l1 = QtWidgets.QLabel("Min Amp.")
-        self._wMinAmp = QtWidgets.QLineEdit("-70")
+        self._wMinAmp = self._spinBox(-200, 0, -70, " dB")
         l2 = QtWidgets.QLabel("Max Amp.")
-        self._wMaxAmp = QtWidgets.QLineEdit("0")
+        self._wMaxAmp = self._spinBox(-200, 0, 0, " dB")
         refresh_box_layout.addWidget(l1, 2, 0)
         refresh_box_layout.addWidget(l2, 3, 0)
         refresh_box_layout.addWidget(self._wMinAmp, 2, 1)
@@ -53,22 +65,24 @@ class SpectrumController(DataController):
         extract_box_layout = QtWidgets.QGridLayout()
         extract_box_layout.setAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
         l1 = QtWidgets.QLabel("FFT Length")
-        self._wFFTLength = QtWidgets.QLineEdit("2048")
+        self._wFFTLength = self._spinBox(16, 65536, 2048)
         extract_box_layout.addWidget(l1, 4, 0)
         extract_box_layout.addWidget(self._wFFTLength, 4, 1)
 
         l1 = QtWidgets.QLabel("Frame shift (ms)")
-        self._wFrameshift = QtWidgets.QLineEdit("5")
+        self._wFrameshift = self._spinBox(1, 1000, 5)
         extract_box_layout.addWidget(l1, 5, 0)
         extract_box_layout.addWidget(self._wFrameshift, 5, 1)
 
         l1 = QtWidgets.QLabel("Frame length (ms)")
-        self._wFramelength = QtWidgets.QLineEdit("30")
+        self._wFramelength = self._spinBox(1, 1000, 30)
         extract_box_layout.addWidget(l1, 6, 0)
         extract_box_layout.addWidget(self._wFramelength, 6, 1)
 
         l1 = QtWidgets.QLabel("Window")
-        self._wWindow = QtWidgets.QLineEdit("hamming")
+        self._wWindow = QtWidgets.QComboBox()
+        self._wWindow.setEditable(True)  # any scipy.signal.get_window name is accepted
+        self._wWindow.addItems(["hamming", "hann", "blackman", "blackmanharris", "boxcar"])
         extract_box_layout.addWidget(l1, 7, 0)
         extract_box_layout.addWidget(self._wWindow, 7, 1)
 

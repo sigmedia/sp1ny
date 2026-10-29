@@ -2,8 +2,21 @@ from pyqtgraph.dockarea import Dock
 
 
 class DataController:
+    """Base class of the data plugin controllers
+
+    Subclasses must define _name (the plugin name), _extractor, _widget and set _wav_plot through setWavPlot
+    """
+
     def __init__(self):
         pass
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    @property
+    def widget(self):
+        return self._widget
 
     def extract(self):
         self._extractor.extract()
@@ -56,3 +69,16 @@ class DataDock(Dock):
 
 
 plugin_entry_dict = dict()
+
+
+def register_plugin(controller: DataController) -> None:
+    """Register a data plugin controller under its name
+
+    Raises
+    ------
+    ValueError
+        if a plugin with the same name is already registered
+    """
+    if controller.name in plugin_entry_dict:
+        raise ValueError(f'A plugin named "{controller.name}" is already registered')
+    plugin_entry_dict[controller.name] = controller

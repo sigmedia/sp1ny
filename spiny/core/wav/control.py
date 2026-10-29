@@ -5,7 +5,7 @@ from platform import system
 import sounddevice as sd
 
 # SpINY
-from pyqtgraph.Qt import QtCore, QtWidgets
+from pyqtgraph.Qt import QtCore, QtWidgets, isQObjectAlive
 from .player import player
 
 
@@ -42,10 +42,10 @@ class PlayerControllerWidget(QtWidgets.QWidget):
         self._bLoop.setDefault(False)
         self._bLoop.setAutoDefault(False)
 
-        # Get devices information
+        # Get devices information (the default output index is -1 when there is no output device)
         devices = sd.query_devices()
         self._devices = dict()
-        default_device_index = sd.query_hostapis()[0].get("default_" + "output".lower() + "_device")
+        default_device_index = sd.default.device[1]
         default_device = None
         for index, device in enumerate(devices):
             if device["max_output_channels"] <= 0:  # NOTE: only consider output devices!
@@ -60,7 +60,14 @@ class PlayerControllerWidget(QtWidgets.QWidget):
         # Generation Device ComboBox
         self._boxDevices = QtWidgets.QComboBox()
         self._boxDevices.addItems(self._devices.keys())
-        self._boxDevices.setCurrentText(default_device)
+        if default_device is not None:
+            self._boxDevices.setCurrentText(default_device)
+
+        # Without any output device, playback controls are useless
+        if not self._devices:
+            self._boxDevices.addItem("No output device")
+            for button in (self._bPlay, self._bPause, self._bStop, self._bLoop, self._boxDevices):
+                button.setEnabled(False)
         self._boxDevices.currentTextChanged.connect(self.device_changed)
 
         # Define volume slider
@@ -87,41 +94,52 @@ class PlayerControllerWidget(QtWidgets.QWidget):
         player_layout.addWidget(self._lVolume)
         self.setLayout(player_layout)
 
-        # player.add_position_handler(self.update_position)
-
-    def update_position(self, position):
-        print(f"{float(position) / player._sampling_rate}", end="\r")
-
     def play(self):
         # Play subpart
-        player.play()
+        try:
+            player.play()
+        except sd.PortAudioError as ex:
+            QtWidgets.QMessageBox.warning(self, "Playback error", f"The audio device cannot play this signal:\n{ex}")
 
     def pause(self):
         # Play subpart
         player.pauseResume()
-        if player._is_paused:
+        if player.is_paused:
             self._bPause.setFlat(True)
         else:
             self._bPause.setFlat(False)
 
     def stop(self):
-        player._is_paused = False
         self._bPause.setFlat(False)
         player.stop()
 
     def loop(self):
         player.toggleLoop()
-        if player._loop_activated:
+        if player.loop_activated:
             self._bLoop.setStyleSheet("background-color: #B3EDB1;")
         else:
             self._bLoop.setStyleSheet("background-color: #EAA799;")
 
     def device_changed(self, name):
         index = self._devices[name]
-        player._device = index
+        try:
+            player.setDevice(index)
+        except sd.PortAudioError as ex:
+            QtWidgets.QMessageBox.warning(self, "Output device", f'The device "{name}" cannot be used:\n{ex}')
+            self._boxDevices.blockSignals(True)
+            self._boxDevices.setCurrentText(self._deviceName(player.device))
+            self._boxDevices.blockSignals(False)
+
+    def _deviceName(self, index):
+        if index is None:
+            index = sd.default.device[1]
+        for name, cur_index in self._devices.items():
+            if cur_index == index:
+                return name
+        return ""
 
     def volume_changed(self):
-        player._player_volume = self._sVolume.value() / 100
+        player.volume = self._sVolume.value() / 100
         self._lVolume.setText(f"{self._sVolume.value()}%")
 
 
@@ -141,7 +159,9 @@ class ControlLayout(QtWidgets.QVBoxLayout):
 
         # Generate the necessary widgets
         self._file_box = self._generate_file_box()
-        self._eq_widget = EqWidget(None, (9, 1))  # FIXME: place holder but not work
+        self._eq_widget = EqWidget(None, (9, 1))  # FIXME: place holder, the equalizer is not implemented
+        self._eq_widget.setEnabled(False)
+        self._eq_widget.setToolTip("The equalizer is not implemented yet")
 
         # Add the widgets
         box_layout.addWidget(self._file_box)
@@ -168,13 +188,14 @@ class ControlLayout(QtWidgets.QVBoxLayout):
         file_box_layout.addWidget(self._wCurrentFile, 1, 1)
 
         self._bLoadFile = QtWidgets.QPushButton("Load File")
-        # self._bLoadFile.clicked.connect(self._load_annotation_file)
+        self._bLoadFile.setEnabled(False)  # Enabled once a load handler is set (see setLoadHandler)
         self._bLoadFile.setDefault(False)
         self._bLoadFile.setAutoDefault(False)
         file_box_layout.addWidget(self._bLoadFile)
 
         self._bSaveFile = QtWidgets.QPushButton("Save File")
-        # self._bSaveFile.clicked.connect(self._save_annotation_file)
+        self._bSaveFile.setEnabled(False)  # TODO: nothing modifies the signal yet, so there is nothing to save
+        self._bSaveFile.setToolTip("Saving audio is not implemented yet")
         self._bSaveFile.setDefault(False)
         self._bSaveFile.setAutoDefault(False)
         file_box_layout.addWidget(self._bSaveFile)
@@ -183,6 +204,14 @@ class ControlLayout(QtWidgets.QVBoxLayout):
         file_box.setLayout(file_box_layout)
 
         return file_box
+
+    def setLoadHandler(self, handler):
+        """Define the function called by the "Load File" button"""
+        self._bLoadFile.clicked.connect(handler)
+        self._bLoadFile.setEnabled(True)
+
+    def setCurrentFile(self, filename):
+        self._wCurrentFile.setText(filename)
 
 
 class EqWidget(QtWidgets.QGroupBox):
@@ -251,4 +280,16 @@ class EqSlider(QtWidgets.QWidget):
             self._label.setText(f"< {upper_freq}")
 
 
-controller = ControlLayout(None)
+_controller = None
+
+
+def get_controller() -> ControlLayout:
+    """Return the audio control layout, creating it on first use (a QApplication must exist)
+
+    The layout is also re-created if its Qt object has been deleted (e.g. when the window owning it was closed).
+    """
+    global _controller
+    # NOTE: the layout wrapper can outlive the widgets it manages, so check one of them too
+    if (_controller is None) or (not isQObjectAlive(_controller)) or (not isQObjectAlive(_controller._file_box)):
+        _controller = ControlLayout(None)
+    return _controller
