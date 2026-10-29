@@ -112,7 +112,7 @@ measured effect.
 | Document                    | Algorithm                                                                                   | Commits          |
 |-----------------------------+---------------------------------------------------------------------------------------------+------------------|
 | [[file:waveform.org]]        | min/max pyramid of the signal, one vertical segment per pixel column                         | 2039dda          |
-| [[file:spectrogram.org]]     | block-wise, multi-threaded STFT in one pass (float16 buffer), 8-bit quantization            | 5481f81, f3f9bc0 |
+| [[file:spectrogram.org]]     | block-wise, multi-threaded STFT in one pass, 8-bit storage, live update from the panel       | 5481f81, f3f9bc0 |
 | [[file:image-rendering.org]] | visible-slice rendering of the data images, update hysteresis, release of hidden plugins     | d367a61, 197bc4c |
 | [[file:praat.org]]           | Praat analysis by chunks with margins, two passes, 8-bit quantization                       | 570e7d5, 3aab772 |
 | [[file:playback.org]]        | soundfile loading, linear resampling block by block in the audio callback                   | 386e8f2          |

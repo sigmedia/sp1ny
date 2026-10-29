@@ -14,7 +14,7 @@ dB = librosa.amplitude_to_db(S)                                            # sev
 dB = dB.T[:, first_bin:last_bin], clipped to [L, H]
 #+end_example
 
-With the default settings (FFT of 2 × 2048 points, 5 ms hop) a 10-minute recording at 16 kHz has
+With the old default settings (FFT of 2 × 2048 points, 5 ms hop) a 10-minute recording at 16 kHz had
 120 001 frames of 2 049 bins: the complex STFT alone is about 2 GB, followed by several float32 copies
 of about 1 GB each (magnitude, normalization, power, decibels). The process went over 4 GB and was
 killed. Most of that memory held bins that were cropped away at the end (above 5 kHz), or values that
@@ -41,6 +41,12 @@ which are copied into a zero-padded segment (the padding is only materialized at
 signal). The frames are a strided view of that segment (=np.lib.stride_tricks.sliding_window_view=,
 no copy), multiplied by the window and transformed by a real FFT along each row.
 
+** FFT length
+
+The FFT length is chosen automatically: the frames are zero-padded to at least 4096 samples (more for
+very long windows). Zero-padding adds no information but gives a smooth frequency axis, even for a
+short (wideband) window. Only the bins up to the maximum frequency of the analysis are kept.
+
 ** Windows
 
 The window of w samples (the frame length) is *periodic*, as =scipy.signal.get_window= and librosa
@@ -51,18 +57,16 @@ numpy.
 ** Decibels and quantization
 
 librosa normalizes by the global maximum M of the magnitude (over all frames and all bins) and
-floors the result 80 dB below it. The displayed value of a cell is then clipped to the chosen range
-[L, H] (−70 dB to 0 dB by default) and quantized on 8 bits:
+floors the result 80 dB below it. The spectrogram stores this whole 80 dB range on 8 bits:
 
 #+begin_example
-d    = max(20 × log10(max(|X| / M, 1e-5)), −80)     # dB relative to the maximum
-d    = clip(d, L, H)
-code = round((d − L) × 255 / (H − L))                # 0 ... 255, stored as uint8
+d    = max(20 × log10(max(|X| / M, 1e-5)), −80)     # dB relative to the maximum, in [−80, 0]
+code = round((d + 80) × 255 / 80)                    # 0 ... 255, stored as uint8
 #+end_example
 
-The 256 codes cover the displayed range: 0.27 dB per code for 70 dB, finer than any colormap can
-show. The image is displayed with the fixed levels (0, 255), so the colormap maps code 0 to L dB and
-code 255 to H dB.
+That is 0.31 dB per code, finer than any colormap can show. Since nothing below −80 dB is kept
+anyway, the displayed range (say −70 to 0 dB) is not part of the analysis: it only chooses which
+codes are mapped to the ends of the colormap (see [[*Live update of the spectrogram]]).
 
 ** One pass with a float16 buffer
 
@@ -101,6 +105,40 @@ For F frames and K kept bins:
 
 For 10 minutes with the default settings (F = 120 001, K = 1 280): about 460 MB during the
 extraction, 154 MB afterwards, instead of more than 4 GB.
+
+* Live update of the spectrogram
+
+The spectrogram panel has no "Extract" button: the spectrogram follows the sliders.
+
+** Display settings: instant
+
+The frequency range, the maximum level and the dynamic range do not need a new analysis:
+
+- the levels [max − range, max] dB are converted to codes and given to the image item as its levels
+  (=DataWidget.setLevels=): only the colormap mapping changes;
+- the frequency range is the visible part of the y axis (=DataWidget.setYView=).
+
+Both take a few milliseconds, with the visible-slice rendering ([[file:image-rendering.org]]). Only a
+maximum frequency above the analysed ones starts a new analysis (to compute the missing bins).
+
+** Analysis settings: in the background
+
+The window, the window length and the time step need a new analysis. To keep the interface responsive:
+
+1. *Debounce*: every change restarts a 300 ms timer, so dragging a slider starts one analysis, after
+   the user stops moving it, not one per pixel of movement.
+2. *Background thread*: the analysis (=compute_spectrogram=, which only reads its arguments) runs in
+   a single worker thread; the current spectrogram stays visible meanwhile, with an "Updating…"
+   message under the panel.
+3. *Back to the GUI thread*: when the analysis ends, the worker emits a Qt signal of an object living
+   in the GUI thread; Qt queues it, so the result is always stored and drawn by the GUI thread.
+4. *Only the latest result*: each analysis has a generation number. A result whose generation is not
+   the latest one is dropped (the settings changed again, a new signal was loaded, or another plugin
+   was selected). A request made while an analysis is running waits for it, and only the latest
+   request is kept.
+
+On the 10-minute recording, a new analysis takes about 3 s in the background, during which the
+interface never stops responding for more than about 10 ms; a display change is drawn in about 80 ms.
 
 * Validation
 
