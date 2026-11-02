@@ -60,6 +60,11 @@ spiny -w examples/arctic_as.wav -c examples/arctic_as.neur -d -50 -f 6.4
 
 A click on a plot moves the playhead. Changing the speed also changes the pitch, as on a tape.
 
+## Equalizer
+
+The *Audio* tab has a parametric equalizer with five bands. Drag a handle on the curve to change the frequency and the
+gain of its band, or use the sliders for the selected band, which also set its Q. Every change is heard at once.
+
 ## Configuration
 
 The theme and the shortcuts are set in a YAML file: `spiny/config.yaml` in your configuration directory

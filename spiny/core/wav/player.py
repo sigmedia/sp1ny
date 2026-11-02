@@ -29,6 +29,8 @@ import numpy as np
 import sounddevice as sd
 import soundfile as sf
 
+from .equalizer import Equalizer
+
 
 ###############################################################################
 # Functions
@@ -97,6 +99,7 @@ class Player(metaclass=Singleton):
         self._position = 0.0  # In samples of the signal, fractional as soon as the signal is resampled
         self._speed = 1.0
         self._muted = False
+        self._equalizer = Equalizer()
         self._cursor = 0.0  # In seconds: where the playback starts, and where stop goes back to
         self._thread: threading.Thread | None = None
         self._wav = np.zeros((0, 1), dtype=np.float32)
@@ -150,6 +153,7 @@ class Player(metaclass=Singleton):
         self._filename = filename
         self._sampling_rate = sampling_rate
         self.setWavData(signal)
+        self._equalizer.prepare(sampling_rate, self._wav.shape[1])
 
     def setDevice(self, device: int | None) -> None:
         """Select the output device, checking that the current signal can be played on it
@@ -227,6 +231,7 @@ class Player(metaclass=Singleton):
             # Get a rate compatible with the device (may raise sd.PortAudioError)
             self._play_rate = self._playbackRate(self._device)
             ratio = self.sampling_rate / self._play_rate  # Source samples per played sample
+            self._equalizer.prepare(self._play_rate, self._wav.shape[1])
 
             # Boundaries in samples of the signal
             nb_samples = self._wav.shape[0]
@@ -330,6 +335,11 @@ class Player(metaclass=Singleton):
     @volume.setter
     def volume(self, value: float) -> None:
         self._player_volume = min(max(value, 0.0), 1.0)
+
+    @property
+    def equalizer(self) -> Equalizer:
+        """Equalizer: The equalizer of the playback: changing its bands is heard at once"""
+        return self._equalizer
 
     @property
     def speed(self) -> float:
@@ -441,11 +451,14 @@ class Player(metaclass=Singleton):
             # Keep playing audio normally
             else:
                 self._fillBlock(outdata, source, self._position, step, chunksize)
+                outdata[chunksize:] = 0
+                self._equalizer.process(outdata)
                 gain = 0.0 if self._muted else self._player_volume
                 if gain != 1.0:
-                    outdata[:chunksize] *= gain
+                    outdata *= gain
+                if self._equalizer.active:
+                    np.clip(outdata, -1.0, 1.0, out=outdata)  # NOTE: a boost can go over full scale
                 if chunksize < frames:
-                    outdata[chunksize:] = 0
                     if not self._loop_activated:
                         raise sd.CallbackStop()
                     self._position = start

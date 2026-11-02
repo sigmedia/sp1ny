@@ -1,8 +1,12 @@
 # Python
 from __future__ import annotations
 
+import dataclasses
 from collections.abc import Callable
 from typing import Any
+
+import numpy as np
+import pyqtgraph as pg
 
 # Python SoundDevice
 import sounddevice as sd
@@ -11,6 +15,7 @@ import sounddevice as sd
 from pyqtgraph.Qt import QtCore, QtGui, QtWidgets, isQObjectAlive
 
 from spiny.gui import theme
+from spiny.gui.helpers.widgets import LabelledSlider
 from spiny.gui.icons import ToolBarButton
 
 from .player import player
@@ -364,7 +369,7 @@ class ViewWidget(QtWidgets.QWidget):
 
 
 class ControlLayout(QtWidgets.QVBoxLayout):
-    """Audio tab: current file (with the load button) and the equalizer place holder
+    """Audio tab: current file (with the load button) and the equalizer
 
     Parameters
     ----------
@@ -387,9 +392,7 @@ class ControlLayout(QtWidgets.QVBoxLayout):
 
         # Generate the necessary widgets
         self._file_box = self._generate_file_box()
-        self._eq_widget = EqWidget(None, (9, 1))  # NOTE: place holder, the equalizer is not implemented yet
-        self._eq_widget.setEnabled(False)
-        self._eq_widget.setToolTip("The equalizer is not implemented yet")
+        self._eq_widget = ParametricEqWidget()
 
         # Add the widgets
         box_layout.addWidget(self._file_box)
@@ -454,107 +457,251 @@ class ControlLayout(QtWidgets.QVBoxLayout):
             The file name
         """
         self._wCurrentFile.setText(filename)
+        self._eq_widget.refresh()  # The sampling rate has probably changed
 
 
-class EqWidget(QtWidgets.QGroupBox):
-    """Equalizer (place holder: the sliders are shown but not applied yet)
+class EqNode(pg.TargetItem):
+    """Handle of a band on the response curve of the equalizer, which can be dragged and clicked"""
 
-    Parameters
-    ----------
-    parent : QtWidgets.QWidget or None
-        The parent widget
-    wav : tuple(Any, Any)
-        The (signal, sampling rate) to equalize (unused for now)
-    """
+    #: Emitted when the handle is clicked
+    clicked = QtCore.Signal()
 
-    def __init__(self, parent: QtWidgets.QWidget | None, wav: tuple[Any, Any]) -> None:
-        super().__init__(title="Equalizer", parent=parent)
+    def mouseClickEvent(self, ev: Any) -> None:
+        """Report a click
 
-        self._signal = wav[0]
-        self._sampling_rate = wav[1]
-
-        slider_layout = self._define_sliders()
-        self._apply_button = QtWidgets.QPushButton("Apply")
-        overall_layout = QtWidgets.QVBoxLayout()
-        overall_layout.addLayout(slider_layout)
-        overall_layout.addWidget(self._apply_button)
-        self.setLayout(overall_layout)
-
-    def _define_sliders(self) -> QtWidgets.QHBoxLayout:
-        """Create one slider per frequency band
-
-        Returns
-        -------
-        QtWidgets.QHBoxLayout
-            The layout of the sliders
+        Parameters
+        ----------
+        ev : MouseClickEvent
+            The click event
         """
-
-        self._frequencies = [50, 200, 1000, 2000, 4000, 8000, 16000]
-
-        layout = QtWidgets.QHBoxLayout()
-
-        prev_freq = 0
-        for freq in self._frequencies:
-
-            cur_slider = EqSlider(prev_freq, freq, self)
-            layout.addWidget(cur_slider)
-            prev_freq = freq
-
-        return layout
+        ev.accept()
+        self.clicked.emit()
 
 
-class EqSlider(QtWidgets.QWidget):
-    """Vertical gain slider (-120 to 0 dB) of one equalizer band
+class ParametricEqWidget(QtWidgets.QGroupBox):
+    """Parametric equalizer: every change is heard at once, there is nothing to apply
+
+    Each band has a handle on the response curve: horizontally its frequency, vertically its gain. The sliders control
+    the selected band.
 
     Parameters
     ----------
-    lower_freq : float
-        The lower bound of the band, in Hz
-    upper_freq : float
-        The upper bound of the band, in Hz
     parent : QtWidgets.QWidget, optional
         The parent widget. (default: None)
     """
 
-    def __init__(self, lower_freq: float, upper_freq: float, parent: QtWidgets.QWidget | None = None) -> None:
-        super().__init__(parent=parent)
-        self._verticalLayout = QtWidgets.QVBoxLayout(self)
-        self._label = QtWidgets.QLabel(self)
-        self._verticalLayout.addWidget(self._label)
-        self._horizontalLayout = QtWidgets.QHBoxLayout()
-        spacerItem = QtWidgets.QSpacerItem(0, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
-        self._horizontalLayout.addItem(spacerItem)
-        self._slider = QtWidgets.QSlider(self)
-        self._slider.setOrientation(QtCore.Qt.Vertical)
-        self._horizontalLayout.addWidget(self._slider)
-        spacerItem1 = QtWidgets.QSpacerItem(0, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
-        self._horizontalLayout.addItem(spacerItem1)
-        self._verticalLayout.addLayout(self._horizontalLayout)
-        self.resize(self.sizeHint())
+    #: The names of the bands, as in spiny.core.wav.equalizer.DEFAULT_BANDS
+    BAND_NAMES = ("Low", "2", "3", "4", "High")
 
-        self._slider.setMinimum(-120)
-        self._slider.setMaximum(0)
-        self._slider.setValue(0)
-        self._slider.setTickPosition(QtWidgets.QSlider.TicksBelow)
-        self._slider.setTickInterval(10)  # one tick every 10 dB
+    MIN_FREQUENCY = 20.0
+    MAX_FREQUENCY = 20000.0
+    MAX_GAIN_DB = 18.0
 
-        self._lower_freq = lower_freq
-        self._upper_freq = upper_freq
+    #: The number of steps of the frequency slider (which is logarithmic)
+    FREQUENCY_STEPS = 400
 
-        self.setLabelValue(upper_freq)
+    def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
+        super().__init__("Parametric equalizer", parent)
+        self._selected = 2
+        self._updating = False  # True while the controls are updated from the bands: not a change from the user
 
-    def setLabelValue(self, upper_freq: float) -> None:
-        """Show the upper bound of the band (in kHz above 1 kHz)
+        self._cEnabled = QtWidgets.QCheckBox("Enabled")
+        self._cEnabled.setChecked(player.equalizer.enabled)
+        self._cEnabled.toggled.connect(self._onEnabled)
+        self._bFlat = QtWidgets.QPushButton("Flat")
+        self._bFlat.setToolTip("Set the gain of every band to 0 dB")
+        self._bFlat.setAutoDefault(False)
+        self._bFlat.clicked.connect(self._onFlat)
+        header = QtWidgets.QHBoxLayout()
+        header.addWidget(self._cEnabled)
+        header.addStretch(1)
+        header.addWidget(self._bFlat)
+
+        self._plot = pg.PlotWidget()
+        self._plot.setFixedHeight(160)
+        self._plot.setMouseEnabled(x=False, y=False)
+        self._plot.setMenuEnabled(False)
+        self._plot.hideButtons()
+        self._plot.setYRange(-self.MAX_GAIN_DB - 2, self.MAX_GAIN_DB + 2, padding=0)
+        self._plot.getAxis("left").setTicks([[(gain, str(gain)) for gain in (-18, -9, 0, 9, 18)]])
+        self._plot.getAxis("left").setWidth(30)
+        ticks = [(100, "100"), (1000, "1k"), (10000, "10k")]
+        self._plot.getAxis("bottom").setTicks([[(np.log10(f), label) for f, label in ticks]])
+        self._curve = self._plot.plot()
+        self._nodes = []
+        for index in range(len(self.BAND_NAMES)):
+            node = EqNode(symbol="o", size=12)
+            node.sigPositionChanged.connect(lambda _, index=index: self._onNodeMoved(index))
+            node.clicked.connect(lambda index=index: self._select(index))
+            self._plot.addItem(node)
+            self._nodes.append(node)
+
+        band_layout = QtWidgets.QHBoxLayout()
+        self._band_buttons = QtWidgets.QButtonGroup(self)
+        for index, name in enumerate(self.BAND_NAMES):
+            button = QtWidgets.QPushButton(name)
+            button.setCheckable(True)
+            button.setAutoDefault(False)
+            # NOTE: the default width of a button would make the panel wider than its tab
+            button.setSizePolicy(QtWidgets.QSizePolicy.Policy.Ignored, QtWidgets.QSizePolicy.Policy.Fixed)
+            self._band_buttons.addButton(button, index)
+            band_layout.addWidget(button)
+        self._band_buttons.idClicked.connect(self._select)
+        self._cBand = QtWidgets.QCheckBox("On")
+        self._cBand.setToolTip("Use the selected band")
+        self._cBand.toggled.connect(lambda checked: self._changeBand(enabled=checked))
+        band_layout.addWidget(self._cBand)
+
+        self._sFrequency = LabelledSlider(
+            0, self.FREQUENCY_STEPS, 0, lambda step: f"{self._frequencyOfStep(step):.0f} Hz", step=4
+        )
+        self._sGain = LabelledSlider(
+            round(-10 * self.MAX_GAIN_DB), round(10 * self.MAX_GAIN_DB), 0, lambda v: f"{v / 10:+.1f} dB", step=5
+        )
+        self._sQ = LabelledSlider(1, 100, 7, lambda v: f"{v / 10:.1f}")
+        self._sFrequency.valueChanged.connect(lambda step: self._changeBand(frequency=self._frequencyOfStep(step)))
+        self._sGain.valueChanged.connect(lambda value: self._changeBand(gain_db=value / 10))
+        self._sQ.valueChanged.connect(lambda value: self._changeBand(q=value / 10))
+
+        form = QtWidgets.QFormLayout()
+        form.setRowWrapPolicy(QtWidgets.QFormLayout.RowWrapPolicy.WrapAllRows)  # wider sliders
+        form.addRow("Frequency", self._sFrequency)
+        form.addRow("Gain", self._sGain)
+        form.addRow("Q", self._sQ)
+
+        layout = QtWidgets.QVBoxLayout(self)
+        layout.addLayout(header)
+        layout.addWidget(self._plot)
+        layout.addLayout(band_layout)
+        layout.addLayout(form)
+
+        self.applyTheme()
+        self.refresh()
+
+    def _frequencyOfStep(self, step: int) -> float:
+        """Convert a position of the frequency slider into a frequency
 
         Parameters
         ----------
-        upper_freq : float
-            The upper bound, in Hz
+        step : int
+            The position
+
+        Returns
+        -------
+        float
+            The frequency, in Hz
         """
-        if upper_freq >= 1000:
-            self._label.setText(f"< {int(upper_freq/1000):2d}k")
-        else:
-            self._label.setText(f"< {upper_freq}")
+        return self.MIN_FREQUENCY * (self.MAX_FREQUENCY / self.MIN_FREQUENCY) ** (step / self.FREQUENCY_STEPS)
+
+    def _stepOfFrequency(self, frequency: float) -> int:
+        """Convert a frequency into a position of the frequency slider
+
+        Parameters
+        ----------
+        frequency : float
+            The frequency, in Hz
+
+        Returns
+        -------
+        int
+            The position
+        """
+        return round(
+            self.FREQUENCY_STEPS
+            * np.log(frequency / self.MIN_FREQUENCY)
+            / np.log(self.MAX_FREQUENCY / self.MIN_FREQUENCY)
+        )
+
+    def applyTheme(self) -> None:
+        """Draw the curve and the handles with the colours of the current theme"""
+        self._curve.setPen(pg.mkPen(theme.color("accent"), width=2))
+        for index, node in enumerate(self._nodes):
+            node.setBrush(theme.color("play" if index == self._selected else "accent"))
+            node.setPen(theme.color("plot_foreground"))
+
+    def refresh(self) -> None:
+        """Show the bands in the curve, the handles and the sliders (also when the sampling rate has changed)"""
+        equalizer = player.equalizer
+        band = equalizer.bands[self._selected]
+        top = min(self.MAX_FREQUENCY, equalizer.rate / 2)
+
+        self._updating = True
+        self._plot.setXRange(np.log10(self.MIN_FREQUENCY), np.log10(top), padding=0)
+        for node, node_band in zip(self._nodes, equalizer.bands):
+            node.setPos(np.log10(node_band.frequency), node_band.gain_db)
+            node.setVisible(node_band.enabled)
+        self._band_buttons.button(self._selected).setChecked(True)
+        self._cBand.setChecked(band.enabled)
+        self._sFrequency.setValue(self._stepOfFrequency(band.frequency))
+        self._sGain.setValue(round(band.gain_db * 10))
+        self._sQ.setValue(round(band.q * 10))
+        self._updating = False
+
+        frequencies = np.geomspace(self.MIN_FREQUENCY, top, 256)
+        self._curve.setData(np.log10(frequencies), equalizer.responseDb(frequencies))
+
+    def _select(self, index: int) -> None:
+        """Make a band the one the sliders control
+
+        Parameters
+        ----------
+        index : int
+            The band
+        """
+        self._selected = index
+        self.applyTheme()
+        self.refresh()
+
+    def _changeBand(self, index: int | None = None, **changes: Any) -> None:
+        """Change a band, which is heard at once
+
+        Parameters
+        ----------
+        index : int, optional
+            The band. (default: None, i.e. the selected one)
+        changes : keyword arguments
+            The fields of the band to change
+        """
+        if self._updating:
+            return
+        bands = list(player.equalizer.bands)
+        index = self._selected if index is None else index
+        bands[index] = dataclasses.replace(bands[index], **changes)
+        player.equalizer.setBands(bands)
+        self.refresh()
+
+    def _onNodeMoved(self, index: int) -> None:
+        """Change the frequency and the gain of the band whose handle has been dragged
+
+        Parameters
+        ----------
+        index : int
+            The band
+        """
+        if self._updating:
+            return
+        position = self._nodes[index].pos()
+        frequency = min(max(10.0 ** position.x(), self.MIN_FREQUENCY), self.MAX_FREQUENCY)
+        gain = min(max(position.y(), -self.MAX_GAIN_DB), self.MAX_GAIN_DB)
+        self._selected = index
+        self.applyTheme()
+        self._changeBand(index, frequency=frequency, gain_db=round(gain, 1))
+
+    def _onEnabled(self, enabled: bool) -> None:
+        """Bypass the equalizer or not
+
+        Parameters
+        ----------
+        enabled : bool
+            False to bypass it
+        """
+        player.equalizer.setEnabled(enabled)
+        self.refresh()
+
+    def _onFlat(self) -> None:
+        """Set the gain of every band to 0 dB"""
+        player.equalizer.setBands([dataclasses.replace(band, gain_db=0.0) for band in player.equalizer.bands])
+        self.refresh()
 
 
 _controller = None

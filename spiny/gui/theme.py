@@ -135,6 +135,10 @@ _STYLE_SHEET = Template("""
     QLabel#time, QLabel#speed { color: $display_text; }
     QLabel#duration { color: $display_dim_text; }
 
+    ParametricEqWidget QPushButton:checked {
+        background: $accent; color: $accent_text; border: none; border-radius: 3px; padding: 4px;
+    }
+
     OutputWidget QSlider::groove:horizontal { height: 4px; border-radius: 2px; background: $slider_groove; }
     OutputWidget QSlider::sub-page:horizontal { border-radius: 2px; background: $accent; }
     OutputWidget QSlider::handle:horizontal {
