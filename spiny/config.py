@@ -89,7 +89,7 @@ def load_config(path: str | os.PathLike | None = None) -> str:
     configure_shortcuts(_section(config, "shortcuts"))
 
     theme_name = config.get("theme", "light")
-    if theme_name not in THEMES:
+    if not isinstance(theme_name, str) or theme_name not in THEMES:
         logger.warning('Configuration: unknown theme "%s", available themes are: %s', theme_name, ", ".join(THEMES))
         return "light"
     return theme_name

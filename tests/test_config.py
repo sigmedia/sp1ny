@@ -95,7 +95,9 @@ shortcuts:
         assert expected in caplog.text
 
 
-@pytest.mark.parametrize("text", ["{not yaml", "- a list", "theme: dark\nthemes: 3\nshortcuts: [a]"])
+@pytest.mark.parametrize(
+    "text", ["{not yaml", "- a list", "theme: dark\nthemes: 3\nshortcuts: [a]", "theme: [dark]", "theme: {a: b}"]
+)
 def test_broken_files_do_not_prevent_starting(settings, tmp_path, caplog, text):
     from spiny.config import load_config
 
