@@ -69,13 +69,14 @@ def window(qapp):
     with pytest.MonkeyPatch.context() as patch:
         for name in ("warning", "critical", "information"):
             patch.setattr(QtWidgets.QMessageBox, name, lambda *a, **k: dialogs.append(a))
+        patch.setattr(QtWidgets.QMessageBox, "question", lambda *a, **k: QtWidgets.QMessageBox.StandardButton.Discard)
         win.dialogs = dialogs
         yield win
-    sys.excepthook = previous_hook
 
-    # Destroy the window now (not at an arbitrary later garbage collection) so that the next tests
-    # get fresh controllers instead of controllers whose widgets disappear under their feet
-    win.close()
+        # Destroy the window now (not at an arbitrary later garbage collection) so that the next tests
+        # get fresh controllers instead of controllers whose widgets disappear under their feet
+        win.close()
+    sys.excepthook = previous_hook
     win.deleteLater()
     del win
     gc.collect()
@@ -447,3 +448,70 @@ def test_shortcuts_reach_the_buttons_but_not_while_typing(window):
     field.deleteLater()
     assert field.text() == "l "
     assert player.loop_activated == before and not player.is_playing
+
+
+def answer_unsaved_question(monkeypatch, button):
+    asked = []
+    monkeypatch.setattr(QtWidgets.QMessageBox, "question", lambda *a, **k: asked.append(a) or button)
+    return asked
+
+
+def test_closing_asks_about_unsaved_annotations(window, monkeypatch, tmp_path):
+    from spiny.annotations import get_controller
+    from spiny.annotations.model import Annotation, AnnotationSet
+
+    Button = QtWidgets.QMessageBox.StandardButton
+    controller = get_controller()
+    controller.setAnnotationModel(AnnotationSet({"t": [Annotation(0.1, 0.2, "a")]}, set()))
+
+    def closes():
+        event = QtGui.QCloseEvent()
+        window.closeEvent(event)
+        return event.isAccepted()
+
+    asked = answer_unsaved_question(monkeypatch, Button.Cancel)
+    assert closes() and not asked  # nothing changed: no question
+
+    for change in (
+        lambda: setattr(controller.model.annotations["t"][0], "label", "b"),
+        lambda: setattr(controller.model.annotations["t"][0], "end_time", 0.3),
+        lambda: controller.model.ignored.add("t"),
+    ):
+        controller.setAnnotationModel(AnnotationSet({"t": [Annotation(0.1, 0.2, "a")]}, set()))
+        change()
+        assert not closes()
+
+    # Save, but the file dialog is cancelled: the window stays open
+    answer_unsaved_question(monkeypatch, Button.Save)
+    monkeypatch.setattr(QtWidgets.QFileDialog, "getSaveFileName", lambda *a, **k: ("", ""))
+    assert not closes()
+
+    # Save for real: nothing to ask anymore
+    target = tmp_path / "saved.json"
+    monkeypatch.setattr(QtWidgets.QFileDialog, "getSaveFileName", lambda *a, **k: (str(target), ""))
+    assert closes() and target.exists()
+    asked = answer_unsaved_question(monkeypatch, Button.Cancel)
+    assert closes() and not asked
+
+    # Discard: closes without saving
+    controller.model.annotations["t"][0].label = "c"
+    answer_unsaved_question(monkeypatch, Button.Discard)
+    assert closes()
+    controller.setAnnotationModel(AnnotationSet({}, set()))
+
+
+def test_loading_a_file_asks_about_unsaved_annotations(window, monkeypatch, tmp_path):
+    from spiny.annotations import get_controller
+    from spiny.annotations.model import Annotation, AnnotationSet
+
+    controller = get_controller()
+    model = AnnotationSet({"t": [Annotation(0.1, 0.2, "a")]}, set())
+    controller.setAnnotationModel(model)
+    model.annotations["t"][0].label = "edited"
+    answer_unsaved_question(monkeypatch, QtWidgets.QMessageBox.StandardButton.Cancel)
+    monkeypatch.setattr(
+        QtWidgets.QFileDialog, "getOpenFileName", lambda *a, **k: pytest.fail("must not ask for a file")
+    )
+    controller._load_annotation_file()
+    assert controller.model is model
+    controller.setAnnotationModel(AnnotationSet({}, set()))

@@ -147,6 +147,19 @@ class GUIVisu(QtWidgets.QMainWindow):
         self.selectPlugin(self._plugin_list.currentText())
         self.selectColorMap(self._cmap_list.currentText())
 
+    def closeEvent(self, event: QtGui.QCloseEvent) -> None:
+        """Close the window, unless the user wants to keep working on unsaved annotations
+
+        Parameters
+        ----------
+        event : QtGui.QCloseEvent
+            The close event
+        """
+        if self._annotation_layout.confirmDiscardChanges():
+            super().closeEvent(event)
+        else:
+            event.ignore()
+
     def _addToolBar(self, title: str, widget: QtWidgets.QWidget) -> None:
         """Add a toolbar which can be moved along the top and the bottom of the window
 

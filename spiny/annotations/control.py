@@ -118,6 +118,7 @@ class ControlLayout(QtWidgets.QVBoxLayout):
 
         # View and model
         self._model: AnnotationSet = AnnotationSet({}, set())
+        self._saved_contents = self._contents()
         self._view: AnnotationDock | None = None
         self._list_registered_modules = _registered_modules
 
@@ -160,6 +161,45 @@ class ControlLayout(QtWidgets.QVBoxLayout):
     def list_registered_modules(self) -> set[Callable[[], None]]:
         """set(callable): Functions called (without argument) every time the annotation view is reset"""
         return self._list_registered_modules
+
+    def _contents(self) -> tuple[list, set[str]]:
+        """Give what the annotations contain, independently of the objects which are edited in place
+
+        Returns
+        -------
+        list
+            The (name, [(start time, end time, label), ...]) of each tier, in display order
+        set(str)
+            The names of the hidden tiers
+        """
+        tiers = [
+            (name, [(annotation.start_time, annotation.end_time, annotation.label) for annotation in annotations])
+            for name, annotations in self._model.annotations.items()
+        ]
+        return tiers, set(self._model.ignored)
+
+    def confirmDiscardChanges(self) -> bool:
+        """If there are unsaved annotations, ask whether to save them, to discard them or to cancel
+
+        Returns
+        -------
+        bool
+            True if what was going to replace the annotations can go on
+        """
+        if self._contents() == self._saved_contents:
+            return True
+
+        Button = QtWidgets.QMessageBox.StandardButton
+        answer = QtWidgets.QMessageBox.question(
+            self._file_box,
+            "Unsaved annotations",
+            "The annotations have unsaved changes. Save them?",
+            Button.Save | Button.Discard | Button.Cancel,
+            Button.Save,
+        )
+        if answer == Button.Save:
+            return self._save_annotation_file()
+        return answer == Button.Discard
 
     def setView(self, annotation_dock: AnnotationDock) -> None:
         """Define the dock rendering the annotations
@@ -396,6 +436,9 @@ class ControlLayout(QtWidgets.QVBoxLayout):
 
     def _load_annotation_file(self) -> None:
         """Ask for an annotation file and load it (errors are shown in a message box)"""
+        if not self.confirmDiscardChanges():
+            return
+
         options = QtWidgets.QFileDialog.Options()
         options |= QtWidgets.QFileDialog.DontUseNativeDialog
         annotation_file, _ = QtWidgets.QFileDialog.getOpenFileName(
@@ -409,15 +452,21 @@ class ControlLayout(QtWidgets.QVBoxLayout):
         except Exception as ex:
             QtWidgets.QMessageBox.critical(self._file_box, "Load annotation file", f"Cannot load the file:\n{ex}")
 
-    def _save_annotation_file(self) -> None:
-        """Ask for a file name and save the annotations; the extension (or the selected filter) gives the format"""
+    def _save_annotation_file(self) -> bool:
+        """Ask for a file name and save the annotations; the extension (or the selected filter) gives the format
+
+        Returns
+        -------
+        bool
+            True if the annotations have been saved
+        """
         options = QtWidgets.QFileDialog.Options()
         options |= QtWidgets.QFileDialog.DontUseNativeDialog
         annotation_file, selected_filter = QtWidgets.QFileDialog.getSaveFileName(
             self._file_box, "Save annotation file", "", ANNOTATION_FILTERS, options=options
         )
         if not annotation_file:  # Cancelled
-            return
+            return False
 
         # The extension decides the format; without a known extension, use the one of the selected filter
         annotation_file = pathlib.Path(annotation_file)
@@ -432,8 +481,10 @@ class ControlLayout(QtWidgets.QVBoxLayout):
             serialiser.save(annotation_file, self._model)
         except Exception as ex:
             QtWidgets.QMessageBox.critical(self._file_box, "Save annotation file", f"Cannot save the file:\n{ex}")
-            return
+            return False
+        self._saved_contents = self._contents()
         self._wCurrentFile.setText(str(annotation_file.absolute()))
+        return True
 
     def update_current_annotation(self, new_annotation: AnnotationItem | None = None) -> None:
         """Make an annotation the selected one (or clear the selection) and show it in the edition box
@@ -531,6 +582,7 @@ class ControlLayout(QtWidgets.QVBoxLayout):
             The new annotations
         """
         self._model = annotation_model
+        self._saved_contents = self._contents()
         self.resetView()
         self.updateTierList()
 
