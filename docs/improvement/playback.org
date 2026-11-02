@@ -55,6 +55,31 @@ for the real-time thread, and nothing proportional to the signal is ever allocat
 A linear interpolation is fine to listen to when the device rate is higher than the source rate (the
 usual case). It is never used for analysis: every plugin works on the signal at its native rate.
 
+* Transport
+
+The toolbar follows the transport of a DAW; it only needs two values in the player.
+
+- The *cursor* (in seconds) is where a playback starts. A click on any plot, or "return to start", moves it.
+- The *position* (in played samples) belongs to the audio callback during a playback.
+
+The time shown, and the playhead drawn over every plot, are the position during a playback and the cursor
+otherwise:
+
+#+begin_example
+play          start at the cursor (at 0 if the cursor is at the very end)
+pause/resume  the stream stays open and plays zeros, the position does not move
+stop          the position is dropped: the display is back at the cursor
+seek(t)       cursor = t; during a playback, position = t × playback rate
+loop          at the end of the played part, position = the sample where this playback started
+#+end_example
+
+The audio thread never touches Qt: the toolbar and the playheads read the player every 30 ms from the GUI
+thread. With the playhead moving over a spectrogram, the annotations and the waveform, this costs about 30 % of
+one core (4 % when idle), and nothing blocks the interface for more than 25 ms (measured offscreen on a 20 s view).
+
+A new playback first waits for the end of the stream which was just stopped: its last callback would otherwise
+continue with the new playback, or its end would stop it.
+
 * Results
 
 | Measure                        | Before (librosa) | After (soundfile) |
