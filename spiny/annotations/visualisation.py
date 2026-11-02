@@ -131,8 +131,8 @@ class TierPlot(pg.PlotWidget):
     """Plot rendering one annotation tier
 
     Only the annotations which are visible and wide enough (see `threshold`) are rendered, see
-    `updateVisibleRegions`. Clicking twice in an empty area creates a new annotation between the two
-    clicks, and the Delete key removes the selected annotation.
+    `updateVisibleRegions`. Clicking in an empty area moves the playhead, clicking twice creates a new annotation
+    between the two clicks, and the Delete key removes the selected annotation.
 
     Parameters
     ----------
@@ -168,7 +168,7 @@ class TierPlot(pg.PlotWidget):
         self._model = model
         self._handle_segment = handle_segment
         self.scene().sigMouseClicked.connect(self.mouse_clicked)
-        self._start_pos = None
+        self._start_time: float | None = None
 
         self.addItem(PlayheadLine(), ignoreBounds=True)
         self.threshold = 50  # minimum width (pixels) of a drawn annotation: narrower ones would be unreadable
@@ -257,47 +257,47 @@ class TierPlot(pg.PlotWidget):
                 break
 
     def mouse_clicked(self, ev: MouseClickEvent) -> None:
-        """Create an annotation from two successive clicks in an empty area of the tier
+        """Move the playhead to a left click in an empty area of the tier; two of them create an annotation
+
+        A double-click or a click on an annotation cancels the first click.
 
         Parameters
         ----------
         ev : pyqtgraph.GraphicsScene.mouseEvents.MouseClickEvent
             The click event
         """
-        is_void = True
-        items = self.scene().items(ev.scenePos())
-        for x in items:
-            if isinstance(x, AnnotationItem):
-                is_void = False
-                break
+        vb = self.getViewBox()
+        if ev.button() != QtCore.Qt.MouseButton.LeftButton or not vb.sceneBoundingRect().contains(ev.scenePos()):
+            return
 
-        if is_void:
-            ev.accept()
-            if self._start_pos is None:
-                self._start_pos = ev.pos()
-            else:
-                # Build the annotation
-                vb = self.getViewBox()
-                start_time = vb.mapToView(self._start_pos).x()
-                end_time = vb.mapToView(ev.pos()).x()
-                if end_time < start_time:
-                    tmp = start_time
-                    start_time = end_time
-                    end_time = tmp
-                annotation = Annotation(start_time=start_time, end_time=end_time, label="")
+        on_annotation = any(isinstance(item, AnnotationItem) for item in self.scene().items(ev.scenePos()))
+        if on_annotation or ev.double():
+            self._start_time = None
+            return
 
-                # Update the model
-                if self._tier_name not in self._model.annotations:
-                    self._model.annotations[self._tier_name] = []
-                self._model.annotations[self._tier_name].append(annotation)
-                self._model.annotations[self._tier_name].sort(key=lambda x: x.start_time)
+        ev.accept()
+        # NOTE: a time and not a position: the view can change before the second click
+        time = vb.mapSceneToView(ev.scenePos()).x()
+        player.seek(time)
+        if self._start_time is None:
+            self._start_time = time
+            return
 
-                # Now add the item
-                an_item = AnnotationItem(annotation, True, self._handle_segment)
-                self.addItem(an_item)
-                self._items[id(annotation)] = an_item
-                an_item.requestSelection()
-                self._start_pos = None
+        start_time, end_time = sorted((self._start_time, time))
+        self._start_time = None
+        if start_time == end_time:
+            return
+        annotation = Annotation(start_time=start_time, end_time=end_time, label="")
+
+        # Update the model
+        self._model.annotations.setdefault(self._tier_name, []).append(annotation)
+        self._model.annotations[self._tier_name].sort(key=lambda x: x.start_time)
+
+        # Now add the item
+        an_item = AnnotationItem(annotation, True, self._handle_segment)
+        self.addItem(an_item)
+        self._items[id(annotation)] = an_item
+        an_item.requestSelection()
 
 
 class AnnotationItem(SegmentItem):

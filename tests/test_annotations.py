@@ -2,7 +2,7 @@ import json
 import pathlib
 
 import pytest
-from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
+from pyqtgraph.Qt import QtCore, QtGui, QtTest, QtWidgets
 
 from spiny.annotations.model import Annotation
 
@@ -227,3 +227,101 @@ def test_save_replaces_the_target_of_a_link_and_keeps_its_permissions(controller
     assert link.is_symlink()
     assert "annotations" in json.loads(target.read_text())
     assert target.stat().st_mode & 0o777 == 0o640
+
+
+@pytest.fixture
+def empty_tier(controller):
+    from spiny.annotations.model import AnnotationSet
+    from spiny.annotations.visualisation import TierPlot
+
+    model = AnnotationSet({"t": []}, set())
+    plot = TierPlot(tier_name="t", model=model, handle_segment=controller.update_current_annotation)
+    plot.resize(800, 100)
+    plot.setXRange(0, 1, padding=0)
+    plot.show()
+    QtWidgets.QApplication.processEvents()
+    yield plot
+    controller.update_current_annotation(None)
+    plot.close()
+
+
+def widget_position(tier, time):
+    """The position in the tier widget of a time"""
+    return tier.mapFromScene(tier.getViewBox().mapViewToScene(QtCore.QPointF(time, 0.5)))
+
+
+def click(tier, time, button=QtCore.Qt.MouseButton.LeftButton):
+    QtTest.QTest.mouseClick(tier.viewport(), button, pos=widget_position(tier, time))
+    QtWidgets.QApplication.processEvents()
+
+
+def times(tier):
+    return [
+        (pytest.approx(a.start_time, abs=0.01), pytest.approx(a.end_time, abs=0.01))
+        for a in tier._model.annotations["t"]
+    ]
+
+
+def separate_clicks():
+    """The second click of a test must not be taken for a double-click"""
+    QtTest.QTest.qWait(QtWidgets.QApplication.doubleClickInterval() + 50)
+
+
+def test_two_clicks_create_an_annotation_at_the_clicked_times(empty_tier, player):
+    click(empty_tier, 0.7)
+    assert player.position == pytest.approx(0.7, abs=0.01)
+    separate_clicks()
+    click(empty_tier, 0.3)
+    assert times(empty_tier) == [(0.3, 0.7)]
+
+
+def test_view_change_between_two_clicks_keeps_the_first_time(empty_tier):
+    click(empty_tier, 0.3)
+    empty_tier.setXRange(0.5, 1.5, padding=0)
+    QtWidgets.QApplication.processEvents()
+    separate_clicks()
+    click(empty_tier, 0.9)
+    assert times(empty_tier) == [(0.3, 0.9)]
+
+
+def test_double_click_creates_nothing(empty_tier):
+    QtTest.QTest.mouseDClick(
+        empty_tier.viewport(), QtCore.Qt.MouseButton.LeftButton, pos=widget_position(empty_tier, 0.5)
+    )
+    QtWidgets.QApplication.processEvents()
+    assert times(empty_tier) == []
+    separate_clicks()
+    click(empty_tier, 0.2)  # the first click of a new annotation, not the second one of the double-click
+    assert times(empty_tier) == []
+
+
+def test_right_click_creates_nothing(empty_tier, monkeypatch):
+    # NOTE: the context menu of the plot would block the test
+    monkeypatch.setattr(empty_tier.getViewBox(), "raiseContextMenu", lambda ev: None)
+    click(empty_tier, 0.2)
+    separate_clicks()
+    click(empty_tier, 0.6, QtCore.Qt.MouseButton.RightButton)
+    assert times(empty_tier) == []
+
+
+def test_click_outside_the_time_area_creates_nothing(empty_tier):
+    click(empty_tier, 0.2)
+    separate_clicks()
+    QtTest.QTest.mouseClick(empty_tier.viewport(), QtCore.Qt.MouseButton.LeftButton, pos=QtCore.QPoint(3, 3))
+    QtWidgets.QApplication.processEvents()
+    assert times(empty_tier) == []
+
+
+def test_click_on_an_annotation_cancels_the_first_click(empty_tier):
+    click(empty_tier, 0.1)
+    separate_clicks()
+    click(empty_tier, 0.3)
+    assert len(times(empty_tier)) == 1
+    empty_tier._handle_segment(None)
+    separate_clicks()
+    click(empty_tier, 0.6)
+    separate_clicks()
+    click(empty_tier, 0.2)  # on the annotation
+    separate_clicks()
+    click(empty_tier, 0.8)
+    assert len(times(empty_tier)) == 1
