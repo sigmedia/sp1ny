@@ -31,7 +31,7 @@ from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 
 # SpINY
 from spiny.gui.colormaps import Ticks
-from spiny.gui.items import SelectablePlotItem
+from spiny.gui.items import PlayheadLine, SelectablePlotItem
 
 ###############################################################################
 # Classes
@@ -187,6 +187,7 @@ class DataWidget(pg.GraphicsLayoutWidget):
         #       frames than pixels), so the rendered QImage stays small whatever the data size
         self._imageItem = pg.ImageItem(axisOrder="col-major", autoDownsample=True)
         self._plotItem.addItem(self._imageItem)
+        self._plotItem.addItem(PlayheadLine(), ignoreBounds=True)
 
         # Full data and how it is placed (see setImageData)
         self._data: np.ndarray | None = None

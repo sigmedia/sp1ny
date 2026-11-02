@@ -61,6 +61,80 @@ def test_stop_while_paused(fake_audio):
     assert player.position == 0
 
 
+def test_stop_returns_to_the_cursor(fake_audio):
+    player = fake_audio
+    player.seek(2.0)
+    assert player.position == 2.0
+    player.play()
+    assert wait_until(lambda: player.position > 2.0)
+    player.stop()
+    assert player.position == 2.0
+
+
+def test_seek_during_playback_jumps(fake_audio):
+    player = fake_audio
+    player.play()
+    player.seek(4.0)
+    assert wait_until(lambda: player.position >= 4.0)
+    player.stop()
+    assert player.position == 4.0
+
+
+def test_seek_is_clipped_and_play_from_the_end_starts_over(fake_audio):
+    player = fake_audio
+    player.seek(-1.0)
+    assert player.position == 0
+    player.seek(100.0)
+    assert player.position == player.duration
+    player.play()
+    assert player._position < 16000
+
+
+def test_play_right_after_stop_keeps_playing(fake_audio):
+    player = fake_audio
+    player.play()
+    player.stop()
+    player.play()
+    time.sleep(0.05)
+    assert player.is_playing
+    assert sum(thread.name == "spiny-player" for thread in threading.enumerate()) == 1
+
+
+def test_loop_of_a_part_restarts_at_its_start(fake_audio):
+    player = fake_audio
+    player.toggleLoop()
+    try:
+        player.play(start=1.0, end=1.1)
+        positions = [player.position for _ in range(200) if not time.sleep(0.001)]
+    finally:
+        player.toggleLoop()
+    assert min(positions) >= 1.0 and max(positions) <= 1.1
+    assert any(after < before for before, after in zip(positions, positions[1:]))
+
+
+def test_format_time():
+    from spiny.core.wav.control import format_time
+
+    assert format_time(0) == "00:00.000"
+    assert format_time(83.4567) == "01:23.457"
+
+
+def test_toolbar_play_button_toggles(fake_audio, qapp, monkeypatch):
+    from spiny.core.wav import PlayerControllerWidget
+
+    monkeypatch.setattr(sd, "query_devices", lambda *a, **k: [{"name": "fake", "max_output_channels": 2}])
+    monkeypatch.setattr(sd.default, "device", (-1, 0))
+    widget = PlayerControllerWidget()
+    widget._bPlay.click()
+    assert fake_audio.is_playing and not fake_audio.is_paused
+    widget._bPlay.click()
+    assert fake_audio.is_playing and fake_audio.is_paused
+    widget._bPlay.click()
+    assert not fake_audio.is_paused
+    widget._bStop.click()
+    assert not fake_audio.is_playing
+
+
 def test_playback_is_resampled_only_when_needed(fake_audio, monkeypatch):
     player = fake_audio
 

@@ -124,7 +124,9 @@ class GUIVisu(QtWidgets.QMainWindow):
     def __init__(self) -> None:
         super().__init__()
         self._createMenuBar()
-        self.addToolBar("Player").addWidget(PlayerControllerWidget())
+        player_toolbar = self.addToolBar("Player")
+        player_toolbar.setMovable(False)
+        player_toolbar.addWidget(PlayerControllerWidget())
         self._filename_label = QtWidgets.QLabel(str(player.filename or ""))
         self.statusBar().addPermanentWidget(self._filename_label)
 

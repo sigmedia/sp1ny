@@ -193,3 +193,27 @@ def test_set_matrix_places_the_data_in_seconds_and_y_range(qapp):
     assert rect.left() == pytest.approx(0) and rect.right() == pytest.approx(2.0)
     assert rect.top() == pytest.approx(100.0) and rect.bottom() == pytest.approx(4100.0)
     widget.close()
+
+
+def test_click_on_a_plot_moves_the_cursor(window):
+    from spiny.core import player
+
+    class Click:
+        def __init__(self, position, button=QtCore.Qt.MouseButton.LeftButton):
+            self._position, self._button = position, button
+
+        def button(self):
+            return self._button
+
+        def pos(self):
+            return self._position
+
+        def accept(self):
+            pass
+
+    wav_plot = window._visualisation_area._dock_wav.wav_plot
+    wav_plot.setXRange(0, 1, padding=0)
+    view = wav_plot.getViewBox()
+    view.mouseClickEvent(Click(view.mapFromView(QtCore.QPointF(0.5, 0))))
+    assert abs(player.position - 0.5) < 0.01
+    player.seek(0.0)

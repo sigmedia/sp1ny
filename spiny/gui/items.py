@@ -66,6 +66,23 @@ class LinkedInfiniteLine(pg.InfiniteLine):
             linked_line._linked_line = self
 
 
+class PlayheadLine(pg.InfiniteLine):
+    """Vertical line following the position of the player (polled: the audio thread must never touch Qt objects)"""
+
+    def __init__(self) -> None:
+        super().__init__(pos=0, movable=False, angle=90, pen=pg.mkPen({"color": "#e5484d", "width": 2}))
+        self._timer = QtCore.QTimer(self)
+        self._timer.setInterval(30)
+        self._timer.timeout.connect(self._follow)
+        self._timer.start()
+
+    def _follow(self) -> None:
+        """Move the line to the position of the player"""
+        position = player.position
+        if self.value() != position:
+            self.setValue(position)
+
+
 class SegmentItem(pg.LinearRegionItem):
     """A segment item which is a specific pg.LinearRegionItem
 
@@ -248,6 +265,20 @@ class SelectableViewBox(pg.ViewBox):
 
         self.setMouseEnabled(x=True, y=not lock_y_axis)
         self._lock_y_axis = lock_y_axis
+
+    def mouseClickEvent(self, ev: MouseClickEvent) -> None:
+        """Move the cursor of the player to the clicked time
+
+        Parameters
+        ----------
+        ev : MouseClickEvent
+            The click event
+        """
+        if ev.button() == QtCore.Qt.MouseButton.LeftButton:
+            ev.accept()
+            player.seek(self.mapToView(ev.pos()).x())
+        else:
+            super().mouseClickEvent(ev)
 
     def mouseDragEvent(self, ev: MouseDragEvent) -> None:
         """The item dragging event handler.

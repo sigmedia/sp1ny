@@ -94,6 +94,9 @@ class Player(metaclass=Singleton):
         self._loop_activated = False
         self._chunk_size = chunk_size
         self._position = 0  # In samples at the playback rate
+        self._cursor = 0.0  # In seconds: where the playback starts, and where stop goes back to
+        self._thread: threading.Thread | None = None
+        self._wav = np.zeros((0, 1), dtype=np.float32)
         self._player_volume = 1.0
         self._last_status = None
         self._lock = threading.Lock()
@@ -125,6 +128,7 @@ class Player(metaclass=Singleton):
         self._wav = wav_data
         if len(self._wav.shape) < 2:
             self._wav = np.expand_dims(self._wav, axis=1)
+        self._cursor = 0.0
 
     def loadNewWav(self, filename: str | os.PathLike) -> None:
         """Load an audio file at its native sampling rate (see `load_audio`)
@@ -187,7 +191,7 @@ class Player(metaclass=Singleton):
             sd.check_output_settings(samplerate=rate, device=device, channels=channels)
             return rate
 
-    def play(self, wav_data: np.ndarray | None = None, start: float = 0, end: float = -1) -> None:
+    def play(self, wav_data: np.ndarray | None = None, start: float | None = None, end: float = -1) -> None:
         """Play (a part of) the signal in a background thread
 
         Parameters
@@ -195,7 +199,7 @@ class Player(metaclass=Singleton):
         wav_data : np.ndarray, optional
             A new signal to load before playing (see `setWavData`). (default: None)
         start : float, optional
-            The start time in seconds. (default: 0)
+            The start time in seconds. (default: None, i.e. the cursor)
         end : float, optional
             The end time in seconds, -1 for the end of the signal. (default: -1)
 
@@ -209,6 +213,10 @@ class Player(metaclass=Singleton):
             if self._is_playing:
                 return
 
+            # A stream which was just stopped must be closed first: both would otherwise feed the same position
+            if self._thread is not None:
+                self._thread.join()
+
             # We required to play a new data, lets load it
             if wav_data is not None:
                 self.setWavData(wav_data)
@@ -219,6 +227,9 @@ class Player(metaclass=Singleton):
 
             # Boundaries in samples at the playback rate
             nb_played = int((self._wav.shape[0] - 1) / ratio) + 1
+            if start is None:
+                # A DAW starts over when asked to play from the very end
+                start = self._cursor if self._cursor < self.duration else 0.0
             start_sample = min(int(start * self._play_rate), nb_played)
             end_sample = nb_played if end == -1 else min(int(end * self._play_rate), nb_played)
 
@@ -227,23 +238,34 @@ class Player(metaclass=Singleton):
             self._position = start_sample
 
             # Start stream in a new (daemon) thread so that it never blocks the application exit
-            new_thread = threading.Thread(
+            self._thread = threading.Thread(
                 target=self.play_handler,
                 args=(self._wav, ratio, start_sample, end_sample),
                 name="spiny-player",
                 daemon=True,
             )
-            new_thread.start()
+            self._thread.start()
 
     def pauseResume(self) -> None:
         """Toggle the pause state (the stream stays open and plays silence while paused)"""
         self._is_paused = not self._is_paused
 
     def stop(self) -> None:
-        """Stop the playback (also when paused)"""
+        """Stop the playback (also when paused): the position goes back to the cursor"""
         self._is_playing = False
         self._is_paused = False
-        self._position = 0
+
+    def seek(self, time: float) -> None:
+        """Move the cursor; a running playback jumps there
+
+        Parameters
+        ----------
+        time : float
+            The new position in seconds (clipped to the signal)
+        """
+        self._cursor = min(max(time, 0.0), self.duration)
+        if self._is_playing:
+            self._position = int(self._cursor * self._play_rate)
 
     def toggleLoop(self) -> None:
         """Toggle the loop mode (the played part restarts when its end is reached)"""
@@ -269,8 +291,8 @@ class Player(metaclass=Singleton):
 
     @property
     def duration(self) -> float:
-        """float: The duration of the loaded signal in seconds"""
-        return self._wav.shape[0] / self.sampling_rate
+        """float: The duration of the loaded signal in seconds (0 if there is none)"""
+        return 0.0 if self._sampling_rate is None else self._wav.shape[0] / self._sampling_rate
 
     @property
     def filename(self) -> str | os.PathLike | None:
@@ -281,6 +303,11 @@ class Player(metaclass=Singleton):
     def device(self) -> int | None:
         """int: The output device index (None means the default output device)"""
         return self._device
+
+    @property
+    def is_playing(self) -> bool:
+        """bool: True during a playback (also when it is paused)"""
+        return self._is_playing
 
     @property
     def is_paused(self) -> bool:
@@ -303,12 +330,12 @@ class Player(metaclass=Singleton):
 
     @property
     def position(self) -> float:
-        """float: Current playback position in seconds (0 when stopped).
+        """float: Current position in seconds: the played sample during a playback, the cursor otherwise.
 
         This is a plain read of a value updated by the audio thread, so GUI code should poll it
         (e.g. with a QTimer) rather than being called back from the audio thread.
         """
-        return self._position / self._play_rate
+        return self._position / self._play_rate if self._is_playing else self._cursor
 
     @staticmethod
     def _fillBlock(out: np.ndarray, source: np.ndarray, ratio: float, position: int, frames: int) -> None:
@@ -383,7 +410,6 @@ class Player(metaclass=Singleton):
             # Stream Stopped (checked first so that stop() also works while paused)
             if not self._is_playing:
                 outdata[:] = 0
-                self._position = start
                 raise sd.CallbackStop()
             # If stream is paused, keep open but output zeros
             # position is not updated so can resume from same frame
@@ -396,11 +422,11 @@ class Player(metaclass=Singleton):
                     outdata[:chunksize] *= self._player_volume
                 if chunksize < frames:
                     outdata[chunksize:] = 0
-                    if self._loop_activated:
-                        self._position = start
-                    else:
+                    if not self._loop_activated:
                         raise sd.CallbackStop()
-                self._position += chunksize
+                    self._position = start
+                else:
+                    self._position += chunksize
 
         try:
             self._stream = sd.OutputStream(
@@ -421,7 +447,6 @@ class Player(metaclass=Singleton):
                 self._logger.warning("Playback stream status: %s", self._last_status)
 
             # Always leave the player in a playable state, even if the stream failed to open
-            self._position = 0
             self._is_playing = False
             self._is_paused = False
 

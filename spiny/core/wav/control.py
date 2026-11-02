@@ -2,19 +2,42 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from platform import system
 from typing import Any
 
 # Python SoundDevice
 import sounddevice as sd
 
 # SpINY
-from pyqtgraph.Qt import QtCore, QtWidgets, isQObjectAlive
+from pyqtgraph.Qt import QtCore, QtGui, QtWidgets, isQObjectAlive
+
+from spiny.gui.icons import transport_icon
+
 from .player import player
 
 
+def format_time(seconds: float) -> str:
+    """Format a time for the time display
+
+    Parameters
+    ----------
+    seconds : float
+        The time, in seconds
+
+    Returns
+    -------
+    str
+        The time as minutes:seconds.milliseconds
+    """
+    milliseconds = round(seconds * 1000)
+    return f"{milliseconds // 60000:02d}:{milliseconds // 1000 % 60:02d}.{milliseconds % 1000:03d}"
+
+
 class PlayerControllerWidget(QtWidgets.QWidget):
-    """Player toolbar: play/pause/stop/loop, output device and volume
+    """Player toolbar, as the transport bar of a DAW
+
+    On the left the transport (return to start, play/pause, stop, loop) and the time display, on the right the
+    output device and the volume. The state is polled from the player, so that the toolbar is also right when
+    the playback ends by itself or is started elsewhere (e.g. from an annotation).
 
     Parameters
     ----------
@@ -22,35 +45,52 @@ class PlayerControllerWidget(QtWidgets.QWidget):
         The parent widget. (default: None)
     """
 
-    BUTTON_GLYPHS = ("▶", "⏯", "⏹", "Loop") if system() != "Windows" else ("▶️", "⏯️", "⏹️", "Loop️")
+    #: The colour of the play button
+    PLAY_COLOR = QtGui.QColor("#2fa66a")
+
+    STYLE_SHEET = """
+        QToolButton { border: none; border-radius: 6px; padding: 5px; }
+        QToolButton:hover { background: rgba(127, 127, 127, 50); }
+        QToolButton:pressed { background: rgba(127, 127, 127, 90); }
+        QToolButton:checked { background: #2a78d6; }
+        QToolButton:disabled { background: transparent; }
+        QLabel#time { background: #17181a; color: #7fe3a8; border-radius: 6px; padding: 4px 10px; }
+        QLabel#duration { background: #17181a; color: #7c8088; border-radius: 6px; padding: 4px 10px; }
+        QSlider::groove:horizontal { height: 4px; border-radius: 2px; background: rgba(127, 127, 127, 90); }
+        QSlider::sub-page:horizontal { border-radius: 2px; background: #2a78d6; }
+        QSlider::handle:horizontal {
+            width: 12px; margin: -4px 0; border-radius: 6px; background: palette(button-text);
+        }
+    """
 
     def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
         super().__init__(parent)
+        self.setStyleSheet(self.STYLE_SHEET)
+        self.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Preferred)
+        icon_color = self.palette().color(QtGui.QPalette.ColorRole.ButtonText)
 
-        # Define play button
-        self._bPlay = QtWidgets.QPushButton(PlayerControllerWidget.BUTTON_GLYPHS[0], self)
-        self._bPlay.clicked.connect(self.play)
-        self._bPlay.setDefault(False)
-        self._bPlay.setAutoDefault(False)
+        self._play_icon = transport_icon("play", self.PLAY_COLOR)
+        self._pause_icon = transport_icon("pause", self.PLAY_COLOR)
+        self._bStart = self._transportButton(transport_icon("start", icon_color), "Return to start", "Home")
+        self._bPlay = self._transportButton(self._play_icon, "Play / Pause", "Space")
+        self._bStop = self._transportButton(transport_icon("stop", icon_color), "Stop", "Esc")
+        self._bLoop = self._transportButton(transport_icon("loop", icon_color, QtGui.QColor("white")), "Loop", "L")
+        self._bLoop.setCheckable(True)
+        self._bLoop.setChecked(player.loop_activated)
+        self._bStart.clicked.connect(lambda: player.seek(0.0))
+        self._bPlay.clicked.connect(self.playPause)
+        self._bStop.clicked.connect(player.stop)
+        self._bLoop.clicked.connect(player.toggleLoop)
 
-        # Define stop button
-        self._bPause = QtWidgets.QPushButton(PlayerControllerWidget.BUTTON_GLYPHS[1], self)
-        self._bPause.clicked.connect(self.pause)
-        self._bPause.setDefault(False)
-        self._bPause.setAutoDefault(False)
-
-        # Define stop button
-        self._bStop = QtWidgets.QPushButton(PlayerControllerWidget.BUTTON_GLYPHS[2], self)
-        self._bStop.clicked.connect(self.stop)
-        self._bStop.setDefault(False)
-        self._bStop.setAutoDefault(False)
-
-        # Define loop button
-        self._bLoop = QtWidgets.QPushButton(PlayerControllerWidget.BUTTON_GLYPHS[3], self)
-        self._bLoop.setStyleSheet("background-color: #EAA799;")
-        self._bLoop.clicked.connect(self.loop)
-        self._bLoop.setDefault(False)
-        self._bLoop.setAutoDefault(False)
+        # NOTE: a fixed-width font, so that the digits do not move while the time changes
+        time_font = QtGui.QFontDatabase.systemFont(QtGui.QFontDatabase.SystemFont.FixedFont)
+        time_font.setBold(True)
+        self._lTime = QtWidgets.QLabel()
+        self._lTime.setObjectName("time")
+        self._lTime.setFont(time_font)
+        self._lDuration = QtWidgets.QLabel()
+        self._lDuration.setObjectName("duration")
+        self._lDuration.setFont(time_font)
 
         # Get devices information (the default output index is -1 when there is no output device)
         devices = sd.query_devices()
@@ -69,6 +109,8 @@ class PlayerControllerWidget(QtWidgets.QWidget):
 
         # Generation Device ComboBox
         self._boxDevices = QtWidgets.QComboBox()
+        self._boxDevices.setToolTip("Output device")
+        self._boxDevices.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
         self._boxDevices.addItems(self._devices.keys())
         if default_device is not None:
             self._boxDevices.setCurrentText(default_device)
@@ -76,63 +118,87 @@ class PlayerControllerWidget(QtWidgets.QWidget):
         # Without any output device, playback controls are useless
         if not self._devices:
             self._boxDevices.addItem("No output device")
-            for button in (self._bPlay, self._bPause, self._bStop, self._bLoop, self._boxDevices):
-                button.setEnabled(False)
+            for widget in (self._bStart, self._bPlay, self._bStop, self._bLoop, self._boxDevices):
+                widget.setEnabled(False)
         self._boxDevices.currentTextChanged.connect(self.device_changed)
 
         # Define volume slider
-        self._lVolume = QtWidgets.QLabel("100%", self)
-        self._lVolume.setAlignment(QtCore.Qt.AlignmentFlag.AlignVCenter)
-        self._lVolume.setMinimumWidth(80)
+        volume_icon = QtWidgets.QLabel()
+        volume_icon.setPixmap(transport_icon("volume", icon_color).pixmap(20, 20))
         self._sVolume = QtWidgets.QSlider(QtCore.Qt.Horizontal)
         self._sVolume.setRange(0, 100)
-        self._sVolume.setValue(100)
-        self._sVolume.setTracking(True)
+        self._sVolume.setValue(round(player.volume * 100))
+        self._sVolume.setFixedWidth(120)
+        self._sVolume.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
+        self._sVolume.setToolTip("Volume")
         self._sVolume.valueChanged.connect(self.volume_changed)
+        self._lVolume = QtWidgets.QLabel()
+        self._lVolume.setAlignment(QtCore.Qt.AlignmentFlag.AlignRight | QtCore.Qt.AlignmentFlag.AlignVCenter)
+        self._lVolume.setFixedWidth(40)
+        self.volume_changed()
 
-        player_layout = QtWidgets.QHBoxLayout()
-        player_layout.addWidget(self._bPlay)
-        player_layout.addWidget(self._bPause)
-        player_layout.addWidget(self._bStop)
-        player_layout.addWidget(self._bLoop)
-        player_layout.addSpacing(15)
-        player_layout.addWidget(QtWidgets.QLabel("Output Device"))
-        player_layout.addWidget(self._boxDevices)
-        player_layout.addSpacing(15)
-        player_layout.addWidget(QtWidgets.QLabel("Volume"))
-        player_layout.addWidget(self._sVolume)
-        player_layout.addWidget(self._lVolume)
-        self.setLayout(player_layout)
+        layout = QtWidgets.QHBoxLayout(self)
+        layout.setContentsMargins(6, 2, 6, 2)
+        layout.setSpacing(4)
+        for button in (self._bStart, self._bPlay, self._bStop, self._bLoop):
+            layout.addWidget(button)
+        layout.addSpacing(12)
+        layout.addWidget(self._lTime)
+        layout.addWidget(self._lDuration)
+        layout.addStretch(1)
+        layout.addWidget(self._boxDevices)
+        layout.addSpacing(12)
+        layout.addWidget(volume_icon)
+        layout.addWidget(self._sVolume)
+        layout.addWidget(self._lVolume)
 
-    def play(self) -> None:
-        """Play the whole signal (a message box reports a device which cannot play it)"""
-        # Play subpart
+        self._refresh()
+        self._refresh_timer = QtCore.QTimer(self)
+        self._refresh_timer.setInterval(30)
+        self._refresh_timer.timeout.connect(self._refresh)
+        self._refresh_timer.start()
+
+    def _transportButton(self, icon: QtGui.QIcon, tooltip: str, shortcut: str) -> QtWidgets.QToolButton:
+        """Create a button of the transport
+
+        Parameters
+        ----------
+        icon : QtGui.QIcon
+            The icon
+        tooltip : str
+            What the button does
+        shortcut : str
+            The keyboard shortcut
+
+        Returns
+        -------
+        QtWidgets.QToolButton
+            The button
+        """
+        button = QtWidgets.QToolButton()
+        button.setIcon(icon)
+        button.setIconSize(QtCore.QSize(22, 22))
+        button.setToolTip(f"{tooltip} ({shortcut})")
+        button.setShortcut(QtGui.QKeySequence(shortcut))  # NOTE: typing in a text field still goes to the field
+        button.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
+        return button
+
+    def _refresh(self) -> None:
+        """Show the state of the player: position, duration and play or pause icon"""
+        self._lTime.setText(format_time(player.position))
+        self._lDuration.setText(format_time(player.duration))
+        playing = player.is_playing and not player.is_paused
+        self._bPlay.setIcon(self._pause_icon if playing else self._play_icon)
+
+    def playPause(self) -> None:
+        """Play from the cursor, or pause/resume a playback (a message box reports a device which cannot play)"""
+        if player.is_playing:
+            player.pauseResume()
+            return
         try:
             player.play()
         except sd.PortAudioError as ex:
             QtWidgets.QMessageBox.warning(self, "Playback error", f"The audio device cannot play this signal:\n{ex}")
-
-    def pause(self) -> None:
-        """Pause or resume the playback"""
-        # Play subpart
-        player.pauseResume()
-        if player.is_paused:
-            self._bPause.setFlat(True)
-        else:
-            self._bPause.setFlat(False)
-
-    def stop(self) -> None:
-        """Stop the playback"""
-        self._bPause.setFlat(False)
-        player.stop()
-
-    def loop(self) -> None:
-        """Toggle the loop mode (the button turns green when it is activated)"""
-        player.toggleLoop()
-        if player.loop_activated:
-            self._bLoop.setStyleSheet("background-color: #B3EDB1;")
-        else:
-            self._bLoop.setStyleSheet("background-color: #EAA799;")
 
     def device_changed(self, name: str) -> None:
         """Use the selected output device; a device which cannot play the signal is refused and the previous one kept

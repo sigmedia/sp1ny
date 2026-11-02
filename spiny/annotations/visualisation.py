@@ -9,7 +9,7 @@ import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 from pyqtgraph.dockarea import Dock
 
-from spiny.gui.items import SegmentItem
+from spiny.gui.items import PlayheadLine, SegmentItem
 from .model import Annotation, AnnotationSet
 from spiny.core import player
 
@@ -165,6 +165,7 @@ class TierPlot(pg.PlotWidget):
         self.scene().sigMouseClicked.connect(self.mouse_clicked)
         self._start_pos = None
 
+        self.addItem(PlayheadLine(), ignoreBounds=True)
         self.threshold = 50  # minimum width (pixels) of a drawn annotation: narrower ones would be unreadable
 
         # Rendered items, keyed by the id() of the annotation they display

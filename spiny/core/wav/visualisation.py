@@ -11,7 +11,7 @@ from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 from pyqtgraph.dockarea import Dock
 
 # SpINY
-from spiny.gui.items import SelectablePlotItem
+from spiny.gui.items import PlayheadLine, SelectablePlotItem
 from .player import player
 
 ###############################################################################
@@ -238,14 +238,7 @@ class WavPlotWidget(pg.PlotWidget):
         self.plotItem.addItem(self._waveform)
         self.refresh()
 
-        self._v_bar = pg.InfiniteLine(pos=0, movable=False, angle=90, pen=pg.mkPen({"color": "#F00", "width": 2}))
-        self.plotItem.addItem(self._v_bar)
-
-        # Poll the player position from the GUI thread (the audio thread must never touch Qt objects)
-        self._position_timer = QtCore.QTimer(self)
-        self._position_timer.setInterval(30)
-        self._position_timer.timeout.connect(self._update_position)
-        self._position_timer.start()
+        self.plotItem.addItem(PlayheadLine(), ignoreBounds=True)
 
     def refresh(self) -> None:
         """(Re)draw the waveform of the signal currently loaded in the player"""
@@ -262,12 +255,6 @@ class WavPlotWidget(pg.PlotWidget):
             maxXRange=T,
         )
         self.plotItem.setXRange(0, T, padding=0)
-
-    def _update_position(self) -> None:
-        """Move the playback cursor to the current player position (called by the polling timer)"""
-        position = player.position
-        if self._v_bar.value() != position:
-            self._v_bar.setValue(position)
 
 
 class WavDock(Dock):
