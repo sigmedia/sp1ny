@@ -1,7 +1,7 @@
-#+TITLE: Spectrogram: block-wise STFT and 8-bit quantization
+#+TITLE: Spectrogram: computing only the visible part
 #+OPTIONS: toc:nil num:t
 
-Implementation: [[file:../../spiny/plugins/spectrum/extractor.py]] (commits =5481f81= and =f3f9bc0=).
+Implementation: [[file:../../spiny/plugins/spectrum/extractor.py]] and [[file:../../spiny/plugins/spectrum/control.py]].
 
 * The problem
 
@@ -24,8 +24,8 @@ are finally displayed with a colormap of a few hundred colours.
 
 [[file:assets/spectrogram_pipeline.svg]]
 
-The result is the same as before (same framing, same window, same decibel scale), but it is computed
-by blocks of frames and stored as 8-bit codes.
+A screen shows at most a few thousand frames, so only the frames of the visible part of the signal are
+computed, by blocks, and stored as 8-bit codes. The framing and the window are the ones of librosa.
 
 ** Framing (as librosa's =stft(center=True)=)
 
@@ -54,61 +54,59 @@ build it: the symmetric window of w + 1 samples without its last sample. It is z
 to n_fft samples. hamming, hann, blackman, blackmanharris, bartlett and boxcar are implemented with
 numpy.
 
-** Decibels and quantization
+** Only the visible frames
 
-librosa normalizes by the global maximum M of the magnitude (over all frames and all bins) and
-floors the result 80 dB below it. The spectrogram stores this whole 80 dB range on 8 bits:
+The visible time range [start, end] is converted into frames, and only these are computed:
 
 #+begin_example
-d    = max(20 × log10(max(|X| / M, 1e-5)), −80)     # dB relative to the maximum, in [−80, 0]
+first frame = floor(start / frame_duration)
+end frame   = ceil(end / frame_duration) + 1        (both clipped to the frames of the signal)
+frame_duration = hop / sampling rate
+#+end_example
+
+The spectrogram remembers the time of its first frame, which places it on the time axis.
+
+** Decibels and quantization
+
+The levels are relative to a reference R which does not depend on the part being analysed, so that the
+colours do not change when the view moves:
+
+#+begin_example
+R    = peak(|x|) × sum(window) / 2                   # the magnitude of a sine at the peak of the whole signal
+d    = clip(20 × log10(max(|X| / R, 1e-5)), −80, 0)  # dB
 code = round((d + 80) × 255 / 80)                    # 0 ... 255, stored as uint8
 #+end_example
 
-That is 0.31 dB per code, finer than any colormap can show. Since nothing below −80 dB is kept
-anyway, the displayed range (say −70 to 0 dB) is not part of the analysis: it only chooses which
-codes are mapped to the ends of the colormap (see [[*Live update of the spectrogram]]).
+This requires one scan of the samples (no FFT). Normalizing by the maximum of the spectrogram would need
+the whole STFT; normalizing by the maximum of the visible part would make the colours jump while
+panning. A quiet recording still fills the scale, since R follows its peak; a magnitude above R (a
+constant signal, for example) is clipped to 0 dB.
 
-** One pass with a float16 buffer
-
-The quantization needs M, which is only known once every frame has been transformed. Instead of
-computing the STFT twice, the extraction makes a single pass and stores, for the kept bins
-[first_bin, last_bin) only, the *absolute* decibels in float16:
-
-#+begin_example
-for each block of 128 frames:
-    X = rfft(frames × window)
-    a[block, kept bins] = 20 × log10 |X[kept bins]|     # float16 (−inf for a null magnitude)
-    block maximum = max |X|                              # over all the bins
-M = max of the block maxima
-codes = quantize(a − 20 × log10 M)                       # block by block, into the uint8 result
-#+end_example
-
-float16 has an 11-bit significand: for absolute levels up to 128 dB, the rounding error is at most
-0.03 dB (0.0625 dB steps), well below the 0.27 dB of a code. A null magnitude gives −inf dB, which ends up at code 0, as before.
+One code is 0.31 dB, finer than any colormap can show. The displayed range (say −70 to 0 dB) is not part
+of the analysis: it only chooses which codes are mapped to the ends of the colormap.
 
 ** Parallel blocks
 
-numpy's FFT releases the GIL, so the blocks are computed by a pool of up to 4 threads
-(=concurrent.futures.ThreadPoolExecutor=). Each block writes its own rows of the float16 buffer and
-returns its maximum: there is nothing to lock. The global maximum is the maximum of the returned
-values.
+The frames are processed by blocks of 128, each block being transformed and quantized at once. numpy's FFT
+releases the GIL, so the blocks are computed by a pool of up to 4 threads
+(=concurrent.futures.ThreadPoolExecutor=). Each block writes its own rows of the result: there is
+nothing to lock.
 
 ** Memory
 
-For F frames and K kept bins:
+For F visible frames and K kept bins:
 
-| Data                              | Size                  | When                         |
-|-----------------------------------+-----------------------+------------------------------|
-| float16 buffer                    | 2 × F × K bytes       | during the extraction        |
-| uint8 result                      | F × K bytes           | kept                         |
-| per thread: frames, FFT, magnitude | ≈ 128 × n_fft × 12 B | during one block (≈ 6 MB)    |
+| Data                               | Size                 | When                      |
+|------------------------------------+----------------------+---------------------------|
+| uint8 result                       | F × K bytes          | kept                      |
+| per thread: frames, FFT, magnitude | ≈ 128 × n_fft × 12 B | during one block (≈ 6 MB) |
 
-For 10 minutes with the default settings (F = 120 001, K = 1 280): about 460 MB during the
-extraction, 154 MB afterwards, instead of more than 4 GB.
+With the default settings (5 ms, K = 1 281), the maximum visible duration of 30 s gives F = 6 001:
+about 8 MB, whatever the length of the recording.
 
 * Live update of the spectrogram
 
-The spectrogram panel has no "Extract" button: the spectrogram follows the sliders.
+The spectrogram panel has no "Extract" button: the spectrogram follows the view and the sliders.
 
 ** Display settings: instant
 
@@ -118,40 +116,60 @@ The frequency range, the maximum level and the dynamic range do not need a new a
   (=DataWidget.setLevels=): only the colormap mapping changes;
 - the frequency range is the visible part of the y axis (=DataWidget.setYView=).
 
-Both take a few milliseconds, with the visible-slice rendering ([[file:image-rendering.org]]). Only a
-maximum frequency above the analysed ones starts a new analysis (to compute the missing bins).
+Only a maximum frequency above the analysed ones starts a new analysis (to compute the missing bins).
 
-** Analysis settings: in the background
+** View and analysis settings: in the background
 
-The window, the window length and the time step need a new analysis. To keep the interface responsive:
+A change of the visible range, of the window, of the window length or of the time step needs a new
+analysis. To keep the interface responsive:
 
-1. *Debounce*: every change restarts a 300 ms timer, so dragging a slider starts one analysis, after
-   the user stops moving it, not one per pixel of movement.
-2. *Background thread*: the analysis (=compute_spectrogram=, which only reads its arguments) runs in
+1. *Debounce*: every change restarts a 150 ms timer, so a pan, a zoom or a drag of a slider starts one
+   analysis, once the user stops moving, not one per mouse event.
+2. *Nothing to do?* If the current spectrogram has the same settings and already contains the
+   visible range (after a zoom-in, for example), nothing is computed.
+3. *Background thread*: the analysis (=compute_spectrogram=, which only reads its arguments) runs in
    a single worker thread; the current spectrogram stays visible meanwhile, with an "Updating…"
    message under the panel.
-3. *Back to the GUI thread*: when the analysis ends, the worker emits a Qt signal of an object living
+4. *Back to the GUI thread*: when the analysis ends, the worker emits a Qt signal of an object living
    in the GUI thread; Qt queues it, so the result is always stored and drawn by the GUI thread.
-4. *Only the latest result*: each analysis has a generation number. A result whose generation is not
-   the latest one is dropped (the settings changed again, a new signal was loaded, or another plugin
-   was selected). A request made while an analysis is running waits for it, and only the latest
-   request is kept.
+5. *Only the latest result*: each analysis has a generation number. A result whose generation is not
+   the latest one is dropped (the view became too long, a new signal was loaded, or another plugin was
+   selected). A request made while an analysis is running waits for it, and only the latest request
+   is kept.
 
-On the 10-minute recording, a new analysis takes about 3 s in the background, during which the
-interface never stops responding for more than about 10 ms; a display change is drawn in about 80 ms.
+** Maximum visible duration
+
+The "Max visible duration" slider (30 s by default, up to 600 s) bounds the work and the memory:
+
+#+begin_example
+visible duration > maximum:   free the spectrogram, show a message over the plot, compute nothing
+visible duration ≤ maximum:   remove the message, compute and show the visible part
+#+end_example
+
+The same rule applies when the plugin is selected, when the view changes and when the slider moves. The
+message does not intercept the mouse, so the user can zoom in directly over it.
 
 * Validation
 
-A test computes the spectrogram of the example recording both ways (librosa's =stft= +
-=amplitude_to_db= on one side, this implementation on the other) and checks that the 8-bit codes
-differ by at most one (rounding).
+The tests check that:
+
+- the codes match librosa's =stft= + =amplitude_to_db= with the same reference, within one code;
+- the visible part has exactly the codes of the same frames in the analysis of the whole signal;
+- analysing a quiet part alone does not raise its level (the reference stays the one of the whole signal);
+- panning computes the new part, zooming in a computed part computes nothing, and a too long view shows
+  the message until the view is short enough (including exactly the maximum).
 
 * Results
 
-| Measure                                       | Before          | After  |
-|-----------------------------------------------+-----------------+--------|
-| Open the spectrogram, 2 min (time)            | 2.71 s          | 0.62 s |
-| Open the spectrogram, 2 min (memory, peak)    | 1 323 MB        | 329 MB |
-| Open the spectrogram, 10 min                  | killed (> 4 GB) | 3.02 s |
+On the 10-minute recording, with the maximum of 30 s:
 
-librosa is no longer used by spiny, which also saves its import (about 1 s and 100 MB, mostly numba).
+| Measure                                      | Before                       | After                   |
+|----------------------------------------------+------------------------------+-------------------------|
+| Open the recording (full view)               | killed (> 4 GB)              | message, nothing computed |
+| Show a 30 s view                             | whole spectrogram required   | 0.44 s                  |
+| Pan a 30 s view: result in the background    | not applicable               | 0.42 s                  |
+| Longest interface freeze during that pan     | not applicable               | 21 ms                   |
+| Peak memory of the session                   | killed (> 4 GB)              | 313 MB                  |
+
+On the 2-minute recording, the old code took 5.53 s and 1 324 MB to open the spectrogram of the whole
+recording. librosa is no longer used by spiny, which also saves its import (about 1 s and 100 MB).

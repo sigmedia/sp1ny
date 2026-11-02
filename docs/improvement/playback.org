@@ -59,6 +59,6 @@ usual case). It is never used for analysis: every plugin works on the signal at 
 
 | Measure                        | Before (librosa) | After (soundfile) |
 |--------------------------------+------------------+-------------------|
-| Load the audio, 2 min          | 1.00 s           | 0.01 s            |
-| Load the audio, 10 min         | 1.20 s           | 0.06 s            |
+| Load the audio, 2 min          | 2.21 s           | 0.01 s            |
+| Load the audio, 10 min         | 2.20 s           | 0.06 s            |
 | Resampled copy for playback    | 3 × the signal   | none              |

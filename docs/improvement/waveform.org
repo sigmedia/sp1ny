@@ -13,7 +13,7 @@ The waveform was drawn by a pyqtgraph =PlotDataItem= holding one point per sampl
 - every repaint walked through the whole path, even when a few seconds were visible.
 
 For a 10-minute recording at 16 kHz (N = 9.6 million samples), the first paint added about 420 MB and
-took 1.7 s. Yet a screen of W = 1500 pixels can show at most W distinct columns: the information
+took about 3 s. Yet a screen of W = 1500 pixels can show at most W distinct columns: the information
 actually drawn is O(W), not O(N).
 
 * The algorithm
@@ -89,8 +89,8 @@ samples, is read from the samples themselves and merged into the last column.
 
 | Measure                                    | Before | After  |
 |--------------------------------------------+--------+--------|
-| Memory added by the first paint, 10 min    | 422 MB | 25 MB  |
-| First paint, 10 min                        | 1.67 s | 0.10 s |
-| Pan in a 5 s view, 10 frames, 2 min        | 0.41 s | 0.09 s |
+| Memory added by the first paint, 10 min    | 422 MB | 26 MB  |
+| First paint, 10 min                        | 3.31 s | 0.17 s |
+| Pan in a 5 s view, 10 frames, 2 min        | 2.76 s | 0.48 s |
 
 (The first paint and pan times include the rendering of the whole window, not only the waveform.)

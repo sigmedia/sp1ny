@@ -59,6 +59,6 @@ evenly spaced from 0. A test checks that the chunked and full analyses agree apa
 | Measure                                | Before          | After                |
 |----------------------------------------+-----------------+----------------------|
 | Startup memory (parselmouth not used)  | imported        | not imported         |
-| Select Praat, 2 min (time)             | 0.39 s          | 0.56 s (two passes)  |
-| Select Praat, 10 min                   | killed (> 4 GB) | 2.35 s               |
+| Select Praat, 2 min (time)             | 0.64 s          | 1.04 s (two passes)  |
+| Select Praat, 10 min                   | killed (> 4 GB) | 4.30 s               |
 | Spectrogram size, 10 min               | float64         | uint8, about 48 MB   |

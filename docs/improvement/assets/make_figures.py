@@ -332,8 +332,8 @@ def main() -> None:
         ("Load the audio", "load_wav"),
         ("First paint", "first_paint"),
         ("Load annotations", "load_annotations"),
-        ("Open spectrogram", "select Spectrogram"),
-        ("Pan (10 frames)", "pan 5s view x10"),
+        ("Pan a 60 s view (10 frames)", "pan 60s view x10"),
+        ("Pan a 5 s view (10 frames)", "pan 5s view x10"),
         ("Change colormap", "colormap change"),
     ]
     (HERE / "operation_times_2min.svg").write_text(
@@ -341,7 +341,7 @@ def main() -> None:
             "Time of common operations on a 2-minute recording",
             [(label, data["base_short"][key]["s"], data["new_short"][key]["s"]) for label, key in operations],
             "Seconds",
-            3.0,
+            8.0,
             "",
         )
     )

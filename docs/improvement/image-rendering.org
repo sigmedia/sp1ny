@@ -62,7 +62,7 @@ otherwise                         new slice = [f0 − w/2, f1 + w/2)
 
 When the display levels are not given (raw coefficients), they are estimated *once* from at most one
 million values of the whole data (a strided subsample), so that they do not change while panning.
-The 8-bit spectrograms use the fixed levels (0, 255): no scan of the data at all.
+The spectrograms give their levels explicitly: no scan of the data at all.
 
 ** Release of hidden plugins
 
@@ -70,13 +70,18 @@ Selecting a plugin used to keep the data of the previously selected plugins in m
 they are extracted again when selected again. =DataController.release()= now drops the image and the
 extractor result of the plugin that is not displayed anymore.
 
+* And the spectrogram?
+
+The spectrogram now computes only the visible part ([[file:spectrogram.org]]), so its image never has many more
+frames than the view. The visible slice still matters for the raw coefficients and the Praat spectrogram.
+
 * Results
 
 | Measure (10-minute recording)            | Before                  | After       |
 |------------------------------------------+-------------------------+-------------|
 | Rendered image when zoomed in            | 120 001 × 640 (≈ 2 s)   | ≈ 1 500 wide |
-| Colormap change                          | about 2 s when zoomed in| 0.02 s      |
-| Peak memory over the session             | killed (> 4 GB)         | 797 MB      |
+| Colormap change                          | about 2 s when zoomed in| 0.03 s      |
+| Peak memory over the session             | killed (> 4 GB)         | 503 MB      |
 
 (The "before" column of the first two lines was measured on the branch right before this change,
 since the original code could not open a 10-minute spectrogram at all.)

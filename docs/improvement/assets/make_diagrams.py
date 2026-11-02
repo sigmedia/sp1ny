@@ -240,83 +240,67 @@ def waveform_pyramid() -> str:
 
 
 def spectrogram_pipeline() -> str:
-    """Block-wise, multi-threaded STFT with a float16 buffer and 8-bit quantization
+    """Block-wise, multi-threaded STFT of the visible part, with an 8-bit quantization
 
     Returns
     -------
     str
         The SVG document
     """
-    width, height = 900, 500
-    body = [text(24, 30, "Spectrogram: one pass by blocks of frames, then 8-bit quantization", 16, weight="bold")]
+    width, height = 900, 450
+    body = [text(24, 30, "Spectrogram: only the visible frames, by blocks", 16, weight="bold")]
 
-    # Signal and its frames, grouped in blocks
-    body.append(text(24, 70, "signal (zero-padded by n_fft/2 on each side)", 12, TEXT_SECONDARY))
-    body.append(rect(24, 78, 852, 22, LIGHT, LINE, radius=3))
-    blocks_x = [24 + i * 213 for i in range(4)]
-    for i, x in enumerate(blocks_x):
-        body.append(rect(x + 3, 106, 207, 18, BLUE_LIGHT, BLUE, radius=3))
-        body.append(text(x + 106, 119, f"block {i}: 128 frames", 11, TEXT, "middle"))
-    body.append(
-        text(
-            24,
-            142,
-            "frame t is centred on sample t·hop; a block needs the samples of its own frames only",
-            11,
-            TEXT_SECONDARY,
-        )
-    )
+    # Signal, visible range and its blocks of frames
+    body.append(text(24, 62, "signal", 12, TEXT_SECONDARY))
+    body.append(rect(24, 70, 852, 22, LIGHT, LINE, radius=3))
+    view_x0, block_w = 300, 85
+    body.append(rect(view_x0 - 4, 66, 4 * block_w + 8, 30, "none", ORANGE, radius=4, dash="5 4"))
+    body.append(text(view_x0 + 2 * block_w, 62, "visible range", 11, TEXT, "middle"))
+    for i in range(4):
+        x = view_x0 + i * block_w
+        body.append(rect(x + 2, 100, block_w - 4, 18, BLUE_LIGHT, BLUE, radius=3))
+        body.append(text(x + block_w / 2, 113, "128 frames", 11, TEXT, "middle"))
+    body.append(text(24, 138, "only the frames of the visible range are computed, by blocks", 11, TEXT_SECONDARY))
 
     # Worker threads
     stages = ["frames (view, no copy)", "× window", "rFFT (n_fft)", "|X|  (float32)"]
     for lane in range(2):
-        y = 165 + lane * 85
-        body.append(text(24, y + 20, f"thread {lane + 1}", 12, TEXT))
+        y = 158 + lane * 62
+        body.append(text(24, y + 21, f"thread {lane + 1}", 12, TEXT))
         for s, label in enumerate(stages):
-            x = 110 + s * 150
-            body.append(rect(x, y, 130, 34, BLUE_LIGHT, BLUE, radius=4))
-            body.append(text(x + 65, y + 21, label, 11, TEXT, "middle"))
+            x = 90 + s * 145
+            body.append(rect(x, y, 128, 34, BLUE_LIGHT, BLUE, radius=4))
+            body.append(text(x + 64, y + 21, label, 11, TEXT, "middle"))
             if s:
-                body.append(arrow(x - 20, y + 17, x - 2, y + 17))
-        body.append(arrow(110 + 4 * 150 - 20, y + 17, 728, 183))
-        body.append(arrow(110 + 4 * 150 - 20, y + 17, 728, 245))
+                body.append(arrow(x - 17, y + 17, x - 2, y + 17))
+        body.append(arrow(90 + 3 * 145 + 128, y + 17, 672, y + 17))
+        body.append(rect(674, y, 202, 34, BLUE, BLUE, radius=4))
+        body.append(text(775, y + 21, "8-bit codes of the block", 11, SURFACE, "middle"))
     body.append(
         text(
             24,
-            306,
+            272,
             "(up to 4 threads; numpy releases the GIL during the FFT; each block writes its own rows)",
             11,
             TEXT_SECONDARY,
         )
     )
 
-    # Outputs of a block
-    body.append(rect(732, 160, 144, 46, ORANGE_LIGHT, ORANGE, radius=4))
-    body.append(text(804, 179, "block maximum", 11, TEXT, "middle"))
-    body.append(text(804, 195, "(all bins)", 11, TEXT_SECONDARY, "middle"))
-    body.append(rect(732, 222, 144, 46, BLUE_LIGHT, BLUE, radius=4))
-    body.append(text(804, 241, "20·log10 |X| of the", 11, TEXT, "middle"))
-    body.append(text(804, 257, "kept bins → float16", 11, TEXT, "middle"))
-
-    # After the pass
-    body.append(line(24, 320, 876, 320, LIGHT, 1))
-    body.append(text(24, 345, "after the pass", 12, TEXT, weight="bold"))
-    body.append(rect(24, 360, 250, 54, ORANGE_LIGHT, ORANGE, radius=4))
-    body.append(text(149, 382, "M = max of the block maxima", 11, TEXT, "middle"))
-    body.append(text(149, 399, "(0 dB reference, as librosa)", 11, TEXT_SECONDARY, "middle"))
-    body.append(rect(314, 360, 300, 54, BLUE_LIGHT, BLUE, radius=4))
-    body.append(text(464, 382, "d = max(a − 20·log10 M, −80) clipped to [L, H]", 11, TEXT, "middle"))
-    body.append(text(464, 399, "code = round((d − L) · 255 / (H − L))", 11, TEXT, "middle"))
-    body.append(rect(654, 360, 222, 54, BLUE, BLUE, radius=4))
-    body.append(text(765, 382, "uint8 spectrogram", 12, SURFACE, "middle", "bold"))
-    body.append(text(765, 399, "1 byte per kept cell", 11, SURFACE, "middle"))
-    body.append(arrow(274, 387, 312, 387))
-    body.append(arrow(614, 387, 652, 387))
+    # Quantization
+    body.append(line(24, 290, 876, 290, LIGHT, 1))
+    body.append(text(24, 314, "quantization of a block", 12, TEXT, weight="bold"))
+    body.append(rect(24, 328, 330, 54, ORANGE_LIGHT, ORANGE, radius=4))
+    body.append(text(189, 350, "R = peak(|x|) · sum(window) / 2", 11, TEXT, "middle"))
+    body.append(text(189, 367, "a sine at the peak of the whole signal: stable colours", 11, TEXT_SECONDARY, "middle"))
+    body.append(rect(394, 328, 482, 54, BLUE_LIGHT, BLUE, radius=4))
+    body.append(text(635, 350, "d = clip(20 · log10(|X| / R), −80, 0)", 11, TEXT, "middle"))
+    body.append(text(635, 367, "code = round((d + 80) · 255 / 80)", 11, TEXT, "middle"))
+    body.append(arrow(354, 355, 392, 355))
     body.append(
         text(
             24,
-            448,
-            "Memory: the float16 buffer (2 bytes per kept cell) and the uint8 result (1 byte) during the extraction,",
+            412,
+            "Memory: 1 byte per kept cell of the visible range; each thread only holds the temporaries of one block",
             12,
             TEXT_SECONDARY,
         )
@@ -324,14 +308,13 @@ def spectrogram_pipeline() -> str:
     body.append(
         text(
             24,
-            466,
-            "1 byte per kept cell afterwards; each thread only holds the temporaries of one block "
-            "(128 × n_fft values).",
+            430,
+            "(128 × n_fft values). The display range only selects which codes map to the ends of the colormap.",
             12,
             TEXT_SECONDARY,
         )
     )
-    return svg(width, height - 10, body, "Spectrogram extraction pipeline")
+    return svg(width, height, body, "Spectrogram extraction pipeline")
 
 
 def visible_slice() -> str:
