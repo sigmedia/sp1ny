@@ -120,11 +120,11 @@ def test_format_time():
 
 
 def test_toolbar_play_button_toggles(fake_audio, qapp, monkeypatch):
-    from spiny.core.wav import PlayerControllerWidget
+    from spiny.core.wav import TransportWidget
 
     monkeypatch.setattr(sd, "query_devices", lambda *a, **k: [{"name": "fake", "max_output_channels": 2}])
     monkeypatch.setattr(sd.default, "device", (-1, 0))
-    widget = PlayerControllerWidget()
+    widget = TransportWidget()
     widget._bPlay.click()
     assert fake_audio.is_playing and not fake_audio.is_paused
     widget._bPlay.click()
@@ -184,9 +184,9 @@ def test_unplayable_device_raises_and_resets(fake_audio, monkeypatch):
 
 
 def test_toolbar_without_output_device(qapp, monkeypatch):
-    from spiny.core.wav import PlayerControllerWidget
+    from spiny.core.wav import OutputWidget, TransportWidget
 
     monkeypatch.setattr(sd, "query_devices", lambda *a, **k: [])
     monkeypatch.setattr(sd.default, "device", (-1, -1))
-    widget = PlayerControllerWidget()
-    assert not widget._bPlay.isEnabled()
+    assert not TransportWidget()._bPlay.isEnabled()
+    assert not OutputWidget()._boxDevices.isEnabled()

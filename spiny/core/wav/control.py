@@ -32,12 +32,36 @@ def format_time(seconds: float) -> str:
     return f"{milliseconds // 60000:02d}:{milliseconds // 1000 % 60:02d}.{milliseconds % 1000:03d}"
 
 
-class PlayerControllerWidget(QtWidgets.QWidget):
-    """Player toolbar, as the transport bar of a DAW
+def output_devices() -> tuple[dict[str, int], str | None]:
+    """List the audio output devices
 
-    On the left the transport (return to start, play/pause, stop, loop) and the time display, on the right the
-    output device and the volume. The state is polled from the player, so that the toolbar is also right when
-    the playback ends by itself or is started elsewhere (e.g. from an annotation).
+    Returns
+    -------
+    dict(str, int)
+        The PortAudio index of each output device, by name
+    str or None
+        The name of the default output device (its index is -1 when there is none)
+    """
+    devices = dict()
+    default_index = sd.default.device[1]
+    default_device = None
+    for index, device in enumerate(sd.query_devices()):
+        if device["max_output_channels"] <= 0:  # NOTE: only consider output devices!
+            continue
+        if "index" in device:
+            index = int(device["index"])
+
+        devices[device["name"]] = index
+        if index == default_index:
+            default_device = device["name"]
+    return devices, default_device
+
+
+class TransportWidget(QtWidgets.QWidget):
+    """Transport of the player, as in a DAW: return to start, play/pause, stop, loop and the time display
+
+    The state is polled from the player, so that the display is also right when the playback ends by itself or is
+    started elsewhere (e.g. from an annotation).
 
     Parameters
     ----------
@@ -56,17 +80,11 @@ class PlayerControllerWidget(QtWidgets.QWidget):
         QToolButton:disabled { background: transparent; }
         QLabel#time { background: #17181a; color: #7fe3a8; border-radius: 6px; padding: 4px 10px; }
         QLabel#duration { background: #17181a; color: #7c8088; border-radius: 6px; padding: 4px 10px; }
-        QSlider::groove:horizontal { height: 4px; border-radius: 2px; background: rgba(127, 127, 127, 90); }
-        QSlider::sub-page:horizontal { border-radius: 2px; background: #2a78d6; }
-        QSlider::handle:horizontal {
-            width: 12px; margin: -4px 0; border-radius: 6px; background: palette(button-text);
-        }
     """
 
     def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
         super().__init__(parent)
         self.setStyleSheet(self.STYLE_SHEET)
-        self.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Preferred)
         icon_color = self.palette().color(QtGui.QPalette.ColorRole.ButtonText)
 
         self._play_icon = transport_icon("play", self.PLAY_COLOR)
@@ -92,50 +110,10 @@ class PlayerControllerWidget(QtWidgets.QWidget):
         self._lDuration.setObjectName("duration")
         self._lDuration.setFont(time_font)
 
-        # Get devices information (the default output index is -1 when there is no output device)
-        devices = sd.query_devices()
-        self._devices = dict()
-        default_device_index = sd.default.device[1]
-        default_device = None
-        for index, device in enumerate(devices):
-            if device["max_output_channels"] <= 0:  # NOTE: only consider output devices!
-                continue
-            if "index" in device:
-                index = int(device["index"])
-
-            self._devices[device["name"]] = index
-            if index == default_device_index:
-                default_device = device["name"]
-
-        # Generation Device ComboBox
-        self._boxDevices = QtWidgets.QComboBox()
-        self._boxDevices.setToolTip("Output device")
-        self._boxDevices.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
-        self._boxDevices.addItems(self._devices.keys())
-        if default_device is not None:
-            self._boxDevices.setCurrentText(default_device)
-
         # Without any output device, playback controls are useless
-        if not self._devices:
-            self._boxDevices.addItem("No output device")
-            for widget in (self._bStart, self._bPlay, self._bStop, self._bLoop, self._boxDevices):
-                widget.setEnabled(False)
-        self._boxDevices.currentTextChanged.connect(self.device_changed)
-
-        # Define volume slider
-        volume_icon = QtWidgets.QLabel()
-        volume_icon.setPixmap(transport_icon("volume", icon_color).pixmap(20, 20))
-        self._sVolume = QtWidgets.QSlider(QtCore.Qt.Horizontal)
-        self._sVolume.setRange(0, 100)
-        self._sVolume.setValue(round(player.volume * 100))
-        self._sVolume.setFixedWidth(120)
-        self._sVolume.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
-        self._sVolume.setToolTip("Volume")
-        self._sVolume.valueChanged.connect(self.volume_changed)
-        self._lVolume = QtWidgets.QLabel()
-        self._lVolume.setAlignment(QtCore.Qt.AlignmentFlag.AlignRight | QtCore.Qt.AlignmentFlag.AlignVCenter)
-        self._lVolume.setFixedWidth(40)
-        self.volume_changed()
+        if not output_devices()[0]:
+            for button in (self._bStart, self._bPlay, self._bStop, self._bLoop):
+                button.setEnabled(False)
 
         layout = QtWidgets.QHBoxLayout(self)
         layout.setContentsMargins(6, 2, 6, 2)
@@ -145,12 +123,6 @@ class PlayerControllerWidget(QtWidgets.QWidget):
         layout.addSpacing(12)
         layout.addWidget(self._lTime)
         layout.addWidget(self._lDuration)
-        layout.addStretch(1)
-        layout.addWidget(self._boxDevices)
-        layout.addSpacing(12)
-        layout.addWidget(volume_icon)
-        layout.addWidget(self._sVolume)
-        layout.addWidget(self._lVolume)
 
         self._refresh()
         self._refresh_timer = QtCore.QTimer(self)
@@ -199,6 +171,72 @@ class PlayerControllerWidget(QtWidgets.QWidget):
             player.play()
         except sd.PortAudioError as ex:
             QtWidgets.QMessageBox.warning(self, "Playback error", f"The audio device cannot play this signal:\n{ex}")
+
+
+class OutputWidget(QtWidgets.QWidget):
+    """Output of the player: the audio device and the volume
+
+    Parameters
+    ----------
+    parent : QtWidgets.QWidget, optional
+        The parent widget. (default: None)
+    """
+
+    STYLE_SHEET = """
+        QSlider::groove:horizontal { height: 4px; border-radius: 2px; background: rgba(127, 127, 127, 90); }
+        QSlider::sub-page:horizontal { border-radius: 2px; background: #2a78d6; }
+        QSlider::handle:horizontal {
+            width: 12px; margin: -4px 0; border-radius: 6px; background: palette(button-text);
+        }
+    """
+
+    def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setStyleSheet(self.STYLE_SHEET)
+        self.setSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Policy.Preferred)
+        icon_color = self.palette().color(QtGui.QPalette.ColorRole.ButtonText)
+
+        self._devices, default_device = output_devices()
+
+        # Generation Device ComboBox
+        self._boxDevices = QtWidgets.QComboBox()
+        self._boxDevices.setToolTip("Output device")
+        self._boxDevices.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
+        # NOTE: the name of a device can be very long, it must not decide the width of the toolbar
+        self._boxDevices.setSizeAdjustPolicy(QtWidgets.QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
+        self._boxDevices.setMinimumContentsLength(24)
+        self._boxDevices.addItems(self._devices.keys())
+        if default_device is not None:
+            self._boxDevices.setCurrentText(default_device)
+
+        if not self._devices:
+            self._boxDevices.addItem("No output device")
+            self._boxDevices.setEnabled(False)
+        self._boxDevices.currentTextChanged.connect(self.device_changed)
+
+        # Define volume slider
+        volume_icon = QtWidgets.QLabel()
+        volume_icon.setPixmap(transport_icon("volume", icon_color).pixmap(20, 20))
+        self._sVolume = QtWidgets.QSlider(QtCore.Qt.Horizontal)
+        self._sVolume.setRange(0, 100)
+        self._sVolume.setValue(round(player.volume * 100))
+        self._sVolume.setFixedWidth(120)
+        self._sVolume.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
+        self._sVolume.setToolTip("Volume")
+        self._sVolume.valueChanged.connect(self.volume_changed)
+        self._lVolume = QtWidgets.QLabel()
+        self._lVolume.setAlignment(QtCore.Qt.AlignmentFlag.AlignRight | QtCore.Qt.AlignmentFlag.AlignVCenter)
+        self._lVolume.setFixedWidth(40)
+        self.volume_changed()
+
+        layout = QtWidgets.QHBoxLayout(self)
+        layout.setContentsMargins(6, 2, 6, 2)
+        layout.setSpacing(4)
+        layout.addWidget(self._boxDevices)
+        layout.addSpacing(12)
+        layout.addWidget(volume_icon)
+        layout.addWidget(self._sVolume)
+        layout.addWidget(self._lVolume)
 
     def device_changed(self, name: str) -> None:
         """Use the selected output device; a device which cannot play the signal is refused and the previous one kept

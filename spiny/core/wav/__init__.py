@@ -3,10 +3,10 @@ from __future__ import annotations
 from typing import Any
 
 from .player import player as player
-from .control import PlayerControllerWidget
+from .control import OutputWidget, TransportWidget
 from .control import get_controller
 
-__all__ = ["player", "PlayerControllerWidget", "get_controller"]
+__all__ = ["player", "TransportWidget", "OutputWidget", "get_controller"]
 
 
 def __getattr__(name: str) -> Any:

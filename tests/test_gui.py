@@ -217,3 +217,11 @@ def test_click_on_a_plot_moves_the_cursor(window):
     view.mouseClickEvent(Click(view.mapFromView(QtCore.QPointF(0.5, 0))))
     assert abs(player.position - 0.5) < 0.01
     player.seek(0.0)
+
+
+def test_transport_and_output_are_separate_movable_toolbars(window):
+    toolbars = {toolbar.windowTitle(): toolbar for toolbar in window.findChildren(QtWidgets.QToolBar)}
+    assert set(toolbars) == {"Transport", "Output"}
+    assert all(toolbar.isMovable() for toolbar in toolbars.values())
+    window.addToolBar(QtCore.Qt.ToolBarArea.BottomToolBarArea, toolbars["Output"])
+    assert window.toolBarArea(toolbars["Output"]) == QtCore.Qt.ToolBarArea.BottomToolBarArea

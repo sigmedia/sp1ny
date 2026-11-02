@@ -26,7 +26,7 @@ from .core.wav import get_controller as get_audio_controller
 from .annotations.visualisation import AnnotationDock
 from .core import DataController, DataDock
 from .core import player
-from .core.wav import PlayerControllerWidget
+from .core.wav import OutputWidget, TransportWidget
 from .core import plugin_entry_dict
 from .annotations import get_controller as get_annotation_controller
 
@@ -119,14 +119,13 @@ def discover_plugins() -> dict[str, types.ModuleType]:
 
 
 class GUIVisu(QtWidgets.QMainWindow):
-    """Main window: player toolbar, plots (data, annotations, waveform) on the left, control tabs on the right"""
+    """Main window: player toolbars, plots (data, annotations, waveform) on the left, control tabs on the right"""
 
     def __init__(self) -> None:
         super().__init__()
         self._createMenuBar()
-        player_toolbar = self.addToolBar("Player")
-        player_toolbar.setMovable(False)
-        player_toolbar.addWidget(PlayerControllerWidget())
+        self._addToolBar("Transport", TransportWidget())
+        self._addToolBar("Output", OutputWidget())
         self._filename_label = QtWidgets.QLabel(str(player.filename or ""))
         self.statusBar().addPermanentWidget(self._filename_label)
 
@@ -146,6 +145,24 @@ class GUIVisu(QtWidgets.QMainWindow):
         # Show the default plugin with the default colormap
         self.selectPlugin(self._plugin_list.currentText())
         self.selectColorMap(self._cmap_list.currentText())
+
+    def _addToolBar(self, title: str, widget: QtWidgets.QWidget) -> None:
+        """Add a toolbar which can be moved along the top and the bottom of the window
+
+        The contents are horizontal, hence no toolbar on the sides. A floating toolbar would be another window: the
+        shortcuts of its buttons would not work while the main window is active.
+
+        Parameters
+        ----------
+        title : str
+            The title of the toolbar
+        widget : QtWidgets.QWidget
+            The contents of the toolbar
+        """
+        toolbar = self.addToolBar(title)
+        toolbar.setAllowedAreas(QtCore.Qt.ToolBarArea.TopToolBarArea | QtCore.Qt.ToolBarArea.BottomToolBarArea)
+        toolbar.setFloatable(False)
+        toolbar.addWidget(widget)
 
     def _createMenuBar(self) -> None:
         """Create the File menu (open an audio file, quit)"""
