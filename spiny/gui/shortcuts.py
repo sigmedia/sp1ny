@@ -22,6 +22,12 @@ SHORTCUTS: dict[str, str] = {
     "speed_down": "[",
     "speed_up": "]",
     "mute": "M",
+    # View
+    "zoom_in": "Ctrl+=",
+    "zoom_out": "Ctrl+-",
+    "zoom_fit": "Ctrl+0",
+    "follow": "F",
+    "switch_theme": "Ctrl+T",
     # Annotations
     "delete_annotation": "Delete",
 }

@@ -27,7 +27,7 @@ from .core.wav import get_controller as get_audio_controller
 from .annotations.visualisation import AnnotationDock
 from .core import DataController, DataDock
 from .core import player
-from .core.wav import OutputWidget, TransportWidget
+from .core.wav import OutputWidget, TransportWidget, ViewWidget
 from .core import plugin_entry_dict
 from .annotations import get_controller as get_annotation_controller
 
@@ -131,6 +131,7 @@ class GUIVisu(QtWidgets.QMainWindow):
         self.statusBar().addPermanentWidget(self._filename_label)
 
         self._visualisation_area = VisualisationArea()
+        self._addToolBar("View", ViewWidget(self._visualisation_area._dock_wav.wav_plot))
         tabs = QtWidgets.QTabWidget()
         tabs.addTab(self._createDataTab(), "Data/Visualization")
         tabs.addTab(self._createAnnotationTab(), "Annotations")

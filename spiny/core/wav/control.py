@@ -10,6 +10,7 @@ import sounddevice as sd
 # SpINY
 from pyqtgraph.Qt import QtCore, QtGui, QtWidgets, isQObjectAlive
 
+from spiny.gui import theme
 from spiny.gui.icons import ToolBarButton
 
 from .player import player
@@ -284,6 +285,82 @@ class OutputWidget(QtWidgets.QWidget):
         """Apply the volume of the slider to the player"""
         player.volume = self._sVolume.value() / 100
         self._lVolume.setText(f"{self._sVolume.value()}%")
+
+
+class ViewWidget(QtWidgets.QWidget):
+    """View of the plots: zoom, following the playhead and the theme
+
+    Parameters
+    ----------
+    wav_plot : pg.PlotWidget
+        The waveform plot: the time axis of every other plot is linked to it
+    parent : QtWidgets.QWidget, optional
+        The parent widget. (default: None)
+    """
+
+    #: How much a click on a zoom button changes the visible duration
+    ZOOM_FACTOR = 2.0
+
+    #: The shortest visible duration, in seconds
+    MIN_VISIBLE_DURATION = 0.01
+
+    def __init__(self, wav_plot: Any, parent: QtWidgets.QWidget | None = None) -> None:
+        super().__init__(parent)
+        self._wav_plot = wav_plot
+
+        self._bZoomOut = ToolBarButton("zoom_out", "Zoom out", "zoom_out")
+        self._bZoomIn = ToolBarButton("zoom_in", "Zoom in", "zoom_in")
+        self._bZoomFit = ToolBarButton("zoom_fit", "Show the whole signal", "zoom_fit")
+        self._bFollow = ToolBarButton("follow", "Follow the playhead", "follow")
+        self._bFollow.setCheckable(True)
+        self._bFollow.setChecked(True)
+        self._bTheme = ToolBarButton("theme", "Switch the theme", "switch_theme")
+        self._bZoomOut.clicked.connect(lambda: self.zoom(self.ZOOM_FACTOR))
+        self._bZoomIn.clicked.connect(lambda: self.zoom(1 / self.ZOOM_FACTOR))
+        self._bZoomFit.clicked.connect(self.zoomFit)
+        self._bTheme.clicked.connect(theme.toggle_theme)
+
+        layout = QtWidgets.QHBoxLayout(self)
+        layout.setContentsMargins(6, 2, 6, 2)
+        layout.setSpacing(4)
+        for button in (self._bZoomOut, self._bZoomIn, self._bZoomFit, self._bFollow):
+            layout.addWidget(button)
+        layout.addSpacing(12)
+        layout.addWidget(self._bTheme)
+
+        self._follow_timer = QtCore.QTimer(self)
+        self._follow_timer.setInterval(30)
+        self._follow_timer.timeout.connect(self.followPlayhead)
+        self._follow_timer.start()
+
+    def zoom(self, factor: float) -> None:
+        """Change the visible duration, around the playhead if it is visible (around the middle otherwise)
+
+        Parameters
+        ----------
+        factor : float
+            By how much the visible duration is multiplied
+        """
+        x_min, x_max = self._wav_plot.getViewBox().viewRange()[0]
+        duration = player.duration
+        width = min(max((x_max - x_min) * factor, self.MIN_VISIBLE_DURATION), duration)
+        centre = player.position if x_min <= player.position <= x_max else (x_min + x_max) / 2
+        start = min(max(centre - width / 2, 0.0), duration - width)
+        self._wav_plot.setXRange(start, start + width, padding=0)
+
+    def zoomFit(self) -> None:
+        """Show the whole signal"""
+        self._wav_plot.setXRange(0, player.duration, padding=0)
+
+    def followPlayhead(self) -> None:
+        """During a playback, turn the page when the playhead leaves the view"""
+        if not self._bFollow.isChecked() or not player.is_playing or player.is_paused:
+            return
+        x_min, x_max = self._wav_plot.getViewBox().viewRange()[0]
+        position = player.position
+        if not x_min <= position <= x_max:
+            start = min(position, player.duration - (x_max - x_min))
+            self._wav_plot.setXRange(start, start + (x_max - x_min), padding=0)
 
 
 class ControlLayout(QtWidgets.QVBoxLayout):

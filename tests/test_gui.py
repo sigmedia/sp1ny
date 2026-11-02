@@ -221,7 +221,7 @@ def test_click_on_a_plot_moves_the_cursor(window):
 
 def test_transport_and_output_are_separate_movable_toolbars(window):
     toolbars = {toolbar.windowTitle(): toolbar for toolbar in window.findChildren(QtWidgets.QToolBar)}
-    assert set(toolbars) == {"Transport", "Output"}
+    assert set(toolbars) == {"Transport", "Output", "View"}
     assert all(toolbar.isMovable() for toolbar in toolbars.values())
     window.addToolBar(QtCore.Qt.ToolBarArea.BottomToolBarArea, toolbars["Output"])
     assert window.toolBarArea(toolbars["Output"]) == QtCore.Qt.ToolBarArea.BottomToolBarArea
@@ -344,5 +344,68 @@ def test_switching_the_theme_updates_what_is_on_the_screen(window):
         line = next(item for item in wav_plot.getPlotItem().items if isinstance(item, PlayheadLine))
         assert line.pen.color() == color("playhead")
         window.grab()
+    finally:
+        apply_theme("light")
+
+
+def view_widget(window):
+    from spiny.core.wav import ViewWidget
+
+    return window.findChild(ViewWidget)
+
+
+def visible_range(window):
+    return window._visualisation_area._dock_wav.wav_plot.getViewBox().viewRange()[0]
+
+
+def test_zoom_buttons(window):
+    from spiny.core import player
+
+    view = view_widget(window)
+    view.zoomFit()
+    player.seek(player.duration / 2)
+    before = visible_range(window)
+    view._bZoomIn.click()
+    x_min, x_max = visible_range(window)
+    assert x_max - x_min == pytest.approx((before[1] - before[0]) / 2, rel=0.01)
+    assert (x_min + x_max) / 2 == pytest.approx(player.duration / 2, rel=0.01)
+
+    # Zooming out near the end stays in the signal
+    player.seek(player.duration)
+    view._bZoomOut.click()
+    x_min, x_max = visible_range(window)
+    assert x_max <= player.duration * 1.001
+
+    view._bZoomFit.click()
+    assert visible_range(window)[1] - visible_range(window)[0] == pytest.approx(player.duration, rel=0.01)
+    player.seek(0.0)
+
+
+def test_view_follows_the_playhead(window, monkeypatch):
+    from spiny.core import player
+
+    view = view_widget(window)
+    wav_plot = window._visualisation_area._dock_wav.wav_plot
+    wav_plot.setXRange(0, 0.2, padding=0)
+    monkeypatch.setattr(type(player), "is_playing", property(lambda self: True))
+    monkeypatch.setattr(type(player), "position", property(lambda self: 0.5))
+
+    view._bFollow.setChecked(False)
+    view.followPlayhead()
+    assert visible_range(window)[0] == pytest.approx(0, abs=0.01)
+
+    view._bFollow.setChecked(True)
+    view.followPlayhead()
+    assert visible_range(window)[0] == pytest.approx(0.5, abs=0.01)
+    assert visible_range(window)[1] - visible_range(window)[0] == pytest.approx(0.2, abs=0.01)
+
+
+def test_theme_button_switches_the_theme(window):
+    from spiny.gui.theme import apply_theme, current_theme
+
+    apply_theme("light")
+    try:
+        view_widget(window)._bTheme.click()
+        assert current_theme() == "dark"
     finally:
         apply_theme("light")

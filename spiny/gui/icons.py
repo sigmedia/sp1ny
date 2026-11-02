@@ -97,6 +97,25 @@ def _shape(name: str) -> QtGui.QPainterPath:
         cross.moveTo(20.5, 9)
         cross.lineTo(15.5, 15)
         return _polygon((3.5, 9), (7.5, 9), (12.5, 5), (12.5, 19), (7.5, 15), (3.5, 15)) + _stroked(cross)
+    if name in ("zoom_in", "zoom_out"):
+        lens = QtGui.QPainterPath()
+        lens.addEllipse(QtCore.QPointF(10, 10), 6.5, 6.5)
+        handle = QtGui.QPainterPath(QtCore.QPointF(15, 15))
+        handle.lineTo(20.5, 20.5)
+        shape = _stroked(lens) + _stroked(handle, 2.5) + _roundedRect(7, 9.2, 6, 1.6, 0.5)
+        return shape + _roundedRect(9.2, 7, 1.6, 6, 0.5) if name == "zoom_in" else shape
+    if name == "zoom_fit":
+        arrows = _polygon((3, 12), (8, 7), (8, 17)) + _polygon((21, 12), (16, 7), (16, 17))
+        return arrows + _roundedRect(7.5, 11, 9, 2, 0.5)
+    if name == "follow":
+        return _roundedRect(4, 4, 2.5, 16) + _roundedRect(9, 11, 7, 2, 0.5) + _polygon((15, 6.5), (21, 12), (15, 17.5))
+    if name == "theme":
+        ring = QtGui.QPainterPath()
+        ring.addEllipse(QtCore.QPointF(12, 12), 8, 8)
+        half = QtGui.QPainterPath(QtCore.QPointF(12, 4))
+        half.arcTo(4, 4, 16, 16, 90, 180)
+        half.closeSubpath()
+        return _stroked(ring) + half
     if name == "play":
         return _polygon((7, 4.5), (20, 12), (7, 19.5))
     if name == "pause":
