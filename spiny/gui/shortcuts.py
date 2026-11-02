@@ -15,7 +15,13 @@ SHORTCUTS: dict[str, str] = {
     "play_pause": "Space",
     "stop": "Esc",
     "go_to_start": "Home",
+    "go_to_end": "End",
+    "rewind": "Left",
+    "forward": "Right",
     "loop": "L",
+    "speed_down": "[",
+    "speed_up": "]",
+    "mute": "M",
     # Annotations
     "delete_annotation": "Delete",
 }

@@ -10,8 +10,7 @@ import sounddevice as sd
 # SpINY
 from pyqtgraph.Qt import QtCore, QtGui, QtWidgets, isQObjectAlive
 
-from spiny.gui import theme
-from spiny.gui.icons import ToolBarButton, transport_icon
+from spiny.gui.icons import ToolBarButton
 
 from .player import player
 
@@ -70,15 +69,31 @@ class TransportWidget(QtWidgets.QWidget):
         The parent widget. (default: None)
     """
 
+    #: How far the rewind and forward buttons jump, in seconds
+    SKIP_SECONDS = 1.0
+
+    #: The playback speeds offered
+    SPEEDS = (0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0)
+
     def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
         super().__init__(parent)
         self._bStart = ToolBarButton("start", "Return to start", "go_to_start")
+        self._bRewind = ToolBarButton("rewind", f"Back {self.SKIP_SECONDS:g} s", "rewind")
         self._bPlay = ToolBarButton("play", "Play / Pause", "play_pause", color_name="play")
         self._bStop = ToolBarButton("stop", "Stop", "stop")
+        self._bForward = ToolBarButton("forward", f"Forward {self.SKIP_SECONDS:g} s", "forward")
+        self._bEnd = ToolBarButton("end", "Go to the end", "go_to_end")
         self._bLoop = ToolBarButton("loop", "Loop", "loop")
+        self._bSlower = ToolBarButton("minus", "Slower (the pitch follows)", "speed_down")
+        self._bFaster = ToolBarButton("plus", "Faster (the pitch follows)", "speed_up")
         self._bLoop.setCheckable(True)
         self._bLoop.setChecked(player.loop_activated)
         self._bStart.clicked.connect(lambda: player.seek(0.0))
+        self._bRewind.clicked.connect(lambda: player.seek(player.position - self.SKIP_SECONDS))
+        self._bForward.clicked.connect(lambda: player.seek(player.position + self.SKIP_SECONDS))
+        self._bEnd.clicked.connect(lambda: player.seek(player.duration))
+        self._bSlower.clicked.connect(lambda: self.changeSpeed(-1))
+        self._bFaster.clicked.connect(lambda: self.changeSpeed(1))
         self._bPlay.clicked.connect(self.playPause)
         self._bStop.clicked.connect(player.stop)
         self._bLoop.clicked.connect(player.toggleLoop)
@@ -92,20 +107,38 @@ class TransportWidget(QtWidgets.QWidget):
         self._lDuration = QtWidgets.QLabel()
         self._lDuration.setObjectName("duration")
         self._lDuration.setFont(time_font)
+        self._lSpeed = QtWidgets.QLabel()
+        self._lSpeed.setObjectName("speed")
+        self._lSpeed.setFont(time_font)
+        self._lSpeed.setToolTip("Playback speed")
 
         # Without any output device, playback controls are useless
         if not output_devices()[0]:
-            for button in (self._bStart, self._bPlay, self._bStop, self._bLoop):
+            for button in (
+                self._bStart,
+                self._bRewind,
+                self._bPlay,
+                self._bStop,
+                self._bForward,
+                self._bEnd,
+                self._bLoop,
+                self._bSlower,
+                self._bFaster,
+            ):
                 button.setEnabled(False)
 
         layout = QtWidgets.QHBoxLayout(self)
         layout.setContentsMargins(6, 2, 6, 2)
         layout.setSpacing(4)
-        for button in (self._bStart, self._bPlay, self._bStop, self._bLoop):
+        for button in (self._bStart, self._bRewind, self._bPlay, self._bStop, self._bForward, self._bEnd, self._bLoop):
             layout.addWidget(button)
         layout.addSpacing(12)
         layout.addWidget(self._lTime)
         layout.addWidget(self._lDuration)
+        layout.addSpacing(12)
+        layout.addWidget(self._bSlower)
+        layout.addWidget(self._lSpeed)
+        layout.addWidget(self._bFaster)
 
         self._refresh()
         self._refresh_timer = QtCore.QTimer(self)
@@ -117,7 +150,19 @@ class TransportWidget(QtWidgets.QWidget):
         """Show the state of the player: position, duration and play or pause icon"""
         self._lTime.setText(format_time(player.position))
         self._lDuration.setText(format_time(player.duration))
+        self._lSpeed.setText(f"{player.speed:.2f}x")
         self._bPlay.setIconName("pause" if player.is_playing and not player.is_paused else "play")
+
+    def changeSpeed(self, direction: int) -> None:
+        """Move to the next or previous playback speed
+
+        Parameters
+        ----------
+        direction : int
+            1 for the next faster speed, -1 for the next slower one
+        """
+        index = self.SPEEDS.index(player.speed) if player.speed in self.SPEEDS else self.SPEEDS.index(1.0)
+        player.speed = self.SPEEDS[min(max(index + direction, 0), len(self.SPEEDS) - 1)]
 
     def playPause(self) -> None:
         """Play from the cursor, or pause/resume a playback (a message box reports a device which cannot play)"""
@@ -162,8 +207,10 @@ class OutputWidget(QtWidgets.QWidget):
         self._boxDevices.currentTextChanged.connect(self.device_changed)
 
         # Define volume slider
-        self._volume_icon = QtWidgets.QLabel()
-        self.applyTheme()
+        self._bMute = ToolBarButton("volume", "Mute", "mute")
+        self._bMute.setCheckable(True)
+        self._bMute.setChecked(player.muted)
+        self._bMute.toggled.connect(self.mute_changed)
         self._sVolume = QtWidgets.QSlider(QtCore.Qt.Horizontal)
         self._sVolume.setRange(0, 100)
         self._sVolume.setValue(round(player.volume * 100))
@@ -181,13 +228,20 @@ class OutputWidget(QtWidgets.QWidget):
         layout.setSpacing(4)
         layout.addWidget(self._boxDevices)
         layout.addSpacing(12)
-        layout.addWidget(self._volume_icon)
+        layout.addWidget(self._bMute)
         layout.addWidget(self._sVolume)
         layout.addWidget(self._lVolume)
 
-    def applyTheme(self) -> None:
-        """Draw the volume icon with the colours of the current theme"""
-        self._volume_icon.setPixmap(transport_icon("volume", theme.color("button_text")).pixmap(20, 20))
+    def mute_changed(self, muted: bool) -> None:
+        """Mute or unmute the player
+
+        Parameters
+        ----------
+        muted : bool
+            True to mute
+        """
+        player.muted = muted
+        self._bMute.setIconName("mute" if muted else "volume")
 
     def device_changed(self, name: str) -> None:
         """Use the selected output device; a device which cannot play the signal is refused and the previous one kept

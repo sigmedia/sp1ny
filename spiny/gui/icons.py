@@ -74,13 +74,29 @@ def _shape(name: str) -> QtGui.QPainterPath:
     Parameters
     ----------
     name : str
-        "play", "pause", "stop", "start", "loop" or "volume"
+        The name of the icon
 
     Returns
     -------
     QtGui.QPainterPath
         The shape, on a 24 × 24 grid
     """
+    if name == "rewind":
+        return _polygon((11.5, 5), (3, 12), (11.5, 19)) + _polygon((21, 5), (12.5, 12), (21, 19))
+    if name == "forward":
+        return _polygon((12.5, 5), (21, 12), (12.5, 19)) + _polygon((3, 5), (11.5, 12), (3, 19))
+    if name == "end":
+        return _roundedRect(16.5, 5, 2.5, 14) + _polygon((4.5, 5), (14.5, 12), (4.5, 19))
+    if name == "minus":
+        return _roundedRect(5, 10.5, 14, 3, 1.5)
+    if name == "plus":
+        return _roundedRect(5, 10.5, 14, 3, 1.5) + _roundedRect(10.5, 5, 3, 14, 1.5)
+    if name == "mute":
+        cross = QtGui.QPainterPath(QtCore.QPointF(15.5, 9))
+        cross.lineTo(20.5, 15)
+        cross.moveTo(20.5, 9)
+        cross.lineTo(15.5, 15)
+        return _polygon((3.5, 9), (7.5, 9), (12.5, 5), (12.5, 19), (7.5, 15), (3.5, 15)) + _stroked(cross)
     if name == "play":
         return _polygon((7, 4.5), (20, 12), (7, 19.5))
     if name == "pause":
@@ -175,7 +191,7 @@ def transport_icon(name: str, color: QtGui.QColor, checked_color: QtGui.QColor |
     Parameters
     ----------
     name : str
-        "play", "pause", "stop", "start", "loop" or "volume"
+        The name of the icon, see _shape
     color : QtGui.QColor
         The colour
     checked_color : QtGui.QColor, optional

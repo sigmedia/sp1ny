@@ -22,6 +22,7 @@ from typing import Any
 
 
 import logging
+import math
 import threading
 
 import numpy as np
@@ -93,7 +94,9 @@ class Player(metaclass=Singleton):
         self._is_paused = False
         self._loop_activated = False
         self._chunk_size = chunk_size
-        self._position = 0  # In samples at the playback rate
+        self._position = 0.0  # In samples of the signal, fractional as soon as the signal is resampled
+        self._speed = 1.0
+        self._muted = False
         self._cursor = 0.0  # In seconds: where the playback starts, and where stop goes back to
         self._thread: threading.Thread | None = None
         self._wav = np.zeros((0, 1), dtype=np.float32)
@@ -225,17 +228,17 @@ class Player(metaclass=Singleton):
             self._play_rate = self._playbackRate(self._device)
             ratio = self.sampling_rate / self._play_rate  # Source samples per played sample
 
-            # Boundaries in samples at the playback rate
-            nb_played = int((self._wav.shape[0] - 1) / ratio) + 1
+            # Boundaries in samples of the signal
+            nb_samples = self._wav.shape[0]
             if start is None:
                 # A DAW starts over when asked to play from the very end
                 start = self._cursor if self._cursor < self.duration else 0.0
-            start_sample = min(int(start * self._play_rate), nb_played)
-            end_sample = nb_played if end == -1 else min(int(end * self._play_rate), nb_played)
+            start_sample = min(int(start * self.sampling_rate), nb_samples)
+            end_sample = nb_samples if end == -1 else min(int(end * self.sampling_rate), nb_samples)
 
             # And now play!
             self._is_playing = True
-            self._position = start_sample
+            self._position = float(start_sample)
 
             # Start stream in a new (daemon) thread so that it never blocks the application exit
             self._thread = threading.Thread(
@@ -265,7 +268,7 @@ class Player(metaclass=Singleton):
         """
         self._cursor = min(max(time, 0.0), self.duration)
         if self._is_playing:
-            self._position = int(self._cursor * self._play_rate)
+            self._position = self._cursor * self.sampling_rate
 
     def toggleLoop(self) -> None:
         """Toggle the loop mode (the played part restarts when its end is reached)"""
@@ -329,17 +332,35 @@ class Player(metaclass=Singleton):
         self._player_volume = min(max(value, 0.0), 1.0)
 
     @property
+    def speed(self) -> float:
+        """float: The playback speed (1 is the normal speed). It changes the pitch too, as a tape would"""
+        return self._speed
+
+    @speed.setter
+    def speed(self, value: float) -> None:
+        self._speed = max(value, 0.01)
+
+    @property
+    def muted(self) -> bool:
+        """bool: True if nothing is heard, whatever the volume"""
+        return self._muted
+
+    @muted.setter
+    def muted(self, value: bool) -> None:
+        self._muted = value
+
+    @property
     def position(self) -> float:
         """float: Current position in seconds: the played sample during a playback, the cursor otherwise.
 
         This is a plain read of a value updated by the audio thread, so GUI code should poll it
         (e.g. with a QTimer) rather than being called back from the audio thread.
         """
-        return self._position / self._play_rate if self._is_playing else self._cursor
+        return self._position / self.sampling_rate if self._is_playing else self._cursor
 
     @staticmethod
-    def _fillBlock(out: np.ndarray, source: np.ndarray, ratio: float, position: int, frames: int) -> None:
-        """Write `frames` played samples, starting at played sample `position`, into `out`
+    def _fillBlock(out: np.ndarray, source: np.ndarray, position: float, step: float, frames: int) -> None:
+        """Write `frames` played samples into `out`, reading the signal from `position` every `step` samples
 
         Parameters
         ----------
@@ -347,10 +368,10 @@ class Player(metaclass=Singleton):
             The output buffer, shape (>= frames, nb_channels)
         source : np.ndarray
             The signal at its native rate, shape (nb_samples, nb_channels)
-        ratio : float
+        position : float
+            The position of the first played sample in the signal
+        step : float
             The number of source samples per played sample (1.0 means no resampling)
-        position : int
-            The first played sample to write
         frames : int
             The number of samples to write
 
@@ -359,11 +380,12 @@ class Player(metaclass=Singleton):
         Resampling uses a linear interpolation, which is cheap enough for the real-time callback and
         fine for monitoring (it is never used for analysis).
         """
-        if ratio == 1.0:
-            out[:frames] = source[position : position + frames]
+        if step == 1.0 and position.is_integer():
+            first = int(position)
+            out[:frames] = source[first : first + frames]
             return
 
-        source_positions = (position + np.arange(frames)) * ratio
+        source_positions = position + np.arange(frames) * step
         i0 = np.minimum(source_positions.astype(np.intp), source.shape[0] - 1)
         i1 = np.minimum(i0 + 1, source.shape[0] - 1)
         frac = (source_positions - i0).astype(np.float32)[:, None]
@@ -379,9 +401,9 @@ class Player(metaclass=Singleton):
         ratio : float
             The number of source samples per played sample (1.0 means no resampling)
         start : int
-            The first played sample (at the playback rate)
+            The first played sample of the signal
         end : int
-            The played sample where the playback stops (at the playback rate, excluded)
+            The sample of the signal where the playback stops (excluded)
         """
         event = threading.Event()
         rate = self._play_rate
@@ -405,7 +427,8 @@ class Player(metaclass=Singleton):
             if status:
                 self._last_status = status
 
-            chunksize = max(min(end - self._position, frames), 0)
+            step = ratio * self._speed
+            chunksize = max(min(math.ceil((end - self._position) / step), frames), 0)
 
             # Stream Stopped (checked first so that stop() also works while paused)
             if not self._is_playing:
@@ -417,16 +440,17 @@ class Player(metaclass=Singleton):
                 outdata[:] = 0
             # Keep playing audio normally
             else:
-                self._fillBlock(outdata, source, ratio, self._position, chunksize)
-                if self._player_volume != 1.0:
-                    outdata[:chunksize] *= self._player_volume
+                self._fillBlock(outdata, source, self._position, step, chunksize)
+                gain = 0.0 if self._muted else self._player_volume
+                if gain != 1.0:
+                    outdata[:chunksize] *= gain
                 if chunksize < frames:
                     outdata[chunksize:] = 0
                     if not self._loop_activated:
                         raise sd.CallbackStop()
                     self._position = start
                 else:
-                    self._position += chunksize
+                    self._position += chunksize * step
 
         try:
             self._stream = sd.OutputStream(

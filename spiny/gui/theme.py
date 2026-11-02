@@ -125,8 +125,10 @@ _STYLE_SHEET = Template("""
     ToolBarButton:checked { background: $accent; }
     ToolBarButton:disabled { background: transparent; }
 
-    QLabel#time, QLabel#duration { background: $display_background; border-radius: 6px; padding: 4px 10px; }
-    QLabel#time { color: $display_text; }
+    QLabel#time, QLabel#duration, QLabel#speed {
+        background: $display_background; border-radius: 6px; padding: 4px 10px;
+    }
+    QLabel#time, QLabel#speed { color: $display_text; }
     QLabel#duration { color: $display_dim_text; }
 
     OutputWidget QSlider::groove:horizontal { height: 4px; border-radius: 2px; background: $slider_groove; }
