@@ -230,16 +230,9 @@ class WavPlotWidget(pg.PlotWidget):
         kwargs: kwargs
             arguments passed to spiny.gui.items.SelectablePlotItem
         """
-        super().__init__(parent=parent)
+        # NOTE: given to the constructor, because PlotWidget binds its setXRange, setLimits, ... to this item
+        super().__init__(parent=parent, plotItem=SelectablePlotItem(lock_y_axis=True, default_padding=0, **kwargs))
 
-        # Prepare plot item
-        self.plotItem = SelectablePlotItem(
-            lock_y_axis=True,
-            # values=[min_y, max_y],
-            default_padding=0,
-            **kwargs,
-        )
-        self.setCentralItem(self.plotItem)
         color = QtWidgets.QApplication.instance().palette().color(QtGui.QPalette.Text)
         self._waveform = WaveformItem(pen=color)
         self.plotItem.addItem(self._waveform)

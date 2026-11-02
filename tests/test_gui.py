@@ -96,6 +96,14 @@ def test_every_plugin_renders_with_time_on_x(window):
     assert window.dialogs == []
 
 
+def test_waveform_plot_methods_act_on_the_displayed_plot(player):
+    from spiny.core.wav.visualisation import WavPlotWidget
+
+    plot = WavPlotWidget()
+    plot.setXRange(1, 2, padding=0)
+    assert plot.plotItem.getViewBox().viewRange()[0] == pytest.approx([1, 2])
+
+
 def test_data_widget_renders_only_the_visible_slice(qapp):
     import numpy as np
     from pyqtgraph.Qt import QtGui
@@ -132,11 +140,11 @@ def test_switching_plugin_releases_the_previous_data(window):
     window._plugin_list.setCurrentText("Spectrogram")
     QtWidgets.QApplication.processEvents()
     spectrum = plugin_entry_dict["Spectrogram"]
-    assert spectrum.widget._imageItem.image is not None and spectrum._extractor._spectrum.size > 100
+    assert spectrum.widget._imageItem.image is not None and spectrum._extractor.spectrogram is not None
 
     window._plugin_list.setCurrentText("Raw DATA")
     QtWidgets.QApplication.processEvents()
-    assert spectrum.widget._imageItem.image is None and spectrum._extractor._spectrum.size == 100
+    assert spectrum.widget._imageItem.image is None and spectrum._extractor.spectrogram is None
     assert plugin_entry_dict["Raw DATA"].widget._imageItem.image is not None
 
 

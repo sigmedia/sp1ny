@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from concurrent.futures import Future, ThreadPoolExecutor
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
+import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtWidgets, isQObjectAlive
 
 from spiny.core import DataController, player
@@ -24,12 +25,15 @@ class _AnalysisSignals(QtCore.QObject):
 
 
 class SpectrumController(DataController):
-    """Controller of the "Spectrogram" plugin: a control panel which updates the spectrogram live
+    """Controller of the "Spectrogram" plugin: only the visible part of the signal is analysed, live
 
     - The display settings (frequency range, maximum level, dynamic range) are applied instantly.
-    - The analysis settings (window, window length, time step) start a new analysis in a background
-      thread, `ANALYSIS_DELAY_MS` after the last change: the current spectrogram stays visible until
-      the new one is ready, and the result of an outdated analysis is dropped.
+    - A change of the visible range or of an analysis setting (window, window length, time step) starts
+      a new analysis in a background thread, `ANALYSIS_DELAY_MS` after the last change: the current
+      spectrogram stays visible until the new one is ready, and the result of an outdated analysis is
+      dropped. Nothing is computed if the current spectrogram already covers the visible range.
+    - When the visible range is longer than `max_duration`, nothing is computed: the spectrogram is freed
+      and a message is shown instead, until the user zooms in.
 
     Parameters
     ----------
@@ -37,10 +41,15 @@ class SpectrumController(DataController):
         The spectrogram extractor
     widget : SpectrogramPlotWidget
         The widget rendering the spectrogram
+
+    Attributes
+    ----------
+    max_duration : int
+        The longest visible range for which a spectrogram is computed, in seconds
     """
 
-    #: Delay between the last change of an analysis setting and the start of the analysis
-    ANALYSIS_DELAY_MS = 300
+    #: Delay between the last change of the view or of an analysis setting and the start of the analysis
+    ANALYSIS_DELAY_MS = 150
 
     def __init__(self, extractor: SpectrumExtractor, widget: SpectrogramPlotWidget) -> None:
         super().__init__("Spectrogram", extractor, widget)
@@ -54,62 +63,133 @@ class SpectrumController(DataController):
         self._analysis_timer.setInterval(self.ANALYSIS_DELAY_MS)
         self._analysis_timer.timeout.connect(self._requestAnalysis)
 
+        self.max_duration = 30
+        self._active = False  # True while the plugin is displayed
+        self._wav_plot = None
         self._generation = 0  # incremented by every new analysis: only the latest one is shown
         self._running = False
-        self._pending: SpectrogramSettings | None = None  # requested while another analysis was running
+        self._pending: tuple[SpectrogramSettings, float, float] | None = None  # requested during another analysis
         self._panel: QtWidgets.QWidget | None = None
 
     ###########################################################################
     # Analysis
     ###########################################################################
 
+    def setWavPlot(self, wav_plot: pg.PlotWidget) -> None:
+        """Define the waveform plot: it gives the time axis, so its visible range is the one to analyse
+
+        Parameters
+        ----------
+        wav_plot : pg.PlotWidget
+            The waveform plot
+        """
+        if wav_plot is not self._wav_plot:  # this method is called every time the plugin is selected
+            wav_plot.getViewBox().sigXRangeChanged.connect(self._scheduleAnalysis)
+        super().setWavPlot(wav_plot)
+
     def extract(self) -> None:
-        """Compute the spectrogram now (blocking) with the settings of the panel, and show it
+        """Show the spectrogram of the visible range now (blocking), with the settings of the panel
 
         Used when the plugin is selected or a new signal is loaded. Inconsistent settings are reported in
         a message box.
         """
-        self._generation += 1  # any background analysis in progress is now outdated
-        self._pending = None
+        self._active = True
+        self._cancelAnalyses()
         self._extractor.settings = self._panelSettings()
-        try:
-            self._extractor.extract()
-        except ValueError as ex:
-            QtWidgets.QMessageBox.warning(None, "Spectrogram configuration", str(ex))
-            return
+        start_time, end_time = self._visibleRange()
+        if end_time - start_time > self.max_duration:
+            self._hideSpectrogram(end_time - start_time)
+        else:
+            self._widget.setMessage("")
+            try:
+                self._extractor.extract(start_time, end_time)
+            except ValueError as ex:
+                QtWidgets.QMessageBox.warning(None, "Spectrogram configuration", str(ex))
+                return
         self.refresh()
 
     def release(self) -> None:
         """Free the spectrogram and drop the background analyses (the plugin is not displayed anymore)"""
+        self._active = False
         self._analysis_timer.stop()
-        self._generation += 1
-        self._pending = None
+        self._cancelAnalyses()
         super().release()
 
+    def _visibleRange(self) -> tuple[float, float]:
+        """Return the part of the signal which is visible
+
+        Returns
+        -------
+        tuple(float, float)
+            The (start, end) times, in seconds
+        """
+        (start_time, end_time), _ = self._wav_plot.getViewBox().viewRange()
+        return max(start_time, 0.0), min(end_time, player.duration)
+
+    def _cancelAnalyses(self) -> None:
+        """Make the analysis in progress outdated and forget the one waiting"""
+        self._generation += 1
+        self._pending = None
+
+    def _hideSpectrogram(self, visible_duration: float) -> None:
+        """Free the spectrogram and explain why it is not shown
+
+        Parameters
+        ----------
+        visible_duration : float
+            The duration of the visible range, in seconds
+        """
+        super().release()
+        self._widget.setMessage(
+            f"The visible part lasts {visible_duration:.1f} s, more than the maximum of {self.max_duration} s.\n"
+            "Zoom in to see the spectrogram."
+        )
+
+    def _scheduleAnalysis(self, *args: Any) -> None:
+        """Restart the delay before the next analysis, so that dragging or panning starts a single one
+
+        Parameters
+        ----------
+        args : list
+            The arguments of the signal triggering the update (unused)
+        """
+        if self._active:
+            self._analysis_timer.start()
+
     def _requestAnalysis(self) -> None:
-        """Analyse the signal again with the settings of the panel, in the background
+        """Bring the spectrogram up to date with the visible range and the panel, in the background
 
         If an analysis is already running, the request waits for it to finish (only the latest request
         is kept).
         """
+        start_time, end_time = self._visibleRange()
+        if end_time - start_time > self.max_duration:
+            self._cancelAnalyses()
+            self._hideSpectrogram(end_time - start_time)
+            return
+
+        self._widget.setMessage("")
         settings = self._panelSettings()
-        if settings == self._extractor.settings and not self._running:
+        if self._extractor.covers(settings, start_time, end_time) and not self._running:
             return  # nothing would change
-        self._pending = settings
+        self._pending = (settings, start_time, end_time)
         if not self._running:
             self._startAnalysis()
 
     def _startAnalysis(self) -> None:
         """Start the pending analysis in the background thread"""
-        settings, self._pending = self._pending, None
-        if settings is None:
+        if self._pending is None:
             return
+        settings, start_time, end_time = self._pending
+        self._pending = None
         self._generation += 1
         generation = self._generation
         self._running = True
         self._setStatus("Updating…")
 
-        future = self._executor.submit(compute_spectrogram, player.signal[:, 0], player.sampling_rate, settings)
+        future = self._executor.submit(
+            compute_spectrogram, player.signal[:, 0], player.sampling_rate, settings, start_time, end_time
+        )
         future.add_done_callback(lambda done: self._signals.finished.emit((generation, settings, done)))
 
     def _onAnalysisFinished(self, result: tuple[int, SpectrogramSettings, Future]) -> None:
@@ -125,7 +205,7 @@ class SpectrumController(DataController):
         self._setStatus("")
         if generation == self._generation:
             try:
-                self._extractor.setResult(settings, *future.result())
+                self._extractor.setResult(settings, future.result())
                 self.refresh()
             except ValueError as ex:
                 self._setStatus(str(ex))
@@ -163,6 +243,7 @@ class SpectrumController(DataController):
         self._dynamic_range.valueChanged.connect(self._applyDisplay)
 
         display_layout = QtWidgets.QFormLayout()
+        display_layout.setRowWrapPolicy(QtWidgets.QFormLayout.RowWrapPolicy.WrapAllRows)  # wider sliders
         display_layout.addRow("Min frequency", self._min_frequency)
         display_layout.addRow("Max frequency", self._max_frequency)
         display_layout.addRow("Max level", self._max_level)
@@ -176,14 +257,18 @@ class SpectrumController(DataController):
         self._window.setCurrentText(settings.window)
         self._window_length = LabelledSlider(2, 100, int(settings.framelength), _describeWindowLength)
         self._time_step = LabelledSlider(1, 20, int(settings.frameshift), lambda v: f"{v} ms")
-        self._window.currentTextChanged.connect(self._analysis_timer.start)
-        self._window_length.valueChanged.connect(self._analysis_timer.start)
-        self._time_step.valueChanged.connect(self._analysis_timer.start)
+        self._max_duration = LabelledSlider(1, 600, self.max_duration, lambda v: f"{v} s")
+        self._window.currentTextChanged.connect(self._scheduleAnalysis)
+        self._window_length.valueChanged.connect(self._scheduleAnalysis)
+        self._time_step.valueChanged.connect(self._scheduleAnalysis)
+        self._max_duration.valueChanged.connect(self._onMaxDurationChanged)
 
         analysis_layout = QtWidgets.QFormLayout()
+        analysis_layout.setRowWrapPolicy(QtWidgets.QFormLayout.RowWrapPolicy.WrapAllRows)  # wider sliders
         analysis_layout.addRow("Window", self._window)
         analysis_layout.addRow("Window length", self._window_length)
         analysis_layout.addRow("Time step", self._time_step)
+        analysis_layout.addRow("Max visible duration", self._max_duration)
         analysis_box = QtWidgets.QGroupBox("Analysis")
         analysis_box.setLayout(analysis_layout)
 
@@ -214,6 +299,17 @@ class SpectrumController(DataController):
             window=self._window.currentText(),
             max_frequency=max(self._max_frequency.value(), self._extractor.settings.max_frequency),
         )
+
+    def _onMaxDurationChanged(self, value: int) -> None:
+        """Change the longest visible range for which a spectrogram is computed
+
+        Parameters
+        ----------
+        value : int
+            The new maximum, in seconds
+        """
+        self.max_duration = value
+        self._scheduleAnalysis()
 
     def _onMinFrequencyChanged(self, value: int) -> None:
         """Keep the frequency range non-empty (by pushing the max frequency up), then apply it
@@ -248,7 +344,7 @@ class SpectrumController(DataController):
         db_range = (max(max_level - self._dynamic_range.value(), DB_FLOOR), max_level)
         self._widget.setDisplayRange((self._min_frequency.value(), max_frequency), db_range)
         if max_frequency > self._extractor.settings.max_frequency:
-            self._analysis_timer.start()
+            self._scheduleAnalysis()
 
     def _setStatus(self, text: str) -> None:
         """Show a short message under the panel (if it is displayed)

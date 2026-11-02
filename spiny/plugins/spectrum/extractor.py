@@ -1,13 +1,12 @@
 """Spectrogram extraction with numpy only
 
-The STFT is computed by blocks of frames (in parallel) so that the full complex STFT is never held
-in memory, and the result is stored as 8-bit codes (one byte per time-frequency cell) instead of
-float64 decibels. For a 10 minute signal at 16 kHz with the default parameters, this brings the
-memory needed from several gigabytes down to about 150 MB (about 450 MB during the extraction).
+Only the requested time range is analysed, by blocks of frames (in parallel), and the result is stored as
+8-bit codes (one byte per time-frequency cell).
 """
 
 from __future__ import annotations
 
+import math
 import os
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
@@ -143,13 +142,13 @@ def stft_magnitude(
     return np.abs(np.fft.rfft(frames * window, axis=1)).astype(np.float32, copy=False)
 
 
-#: The codes 0 and 255 of a spectrogram correspond to DB_FLOOR and 0 dB relative to its maximum. Below DB_FLOOR
-#: everything is floored anyway (librosa's top_db), so the display range can change without a new analysis.
+#: The codes 0 and 255 of a spectrogram correspond to DB_FLOOR and 0 dB, so the displayed level range can change
+#: without a new analysis. 0 dB is the level of a sine at the peak amplitude of the signal (see compute_spectrogram).
 DB_FLOOR = -80.0
 
 
 def db_to_code(db: float) -> float:
-    """Convert a level in dB (relative to the maximum) into the 8-bit code representing it
+    """Convert a level in dB into the 8-bit code representing it
 
     Parameters
     ----------
@@ -167,15 +166,14 @@ def db_to_code(db: float) -> float:
 def quantize_db(magnitude: np.ndarray, reference: float, amin: float = 1e-5) -> np.ndarray:
     """Convert magnitudes to decibels relative to `reference` and quantize them on 8 bits
 
-    The conversion matches ``librosa.amplitude_to_db(magnitude / reference, top_db=-DB_FLOOR)`` (where
-    `reference` is the global maximum); the [DB_FLOOR, 0] dB range is mapped on the codes [0, 255].
+    The [DB_FLOOR, 0] dB range is mapped on the codes [0, 255].
 
     Parameters
     ----------
     magnitude : np.ndarray
         The STFT magnitudes
     reference : float
-        The magnitude corresponding to 0 dB (the maximum of the whole spectrogram)
+        The magnitude corresponding to 0 dB
     amin : float, optional
         The minimum relative amplitude (-100 dB by default) to avoid log(0). (default: 1e-5)
 
@@ -240,6 +238,45 @@ class SpectrogramSettings:
     max_frequency: float = 5000.0
 
 
+@dataclass(frozen=True, eq=False)
+class SpectrogramSlice:
+    """The spectrogram of a part of the signal
+
+    Attributes
+    ----------
+    codes : np.ndarray
+        The 8-bit codes, shape (nb_frames, nb_bins), dtype uint8 (see DB_FLOOR)
+    start_time : float
+        The time of the first frame, in seconds
+    frame_duration : float
+        The time between two frames, in seconds
+    top_frequency : float
+        The frequency at the top of the last bin, in Hz (the bins cover [0, top_frequency])
+    """
+
+    codes: np.ndarray
+    start_time: float
+    frame_duration: float
+    top_frequency: float
+
+    def covers(self, start_time: float, end_time: float) -> bool:
+        """Tell if the slice contains a time range
+
+        Parameters
+        ----------
+        start_time : float
+            The start of the range, in seconds
+        end_time : float
+            The end of the range, in seconds
+
+        Returns
+        -------
+        bool
+            True if the whole range is in the slice
+        """
+        return self.start_time <= start_time and end_time <= self.start_time + self.codes.shape[0] * self.frame_duration
+
+
 #: The number of frames computed at once (it bounds the temporary memory of each thread)
 BLOCK_SIZE = 128
 
@@ -248,90 +285,87 @@ NB_WORKERS = min(4, os.cpu_count() or 1)
 
 
 def compute_spectrogram(
-    signal: np.ndarray, sampling_rate: int, settings: SpectrogramSettings
-) -> tuple[np.ndarray, float]:
-    """Compute the 8-bit spectrogram of a signal
+    signal: np.ndarray,
+    sampling_rate: int,
+    settings: SpectrogramSettings,
+    start_time: float = 0.0,
+    end_time: float = math.inf,
+) -> SpectrogramSlice:
+    """Compute the 8-bit spectrogram of a part of a signal
 
-    A single pass is made over the signal, by blocks of `BLOCK_SIZE` frames computed by `NB_WORKERS`
-    threads: the kept frequency bins are stored as float16 decibels while the global maximum (the 0 dB
-    reference) is searched, then they are quantized on 8 bits. The peak memory is therefore about
-    3 bytes per kept time-frequency cell, 1 byte once the computation is done.
+    The frames covering [start_time, end_time] are computed by blocks of `BLOCK_SIZE` frames, by `NB_WORKERS`
+    threads. 0 dB is the level of a sine at the peak amplitude of the whole signal: this reference does not
+    depend on the analysed part, so the colours do not change when the view moves.
 
     The function only reads its arguments, so it can run in a background thread.
 
     Parameters
     ----------
     signal : np.ndarray
-        The mono signal, shape (nb_samples,)
+        The whole (mono) signal, shape (nb_samples,)
     sampling_rate : int
         The sampling rate of the signal
     settings : SpectrogramSettings
         The analysis parameters
+    start_time : float, optional
+        The start of the part to analyse, in seconds. (default: 0.0)
+    end_time : float, optional
+        The end of the part to analyse, in seconds. (default: the end of the signal)
 
     Returns
     -------
-    spectrum : np.ndarray
-        The codes, shape (nb_frames, nb_bins), dtype uint8 (see DB_FLOOR)
-    top_frequency : float
-        The frequency at the top of the last kept bin, in Hz (the bins cover [0, top_frequency])
+    SpectrogramSlice
+        The spectrogram of the frames covering the requested part
 
     Raises
     ------
     ValueError
         if the parameters are inconsistent
     """
-    frameshift = int(0.001 * settings.frameshift * sampling_rate)
-    framelength = int(0.001 * settings.framelength * sampling_rate)
-    if frameshift < 1:
+    hop_length = int(0.001 * settings.frameshift * sampling_rate)
+    win_length = int(0.001 * settings.framelength * sampling_rate)
+    if hop_length < 1:
         raise ValueError(f"The time step ({settings.frameshift} ms) is shorter than one sample")
-    if framelength < 1:
+    if win_length < 1:
         raise ValueError(f"The window length ({settings.framelength} ms) is shorter than one sample")
     if settings.max_frequency <= 0:
         raise ValueError(f"The maximum frequency must be positive (got {settings.max_frequency} Hz)")
 
-    n_fft = fft_length(framelength)
-    window = get_window(settings.window, framelength, n_fft)
+    n_fft = fft_length(win_length)
+    window = get_window(settings.window, win_length, n_fft)
     signal = np.ascontiguousarray(signal, dtype=np.float32)
     nb_bins = min(int(settings.max_frequency * n_fft / sampling_rate) + 1, n_fft // 2 + 1)
-    nb_frames = 1 + signal.shape[0] // frameshift
+    # A sine of amplitude A gives a magnitude of A × sum(window) / 2; the floor is for silent signals
+    peak = float(np.abs(signal).max(initial=0.0))
+    reference = max(peak * float(window.sum()) / 2, float(np.finfo(np.float32).tiny))
 
-    # Single pass (blocks computed in parallel, numpy's FFT releases the GIL): the kept bins are stored as float16
-    # decibels while the global maximum (over all the bins, as librosa does) is searched
-    absolute_db = np.empty((nb_frames, nb_bins), dtype=np.float16)
+    frame_duration = hop_length / sampling_rate
+    nb_signal_frames = 1 + signal.shape[0] // hop_length
+    first_frame = min(max(int(start_time / frame_duration), 0), nb_signal_frames - 1)
+    end_frame = nb_signal_frames if math.isinf(end_time) else math.ceil(end_time / frame_duration) + 1
+    end_frame = max(min(end_frame, nb_signal_frames), first_frame + 1)
+    codes = np.empty((end_frame - first_frame, nb_bins), dtype=np.uint8)
 
-    def process_block(first: int) -> float:
-        """Compute one block of frames and store its kept bins in decibels
+    def process_block(block_start: int) -> None:
+        """Compute and quantize one block of frames (each block writes its own rows of `codes`)
 
         Parameters
         ----------
-        first : int
+        block_start : int
             The first frame of the block
-
-        Returns
-        -------
-        float
-            The maximum magnitude of the block (over all the bins)
         """
-        last = min(first + BLOCK_SIZE, nb_frames)
-        magnitude = stft_magnitude(signal, first, last, n_fft, frameshift, window)
-        with np.errstate(divide="ignore"):  # a null magnitude gives -inf dB, i.e. the lowest code
-            absolute_db[first:last] = 20.0 * np.log10(magnitude[:, :nb_bins])
-        return float(magnitude.max())
+        block_end = min(block_start + BLOCK_SIZE, end_frame)
+        magnitude = stft_magnitude(signal, block_start, block_end, n_fft, hop_length, window)
+        codes[block_start - first_frame : block_end - first_frame] = quantize_db(magnitude[:, :nb_bins], reference)
 
     with ThreadPoolExecutor(max_workers=NB_WORKERS) as pool:
-        reference = float(max(pool.map(process_block, range(0, nb_frames, BLOCK_SIZE)), default=0.0))
-    reference = max(reference, float(np.finfo(np.float32).tiny))  # silent signal
+        list(pool.map(process_block, range(first_frame, end_frame, BLOCK_SIZE)))  # list(): raises the errors
 
-    # Quantize relative to the maximum, block by block (the float16 buffer is freed when returning)
-    spectrum = np.empty(absolute_db.shape, dtype=np.uint8)
-    for first in range(0, nb_frames, BLOCK_SIZE):
-        block = absolute_db[first : first + BLOCK_SIZE].astype(np.float32)
-        spectrum[first : first + BLOCK_SIZE] = quantize_db(np.power(10.0, block / 20.0, dtype=np.float32), reference)
-    return spectrum, nb_bins * sampling_rate / n_fft
+    return SpectrogramSlice(codes, first_frame * frame_duration, frame_duration, nb_bins * sampling_rate / n_fft)
 
 
 class SpectrumExtractor:
-    """Spectrogram of the signal loaded in the player
+    """Spectrogram of (a part of) the signal loaded in the player
 
     Parameters
     ----------
@@ -342,50 +376,73 @@ class SpectrumExtractor:
     ----------
     settings : SpectrogramSettings
         The parameters of the current spectrogram
-    _spectrum : np.ndarray
-        The spectrogram, shape (nb_frames, nb_bins), dtype uint8 (see DB_FLOOR)
-    _top_frequency : float
-        The frequency at the top of the last stored bin, in Hz
+    spectrogram : SpectrogramSlice or None
+        The current spectrogram, None if there is none
     """
 
     def __init__(self, settings: SpectrogramSettings = SpectrogramSettings()) -> None:
         self.settings = settings
-        self.release()
+        self.spectrogram: SpectrogramSlice | None = None
 
     def release(self) -> None:
-        """Free the spectrogram (the plugin is not displayed anymore)"""
-        self._spectrum: np.ndarray = np.zeros((10, 10), dtype=np.uint8)
-        self._top_frequency = self.settings.max_frequency
+        """Free the spectrogram"""
+        self.spectrogram = None
 
-    def extract(self) -> np.ndarray:
-        """Compute the spectrogram of the loaded signal with the current settings
+    def extract(self, start_time: float = 0.0, end_time: float = math.inf) -> SpectrogramSlice:
+        """Compute the spectrogram of a part of the loaded signal with the current settings
+
+        Parameters
+        ----------
+        start_time : float, optional
+            The start of the part to analyse, in seconds. (default: 0.0)
+        end_time : float, optional
+            The end of the part to analyse, in seconds. (default: the end of the signal)
 
         Returns
         -------
-        np.ndarray
-            The spectrogram (see the `_spectrum` attribute)
+        SpectrogramSlice
+            The spectrogram
 
         Raises
         ------
         ValueError
             if the settings are inconsistent
         """
-        result = compute_spectrogram(player.signal[:, 0], player.sampling_rate, self.settings)
-        self.setResult(self.settings, *result)
-        return self._spectrum
+        self.spectrogram = compute_spectrogram(
+            player.signal[:, 0], player.sampling_rate, self.settings, start_time, end_time
+        )
+        return self.spectrogram
 
-    def setResult(self, settings: SpectrogramSettings, spectrum: np.ndarray, top_frequency: float) -> None:
+    def covers(self, settings: SpectrogramSettings, start_time: float, end_time: float) -> bool:
+        """Tell if the current spectrogram already answers a request (so that nothing has to be computed)
+
+        Parameters
+        ----------
+        settings : SpectrogramSettings
+            The requested analysis parameters
+        start_time : float
+            The start of the requested part, in seconds
+        end_time : float
+            The end of the requested part, in seconds
+
+        Returns
+        -------
+        bool
+            True if the spectrogram has these settings and contains this part
+        """
+        return (
+            self.spectrogram is not None and settings == self.settings and self.spectrogram.covers(start_time, end_time)
+        )
+
+    def setResult(self, settings: SpectrogramSettings, spectrogram: SpectrogramSlice) -> None:
         """Store a spectrogram computed elsewhere (e.g. in a background thread)
 
         Parameters
         ----------
         settings : SpectrogramSettings
             The parameters it was computed with
-        spectrum : np.ndarray
-            The spectrogram, see compute_spectrogram
-        top_frequency : float
-            The frequency at the top of the last bin, see compute_spectrogram
+        spectrogram : SpectrogramSlice
+            The spectrogram
         """
         self.settings = settings
-        self._spectrum = spectrum
-        self._top_frequency = top_frequency
+        self.spectrogram = spectrogram
