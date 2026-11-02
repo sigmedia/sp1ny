@@ -285,9 +285,12 @@ def test_view_change_between_two_clicks_keeps_the_first_time(empty_tier):
 
 
 def test_double_click_creates_nothing(empty_tier):
-    QtTest.QTest.mouseDClick(
-        empty_tier.viewport(), QtCore.Qt.MouseButton.LeftButton, pos=widget_position(empty_tier, 0.5)
-    )
+    position = widget_position(empty_tier, 0.5)
+    left = QtCore.Qt.MouseButton.LeftButton
+    # NOTE: what a real double-click sends: mouseDClick alone has no release, so it would not be a click for pyqtgraph
+    QtTest.QTest.mouseClick(empty_tier.viewport(), left, pos=position)
+    QtTest.QTest.mouseDClick(empty_tier.viewport(), left, pos=position)
+    QtTest.QTest.mouseRelease(empty_tier.viewport(), left, pos=position)
     QtWidgets.QApplication.processEvents()
     assert times(empty_tier) == []
     separate_clicks()
