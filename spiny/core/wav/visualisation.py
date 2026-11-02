@@ -56,6 +56,8 @@ class WaveformItem(pg.GraphicsObject):
         self._sampling_rate = 1
         self._levels: list[tuple[int, np.ndarray, np.ndarray]] = []  # (factor, mins, maxs), finest first
         self._y_range = (-1.0, 1.0)
+        self._path = QtGui.QPainterPath()
+        self._path_key: tuple[int, int, int] | None = None  # What self._path shows: (first, last, nb_columns)
 
     def setSignal(self, signal: np.ndarray, sampling_rate: int) -> None:
         """Define the signal to draw and (re)build its min/max pyramid
@@ -71,6 +73,7 @@ class WaveformItem(pg.GraphicsObject):
         self._signal = signal
         self._sampling_rate = sampling_rate
         self._levels = []
+        self._path_key = None
 
         # Each level summarises `factor` samples by their minimum and maximum
         mins = maxs = signal
@@ -196,19 +199,42 @@ class WaveformItem(pg.GraphicsObject):
         if last - first < 2:
             return
 
-        if (last - first) / nb_columns <= self.RAW_SAMPLES_PER_PIXEL:
-            x = np.arange(first, last) / self._sampling_rate
-            path = pg.arrayToQPath(x, self._signal[first:last], connect="all")
-        else:
-            _, mins, maxs = self._visibleEnvelope(first, last, nb_columns)
-            # Draw each segment at the centre of its pixel column: evenly spaced, so no pixel column stays empty
-            centres = first + (np.arange(mins.shape[0]) + 0.5) * (last - first) / nb_columns
-            x = np.repeat(centres / self._sampling_rate, 2)
-            y = np.stack([mins, maxs], axis=1).ravel()
-            path = pg.arrayToQPath(x, y, connect="pairs")
+        # The playhead repaints the plot at every move, while what is drawn here only depends on the view
+        key = (first, last, nb_columns)
+        if key != self._path_key:
+            self._path = self._buildPath(first, last, nb_columns)
+            self._path_key = key
 
         painter.setPen(self._pen)
-        painter.drawPath(path)
+        painter.drawPath(self._path)
+
+    def _buildPath(self, first: int, last: int, nb_columns: int) -> QtGui.QPainterPath:
+        """Build the path of the samples [first, last) for the given number of pixel columns
+
+        Parameters
+        ----------
+        first : int
+            The first visible sample
+        last : int
+            The sample after the last visible one
+        nb_columns : int
+            The number of pixel columns
+
+        Returns
+        -------
+        QtGui.QPainterPath
+            The path, in seconds x amplitude
+        """
+        if (last - first) / nb_columns <= self.RAW_SAMPLES_PER_PIXEL:
+            x = np.arange(first, last) / self._sampling_rate
+            return pg.arrayToQPath(x, self._signal[first:last], connect="all")
+
+        _, mins, maxs = self._visibleEnvelope(first, last, nb_columns)
+        # Draw each segment at the centre of its pixel column: evenly spaced, so no pixel column stays empty
+        centres = first + (np.arange(mins.shape[0]) + 0.5) * (last - first) / nb_columns
+        x = np.repeat(centres / self._sampling_rate, 2)
+        y = np.stack([mins, maxs], axis=1).ravel()
+        return pg.arrayToQPath(x, y, connect="pairs")
 
 
 class WavPlotWidget(pg.PlotWidget):

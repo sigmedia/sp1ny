@@ -74,8 +74,11 @@ loop          at the end of the played part, position = the sample where this pl
 #+end_example
 
 The audio thread never touches Qt: the toolbar and the playheads read the player every 30 ms from the GUI
-thread. With the playhead moving over a spectrogram, the annotations and the waveform, this costs about 30 % of
-one core (4 % when idle), and nothing blocks the interface for more than 25 ms (measured offscreen on a 20 s view).
+thread. A playhead only moves if its plot is visible and the position moved by at least half a pixel: on a
+full view of 10 minutes, the position takes about 13 polls to cross one pixel, and each move repaints the plot
+under the line. The waveform keeps its last path, which only depends on the view, so these repaints do not
+rebuild it. Together, on a 10-minute recording, this brings the moving playhead from 29 % to 9 % of one core on the
+full view (measured offscreen); on a 20 s view the line moves at nearly every poll, so the gain is small.
 
 A new playback first waits for the end of the stream which was just stopped: its last callback would otherwise
 continue with the new playback, or its end would stop it.

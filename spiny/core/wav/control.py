@@ -91,6 +91,7 @@ class TransportWidget(QtWidgets.QWidget):
         self._pause_icon = transport_icon("pause", self.PLAY_COLOR)
         self._bStart = self._transportButton(transport_icon("start", icon_color), "Return to start", "Home")
         self._bPlay = self._transportButton(self._play_icon, "Play / Pause", "Space")
+        self._showing_pause = False
         self._bStop = self._transportButton(transport_icon("stop", icon_color), "Stop", "Esc")
         self._bLoop = self._transportButton(transport_icon("loop", icon_color, QtGui.QColor("white")), "Loop", "L")
         self._bLoop.setCheckable(True)
@@ -159,8 +160,11 @@ class TransportWidget(QtWidgets.QWidget):
         """Show the state of the player: position, duration and play or pause icon"""
         self._lTime.setText(format_time(player.position))
         self._lDuration.setText(format_time(player.duration))
+        # NOTE: setting an icon repaints the button, even when it is the same one
         playing = player.is_playing and not player.is_paused
-        self._bPlay.setIcon(self._pause_icon if playing else self._play_icon)
+        if playing != self._showing_pause:
+            self._showing_pause = playing
+            self._bPlay.setIcon(self._pause_icon if playing else self._play_icon)
 
     def playPause(self) -> None:
         """Play from the cursor, or pause/resume a playback (a message box reports a device which cannot play)"""

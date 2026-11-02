@@ -206,11 +206,9 @@ class GUIVisu(QtWidgets.QMainWindow):
         general_box = QtWidgets.QGroupBox("General Data Visualization")
         general_box.setLayout(general_box_layout)
 
-        # NOTE: selectPlugin replaces the last item of this layout by the panel of the plugin: the empty
-        #       layout added here is that place holder until a plugin is selected
         self._control_layout = QtWidgets.QVBoxLayout()
         self._control_layout.addWidget(general_box)
-        self._control_layout.addLayout(QtWidgets.QVBoxLayout())
+        self._plugin_panel: QtWidgets.QWidget | None = None  # Added below the general box by selectPlugin
 
         tab = QtWidgets.QWidget()
         tab.setLayout(self._control_layout)
@@ -292,15 +290,18 @@ class GUIVisu(QtWidgets.QMainWindow):
             self._current_controller.release()
         self._current_controller = controller
 
-        i = self._control_layout.count() - 1
-        cur_widget = self._control_layout.itemAt(i).widget()
-        if cur_widget is not None:
+        if self._plugin_panel is not None:
             # NOTE: deferred deletion, destroying the panel synchronously (setParent(None)) can crash
-            self._control_layout.removeWidget(cur_widget)
-            cur_widget.hide()
-            cur_widget.deleteLater()
+            self._control_layout.removeWidget(self._plugin_panel)
+            self._plugin_panel.hide()
+            self._plugin_panel.deleteLater()
 
-        controller.setControlPanel(self._control_layout)
+        # NOTE: the panel of a plugin may be several widgets or layouts: a container deletes them all at once
+        self._plugin_panel = QtWidgets.QWidget()
+        panel_layout = QtWidgets.QVBoxLayout(self._plugin_panel)
+        panel_layout.setContentsMargins(0, 0, 0, 0)
+        controller.setControlPanel(panel_layout)
+        self._control_layout.addWidget(self._plugin_panel)
         self._visualisation_area.selectPlugin(controller)
         self.selectColorMap(self._cmap_list.currentText())
 

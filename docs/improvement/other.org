@@ -54,3 +54,24 @@ A plugin with a heavy optional dependency (parselmouth) checks at startup that i
 
 Implementation: [[file:../../spiny/core/segment.py]], [[file:../../spiny/annotations/model.py]],
 [[file:../../spiny/annotations/visualisation.py]].
+
+* Long sessions: nothing grows
+
+Repeating an action must not make the application grow, so each one was repeated and the live objects counted
+(Qt objects, Python objects, resident memory).
+
+The check found one real defect: =QLayout.itemAt= returns a wrapper which PySide keeps after Qt has deleted the
+layout item. A new Qt object allocated at the same address is then returned as that stale wrapper, so opening
+several audio files in a row ended with an =AttributeError= on a =QWidgetItem=. The code no longer asks a layout for
+its items: it keeps its own references to the widgets. The tier plots are now destroyed when the annotations are
+redrawn, and the selected annotation is cleared first, since its item is destroyed with its tier.
+
+| Repeated action                    | Result                                                 |
+|------------------------------------+--------------------------------------------------------|
+| Pan (1 500 times, Raw DATA)        | resident memory stable at 370 MB                       |
+| Pan (240 times, spectrogram)       | resident memory stable at 405 MB                       |
+| Switch plugin, reload annotations, open a file | number of Qt objects stable, 3 tier plots  |
+| Play/stop, colormap (100 times)    | no growth                                              |
+
+The first minutes of a session do increase the resident memory (155 MB to 262 MB on a 2-minute recording after
+switching plugins, for example), then it stays flat: this is the data of the views and the allocator, not a leak.

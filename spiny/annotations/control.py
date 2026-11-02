@@ -553,6 +553,7 @@ class ControlLayout(QtWidgets.QVBoxLayout):
         for module_handler in self.list_registered_modules:
             module_handler()
         if self._view is not None:
+            self.update_current_annotation(None)  # The selected item is destroyed with its tier
             self._view.clear()
             self._view.setModel(self._model, self.update_current_annotation)
 

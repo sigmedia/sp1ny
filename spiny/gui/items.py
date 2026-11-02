@@ -77,9 +77,17 @@ class PlayheadLine(pg.InfiniteLine):
         self._timer.start()
 
     def _follow(self) -> None:
-        """Move the line to the position of the player"""
+        """Move the line to the position of the player, when it is visible and it would really move on the screen"""
+        widget = self.getViewWidget()
+        view = self.getViewBox()
+        if widget is None or view is None or not widget.isVisible():
+            return
+
+        # NOTE: when zoomed out, the position takes many polls to cross one pixel, and each move repaints the plot
+        x_min, x_max = view.viewRange()[0]
+        half_pixel = (x_max - x_min) / max(view.width(), 1.0) / 2
         position = player.position
-        if self.value() != position:
+        if abs(position - self.value()) >= half_pixel:
             self.setValue(position)
 
 

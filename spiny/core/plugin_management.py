@@ -111,10 +111,8 @@ class DataDock(Dock):
             The widget to remove
         """
         self.widgets.remove(widget)
-        i = self.layout.count() - 1
-        cur_widget = self.layout.itemAt(i).widget()
-        if cur_widget is not None:
-            cur_widget.setParent(None)
+        self.layout.removeWidget(widget)
+        widget.setParent(None)
         self.currentRow = self.currentRow - 1
 
     def setWidget(self, widget: QtWidgets.QWidget, name: str) -> None:

@@ -2,7 +2,7 @@ import gc
 import sys
 
 import pytest
-from pyqtgraph.Qt import QtCore, QtWidgets
+from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 
 from conftest import EXAMPLES
 
@@ -225,3 +225,95 @@ def test_transport_and_output_are_separate_movable_toolbars(window):
     assert all(toolbar.isMovable() for toolbar in toolbars.values())
     window.addToolBar(QtCore.Qt.ToolBarArea.BottomToolBarArea, toolbars["Output"])
     assert window.toolBarArea(toolbars["Output"]) == QtCore.Qt.ToolBarArea.BottomToolBarArea
+
+
+def test_repeated_views_do_not_leak_widgets(window):
+    """Opening a file many times used to crash: a new Qt object could be returned as a stale layout item wrapper"""
+    from spiny.annotations import get_controller
+    from spiny.core import player
+    from spiny.gui.items import PlayheadLine
+
+    annotations = get_controller()
+    annotations._model.annotations["tier"] = []
+
+    def live_objects(kind):
+        QtWidgets.QApplication.sendPostedEvents(None, QtCore.QEvent.DeferredDelete)
+        gc.collect()
+        return sum(isinstance(obj, kind) for obj in gc.get_objects())
+
+    for _ in range(3):
+        window.loadWav(str(player.filename))
+    nb_lines = live_objects(PlayheadLine)
+    nb_layout_items = live_objects(QtWidgets.QWidgetItem)
+
+    for _ in range(10):
+        window.loadWav(str(player.filename))
+    assert live_objects(PlayheadLine) == nb_lines
+    assert live_objects(QtWidgets.QWidgetItem) == nb_layout_items
+    assert window._visualisation_area._dock_annotation.vbox.count() == len(annotations._model.annotations)
+
+
+def test_reloading_clears_the_selected_annotation(window):
+    from spiny.annotations import get_controller
+    from spiny.annotations.model import Annotation
+
+    annotations = get_controller()
+    annotations._model.annotations["tier"] = [Annotation(0.1, 0.2, "a")]
+    annotations.resetView()
+    window._visualisation_area._dock_wav.wav_plot.setXRange(0, 0.3, padding=0)
+    item = window._visualisation_area._dock_annotation.tiers_dict["tier"].annotation_items[0]
+    annotations.update_current_annotation(item)
+    annotations.resetView()
+    assert annotations._current_annotation is None
+
+
+def test_waveform_path_is_only_built_when_the_view_changes(player, monkeypatch):
+    from spiny.core.wav.visualisation import WaveformItem
+
+    item = WaveformItem()
+    item.setSignal(player.signal[:, 0], player.sampling_rate)
+    builds = []
+    build = item._buildPath
+    monkeypatch.setattr(item, "_buildPath", lambda *args: builds.append(args) or build(*args))
+
+    class View:
+        range = (0.0, 1.0)
+
+        def viewRange(self):
+            return (self.range, (-1, 1))
+
+        def width(self):
+            return 100
+
+    view = View()
+    monkeypatch.setattr(item, "getViewBox", lambda: view)
+    image = QtGui.QImage(100, 100, QtGui.QImage.Format.Format_RGB32)
+    painter = QtGui.QPainter(image)
+    item.paint(painter)
+    item.paint(painter)
+    assert len(builds) == 1
+    view.range = (0.0, 0.5)
+    item.paint(painter)
+    assert len(builds) == 2
+    painter.end()
+
+
+def test_playhead_only_moves_when_visible_on_screen(window):
+    from spiny.core import player
+    from spiny.gui.items import PlayheadLine
+
+    wav_plot = window._visualisation_area._dock_wav.wav_plot
+    line = next(item for item in wav_plot.getPlotItem().items if isinstance(item, PlayheadLine))
+    wav_plot.setXRange(0, 1, padding=0)
+    player.seek(0.5)
+    line._follow()
+    assert line.value() == 0.5
+
+    pixel = 1 / wav_plot.getViewBox().width()
+    player.seek(0.5 + pixel / 10)
+    line._follow()
+    assert line.value() == 0.5
+    player.seek(0.5 + 2 * pixel)
+    line._follow()
+    assert line.value() == player.position
+    player.seek(0.0)

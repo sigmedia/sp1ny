@@ -96,8 +96,9 @@ class AnnotationDock(Dock):
             self._tiers_dict[k] = annotation_plot
 
         # Link axes
-        for i in range(self.vbox.count()):
-            w = self.vbox.itemAt(i).widget()
+        # NOTE: not through vbox.itemAt: PySide keeps the wrapper of the layout item after Qt has deleted the item,
+        #       and a new Qt object at the same address is then returned as that stale wrapper
+        for w in self._tiers_dict.values():
             w.setMouseEnabled(x=True, y=False)
             w.hideAxis("bottom")
             w.setLimits(
@@ -116,9 +117,11 @@ class AnnotationDock(Dock):
         return self._tiers_dict
 
     def clear(self) -> None:
-        """Remove every tier plot from the dock"""
-        for i in reversed(range(self.vbox.count())):
-            self.vbox.itemAt(i).widget().setParent(None)
+        """Remove every tier plot from the dock and destroy it"""
+        for tier_plot in self._tiers_dict.values():
+            self.vbox.removeWidget(tier_plot)
+            tier_plot.hide()
+            tier_plot.deleteLater()
         self._tiers_dict.clear()
 
 
