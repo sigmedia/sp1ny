@@ -18,6 +18,7 @@ import importlib
 import pkgutil
 
 # spiny internal packages
+from .gui.shortcuts import shortcut
 from .gui.theme import apply_theme
 from .gui.colormaps import COLORMAP_NAMES, colormap_ticks
 from .gui.helpers.widgets import ExtendedComboBox
@@ -169,12 +170,12 @@ class GUIVisu(QtWidgets.QMainWindow):
         file_menu = self.menuBar().addMenu("&File")
 
         open_action = QtGui.QAction("&Open wav...", self)
-        open_action.setShortcut("Ctrl+O")
+        open_action.setShortcut(shortcut("open_file"))
         open_action.triggered.connect(self.openFile)
         file_menu.addAction(open_action)
 
         exit_action = QtGui.QAction("E&xit", self)
-        exit_action.setShortcut("Ctrl+Q")
+        exit_action.setShortcut(shortcut("quit"))
         exit_action.triggered.connect(self.close)
         file_menu.addAction(exit_action)
 

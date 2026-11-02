@@ -11,6 +11,7 @@ from pyqtgraph.dockarea import Dock
 
 from spiny.gui import theme
 from spiny.gui.items import PlayheadLine, SegmentItem
+from spiny.gui.shortcuts import shortcut
 from .model import Annotation, AnnotationSet
 from spiny.core import player
 
@@ -225,14 +226,14 @@ class TierPlot(pg.PlotWidget):
                 self._items[key] = region
 
     def keyPressEvent(self, event: QtGui.QKeyEvent) -> None:
-        """Delete the selected annotation on Delete, otherwise use the default behaviour
+        """Delete the selected annotation on its shortcut, otherwise use the default behaviour
 
         Parameters
         ----------
         event : QtGui.QKeyEvent
             The key event
         """
-        if event.key() == QtCore.Qt.Key_Delete:
+        if QtGui.QKeySequence(event.keyCombination()) == shortcut("delete_annotation"):
             self.deleteSelectedAnnotation()
         else:
             super().keyPressEvent(event)

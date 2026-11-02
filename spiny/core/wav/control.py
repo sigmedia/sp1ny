@@ -72,10 +72,10 @@ class TransportWidget(QtWidgets.QWidget):
 
     def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
         super().__init__(parent)
-        self._bStart = ToolBarButton("start", "Return to start", "Home")
-        self._bPlay = ToolBarButton("play", "Play / Pause", "Space", color_name="play")
-        self._bStop = ToolBarButton("stop", "Stop", "Esc")
-        self._bLoop = ToolBarButton("loop", "Loop", "L")
+        self._bStart = ToolBarButton("start", "Return to start", "go_to_start")
+        self._bPlay = ToolBarButton("play", "Play / Pause", "play_pause", color_name="play")
+        self._bStop = ToolBarButton("stop", "Stop", "stop")
+        self._bLoop = ToolBarButton("loop", "Loop", "loop")
         self._bLoop.setCheckable(True)
         self._bLoop.setChecked(player.loop_activated)
         self._bStart.clicked.connect(lambda: player.seek(0.0))

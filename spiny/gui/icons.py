@@ -5,6 +5,7 @@ from __future__ import annotations
 from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 
 from spiny.gui import theme
+from spiny.gui.shortcuts import shortcut
 
 
 def _polygon(*points: tuple[float, float]) -> QtGui.QPainterPath:
@@ -133,19 +134,20 @@ class ToolBarButton(QtWidgets.QToolButton):
         The icon, see transport_icon
     tooltip : str
         What the button does
-    shortcut : str
-        The keyboard shortcut
+    action : str
+        The name of the action, which gives the keyboard shortcut (see spiny.gui.shortcuts)
     color_name : str, optional
         The name of the colour of the icon in the theme. (default: "button_text")
     """
 
-    def __init__(self, icon_name: str, tooltip: str, shortcut: str, color_name: str = "button_text") -> None:
+    def __init__(self, icon_name: str, tooltip: str, action: str, color_name: str = "button_text") -> None:
         super().__init__()
         self._icon_name = icon_name
         self._color_name = color_name
         self.setIconSize(QtCore.QSize(22, 22))
-        self.setToolTip(f"{tooltip} ({shortcut})")
-        self.setShortcut(QtGui.QKeySequence(shortcut))  # NOTE: typing in a text field still goes to the field
+        key = shortcut(action)
+        self.setToolTip(f"{tooltip} ({key.toString(QtGui.QKeySequence.SequenceFormat.NativeText)})" if key else tooltip)
+        self.setShortcut(key)  # NOTE: typing in a text field still goes to the field
         self.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
         self.applyTheme()
 
