@@ -49,13 +49,18 @@ class QListWidgetItemHideable(QtWidgets.QListWidgetItem):
     hidden from the list, which is not the case here.
     """
 
+    HIDDEN_COLOR = QtGui.QColor.fromRgb(234, 167, 153)
+
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self._hidden = False
 
     def toggleTierHidden(self) -> None:
-        """Hide the tier if it is shown, show it if it is hidden"""
+        """Hide the tier if it is shown, show it if it is hidden; a hidden tier is highlighted in the list"""
         self._hidden = not self._hidden
+        # NOTE: an empty brush means the colours of the palette, so a shown tier is readable in every theme
+        self.setBackground(QtGui.QBrush(self.HIDDEN_COLOR) if self._hidden else QtGui.QBrush())
+        self.setForeground(QtGui.QBrush(QtGui.QColor("black")) if self._hidden else QtGui.QBrush())
 
     def isTierHidden(self) -> bool:
         """Tell if the tier is hidden
@@ -95,9 +100,6 @@ class ControlLayout(QtWidgets.QVBoxLayout):
     parent : QtWidgets.QWidget or None
         The parent widget
     """
-
-    UNSELECTED_COLOR = QtGui.QColor.fromRgb(234, 167, 153)
-    DEFAULT_COLOR = QtGui.QColor.fromRgb(255, 255, 255)
 
     def __init__(self, parent: QtWidgets.QWidget | None) -> None:
         super().__init__(parent)
@@ -237,10 +239,8 @@ class ControlLayout(QtWidgets.QVBoxLayout):
         for idx, item in enumerate(self._list_tiers_widget.selectedItems()):
             item.toggleTierHidden()
             if item.isTierHidden():
-                item.setBackground(QtGui.QBrush(ControlLayout.UNSELECTED_COLOR))
                 self._model.ignored.add(item.text())
             else:
-                item.setBackground(QtGui.QBrush(ControlLayout.DEFAULT_COLOR))
                 self._model.ignored.discard(item.text())
             if self.view is not None:
                 self.view.tiers_dict[item.text()].setVisible(not item.isTierHidden())
@@ -293,7 +293,6 @@ class ControlLayout(QtWidgets.QVBoxLayout):
         self._model.annotations[tier_name] = []
         item = QListWidgetItemHideable(self._list_tiers_widget)
         item.setText(tier_name)
-        item.setBackground(QtGui.QBrush(ControlLayout.DEFAULT_COLOR))
         self.resetView()
         self._list_tiers_widget.addItem(item)
 
@@ -503,9 +502,6 @@ class ControlLayout(QtWidgets.QVBoxLayout):
             item.setText(tier_name)
             if tier_name in self._model.ignored:
                 item.toggleTierHidden()
-                item.setBackground(QtGui.QBrush(ControlLayout.UNSELECTED_COLOR))
-            else:
-                item.setBackground(QtGui.QBrush(ControlLayout.DEFAULT_COLOR))
             self._list_tiers_widget.addItem(item)
 
     @property

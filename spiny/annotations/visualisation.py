@@ -335,7 +335,9 @@ class AnnotationItem(SegmentItem):
         self._handle_edit = handle_edit
 
         # Some adaptations
-        brush = QtGui.QBrush(QtGui.QColor(255, 255, 255, 255))
+        # NOTE: the label uses the text colour of the palette, so the background must come from the palette too
+        palette = QtWidgets.QApplication.instance().palette()
+        brush = QtGui.QBrush(palette.color(QtGui.QPalette.AlternateBase))
         self.setBrush(brush)
         self._default_brush = brush
         hover_brush = QtGui.QBrush(QtGui.QColor(0, 0, 255, 100))
@@ -346,7 +348,7 @@ class AnnotationItem(SegmentItem):
             self._text = pg.TextItem(
                 text=self._segment.label,
                 anchor=(0.5, 0.5),
-                color=QtWidgets.QApplication.instance().palette().color(QtGui.QPalette.Text),
+                color=palette.color(QtGui.QPalette.Text),
             )
             self._text.setPos((self._segment.start_time + self._segment.end_time) / 2, 0.5)
             self._text.setParentItem(self)

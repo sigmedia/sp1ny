@@ -166,3 +166,31 @@ def test_load_errors_are_reported(controller, view, monkeypatch, no_dialogs):
     monkeypatch.setattr(dialog, "getOpenFileName", lambda *a, **k: (str(pathlib.Path("unknown.wav")), ""))
     controller._load_annotation_file()
     assert [name for name, _ in no_dialogs] == ["critical"]
+
+
+def test_annotation_label_is_readable_in_the_dark_theme(qapp):
+    from pyqtgraph.Qt import QtGui
+    from spiny.annotations.model import Annotation
+    from spiny.annotations.visualisation import AnnotationItem
+    from spiny.gui.theme import define_dark_palette
+
+    previous = qapp.palette()
+    qapp.setPalette(define_dark_palette())
+    try:
+        item = AnnotationItem(Annotation(0.1, 0.2, "a"))
+        assert item._default_brush.color() == QtGui.QColor(53, 53, 53)
+        assert item._text.textItem.defaultTextColor() == QtGui.QColor("white")
+    finally:
+        qapp.setPalette(previous)
+
+
+def test_hidden_tier_keeps_a_readable_text_colour(qapp):
+    from pyqtgraph.Qt import QtCore, QtGui
+    from spiny.annotations.control import QListWidgetItemHideable
+
+    item = QListWidgetItemHideable()
+    item.toggleTierHidden()
+    assert item.foreground().color() == QtGui.QColor("black")
+    item.toggleTierHidden()
+    assert item.background().style() == QtCore.Qt.BrushStyle.NoBrush
+    assert item.foreground().style() == QtCore.Qt.BrushStyle.NoBrush

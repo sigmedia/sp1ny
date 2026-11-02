@@ -71,6 +71,7 @@ class PlayheadLine(pg.InfiniteLine):
 
     def __init__(self) -> None:
         super().__init__(pos=0, movable=False, angle=90, pen=pg.mkPen({"color": "#e5484d", "width": 2}))
+        self.setZValue(1000)  # Above everything, the annotation items are opaque
         self._timer = QtCore.QTimer(self)
         self._timer.setInterval(30)
         self._timer.timeout.connect(self._follow)
