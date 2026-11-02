@@ -30,6 +30,8 @@ from pyqtgraph.Qt import QtWidgets
 
 # SpINY
 from spiny.annotations import load_annotations
+from spiny.config import load_config
+from spiny.gui.theme import apply_theme
 from spiny.ui import build_gui
 from spiny.core import player
 
@@ -145,7 +147,13 @@ def define_argument_parser() -> argparse.ArgumentParser:
         help="The dimension of the coefficient vector (negative shape is assumed to be (-1, d), positive (d, -1))",
     )
     parser.add_argument("-f", "--frameshift", default=5, type=float, help="The frameshift in milliseconds")
-    parser.add_argument("--dark", action="store_true", help="Use the dark theme")
+    parser.add_argument("--dark", action="store_true", help="Start with the dark theme")
+    parser.add_argument(
+        "--config",
+        default=None,
+        type=str,
+        help="The configuration file: theme and shortcuts (default: spiny/config.yaml in the user config directory)",
+    )
     parser.add_argument(
         "-w",
         "--wav-file",
@@ -186,6 +194,7 @@ def main() -> None:
         ("--wav-file", args.wav_file),
         ("--annotation-file", args.annotation_file),
         ("--coefficient-file", args.coefficient_file),
+        ("--config", args.config),
     ]:
         if filename and not os.path.isfile(filename):
             arg_parser.error(f'{option}: "{filename}" does not exist or is not a file')
@@ -195,6 +204,8 @@ def main() -> None:
 
     # Create the application before any widget (controllers and plugins are created lazily)
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication(["SpINY"])
+    theme_name = load_config(args.config)
+    apply_theme("dark" if args.dark else theme_name)
 
     # Without a file on the command line (e.g. the application was started from a file manager), ask for it
     if not args.wav_file:
@@ -219,7 +230,7 @@ def main() -> None:
 
     # Generate window
     logger.info("Rendering")
-    build_gui(app, args.dark)
+    build_gui(app)
 
 
 ###############################################################################

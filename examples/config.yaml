@@ -1,0 +1,108 @@
+# Configuration of Sp1NY, with every setting at its default value.
+#
+# Copy it to spiny/config.yaml in your configuration directory (~/.config/spiny/config.yaml on Linux), or give it with
+# --config, and keep only what you want to change.
+#
+# Colours are anything Qt understands: "#rrggbb", "#aarrggbb" (with transparency) or a name such as "red".
+# Quote them: an unquoted # starts a comment in YAML.
+# Shortcuts are written as in Qt ("Ctrl+Shift+P", "Space", "F5", ...); an empty value removes a shortcut.
+
+theme: light
+shortcuts:
+  open_file: Ctrl+O
+  quit: Ctrl+Q
+  play_pause: Space
+  stop: Esc
+  go_to_start: Home
+  go_to_end: End
+  rewind: Left
+  forward: Right
+  loop: L
+  speed_down: '['
+  speed_up: ']'
+  mute: M
+  zoom_in: Ctrl+=
+  zoom_out: Ctrl+-
+  zoom_fit: Ctrl+0
+  follow: F
+  switch_theme: Ctrl+T
+  delete_annotation: Delete
+themes:
+  light:
+    window: '#efefef'
+    window_text: '#000000'
+    base: '#ffffff'
+    alternate_base: '#f7f7f7'
+    text: '#000000'
+    button: '#efefef'
+    button_text: '#000000'
+    bright_text: '#ff0000'
+    link: '#0000ff'
+    highlight: '#308cc6'
+    highlighted_text: '#ffffff'
+    tooltip_background: '#2a82da'
+    tooltip_text: '#ffffff'
+    plot_background: '#ffffff'
+    plot_foreground: '#000000'
+    waveform: '#000000'
+    playhead: '#e5484d'
+    selection: '#320000ff'
+    selection_hover: '#32ff0000'
+    tier_background: '#19000000'
+    annotation: '#f7f7f7'
+    annotation_text: '#000000'
+    annotation_border: '#a8a84c'
+    annotation_hover: '#640000ff'
+    annotation_selected: '#32ff0000'
+    hidden_tier: '#eaa799'
+    hidden_tier_text: '#000000'
+    ipa_hover: '#867d7d'
+    ipa_hover_text: '#ffffff'
+    accent: '#2a78d6'
+    accent_text: '#ffffff'
+    play: '#2fa66a'
+    button_hover: '#327f7f7f'
+    button_pressed: '#5a7f7f7f'
+    slider_groove: '#5a7f7f7f'
+    display_background: '#17181a'
+    display_text: '#7fe3a8'
+    display_dim_text: '#7c8088'
+  dark:
+    window: '#353535'
+    window_text: '#ffffff'
+    base: '#191919'
+    alternate_base: '#353535'
+    text: '#ffffff'
+    button: '#353535'
+    button_text: '#ffffff'
+    bright_text: '#ff0000'
+    link: '#2a82da'
+    highlight: '#2a82da'
+    highlighted_text: '#000000'
+    tooltip_background: '#2a82da'
+    tooltip_text: '#ffffff'
+    plot_background: '#191919'
+    plot_foreground: '#d0d0d0'
+    waveform: '#ffffff'
+    playhead: '#e5484d'
+    selection: '#320000ff'
+    selection_hover: '#32ff0000'
+    tier_background: '#19000000'
+    annotation: '#353535'
+    annotation_text: '#ffffff'
+    annotation_border: '#c8c864'
+    annotation_hover: '#640000ff'
+    annotation_selected: '#32ff0000'
+    hidden_tier: '#eaa799'
+    hidden_tier_text: '#000000'
+    ipa_hover: '#867d7d'
+    ipa_hover_text: '#ffffff'
+    accent: '#2a78d6'
+    accent_text: '#ffffff'
+    play: '#2fa66a'
+    button_hover: '#327f7f7f'
+    button_pressed: '#5a7f7f7f'
+    slider_groove: '#5a7f7f7f'
+    display_background: '#17181a'
+    display_text: '#7fe3a8'
+    display_dim_text: '#7c8088'

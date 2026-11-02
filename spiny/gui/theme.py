@@ -6,10 +6,14 @@ define an `applyTheme` method, which `apply_theme` calls to switch the theme of 
 
 from __future__ import annotations
 
+import logging
 from string import Template
+from typing import Any
 
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtGui, QtWidgets
+
+logger = logging.getLogger(__name__)
 
 # NOTE: a colour is anything QColor understands; the transparent ones are written #AARRGGBB
 THEMES: dict[str, dict[str, str]] = {
@@ -182,6 +186,31 @@ def _styleSheet() -> str:
         return f"rgba({c.red()}, {c.green()}, {c.blue()}, {c.alpha()})"
 
     return _STYLE_SHEET.substitute({name: css(name) for name in THEMES[_current_theme]})
+
+
+def configure_themes(overrides: dict[str, Any]) -> None:
+    """Change colours of the themes; a mistake is reported in the log and that colour keeps its value
+
+    Parameters
+    ----------
+    overrides : dict
+        The colours to change, by theme: {theme name: {colour name: colour}}
+    """
+    for theme_name, colors in overrides.items():
+        if theme_name not in THEMES:
+            logger.warning('Configuration: unknown theme "%s", available themes are: %s', theme_name, ", ".join(THEMES))
+            continue
+        if not isinstance(colors, dict):
+            logger.warning('Configuration: the colours of the theme "%s" must be a mapping', theme_name)
+            continue
+        for name, value in colors.items():
+            if name not in THEMES[theme_name]:
+                logger.warning('Configuration: unknown colour "%s" in the theme "%s"', name, theme_name)
+            elif not isinstance(value, str) or not QtGui.QColor(value).isValid():
+                # NOTE: an unquoted #rrggbb is a comment in YAML, hence a missing value here
+                logger.warning('Configuration: invalid colour for "%s" (quote it: "#rrggbb"): %s', name, value)
+            else:
+                THEMES[theme_name][name] = value
 
 
 def apply_theme(name: str) -> None:

@@ -19,7 +19,6 @@ import pkgutil
 
 # spiny internal packages
 from .gui.shortcuts import shortcut
-from .gui.theme import apply_theme
 from .gui.colormaps import COLORMAP_NAMES, colormap_ticks
 from .gui.helpers.widgets import ExtendedComboBox
 from .core.wav.visualisation import WavDock
@@ -347,18 +346,15 @@ def install_exception_hook(parent: QtWidgets.QWidget | None = None) -> None:
     sys.excepthook = hook
 
 
-def build_gui(app: QtWidgets.QApplication, dark_activated: bool = False) -> None:
+def build_gui(app: QtWidgets.QApplication) -> None:
     """Create the main window and run the application (blocks until the window is closed)
 
     Parameters
     ----------
     app : QtWidgets.QApplication
         The application
-    dark_activated : bool, optional
-        Use the dark theme. (default: False)
     """
     # Generate application
-    apply_theme("dark" if dark_activated else "light")
     app.aboutToQuit.connect(player.stop)
 
     # Plugins create widgets, so they are discovered only now that the application exists

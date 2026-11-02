@@ -42,7 +42,6 @@ excludes = [
     "scipy",
     "tkinter",
     "wavelet_prosody_toolkit",
-    "yaml",
 ]
 
 # Qt modules pulled by Qt plugins (virtual keyboard, PDF image format, ...) but not used by spiny, matched on the

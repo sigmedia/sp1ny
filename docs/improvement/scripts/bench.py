@@ -87,6 +87,7 @@ def main(data: str, name: str, only: list[str]) -> None:
     from pyqtgraph.Qt import QtWidgets
     from spiny.annotations import get_controller
     from spiny.core import player
+    from spiny.gui.theme import apply_theme
 
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication(["bench"])
 
@@ -98,7 +99,7 @@ def main(data: str, name: str, only: list[str]) -> None:
     from spiny.raw_data import controller as raw
 
     raw.loadCoefficientFile(f"{data}/{name}.neur", -50, 5)
-    ui.apply_theme("light")
+    apply_theme("light")
     stage("discover_plugins", ui.discover_plugins)
     window = stage("build_window", lambda: ui.GUIVisu())
     window.resize(1600, 1000)

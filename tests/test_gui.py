@@ -409,3 +409,41 @@ def test_theme_button_switches_the_theme(window):
         assert current_theme() == "dark"
     finally:
         apply_theme("light")
+
+
+def press(widget, key):
+    from pyqtgraph.Qt import QtTest
+
+    QtTest.QTest.keyClick(widget, key)
+    QtWidgets.QApplication.processEvents()
+
+
+def test_shortcuts_reach_the_buttons_but_not_while_typing(window):
+    from spiny.core import player
+
+    from pyqtgraph.Qt import QtTest
+
+    window.activateWindow()
+    assert QtTest.QTest.qWaitForWindowActive(window, 2000)
+
+    before = player.loop_activated
+    press(window, QtCore.Qt.Key.Key_L)
+    assert player.loop_activated != before
+    press(window, QtCore.Qt.Key.Key_L)
+    assert player.loop_activated == before
+
+    player.seek(0.0)
+    press(window, QtCore.Qt.Key.Key_Right)
+    assert player.position > 0
+    press(window, QtCore.Qt.Key.Key_Home)
+    assert player.position == 0
+
+    field = QtWidgets.QLineEdit(window)
+    field.show()
+    field.setFocus()
+    QtWidgets.QApplication.processEvents()
+    press(field, QtCore.Qt.Key.Key_L)
+    press(field, QtCore.Qt.Key.Key_Space)
+    field.deleteLater()
+    assert field.text() == "l "
+    assert player.loop_activated == before and not player.is_playing

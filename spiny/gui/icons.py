@@ -181,8 +181,10 @@ class ToolBarButton(QtWidgets.QToolButton):
         self._color_name = color_name
         self.setIconSize(QtCore.QSize(22, 22))
         key = shortcut(action)
-        self.setToolTip(f"{tooltip} ({key.toString(QtGui.QKeySequence.SequenceFormat.NativeText)})" if key else tooltip)
-        self.setShortcut(key)  # NOTE: typing in a text field still goes to the field
+        key_name = key.toString(QtGui.QKeySequence.SequenceFormat.NativeText)
+        self.setToolTip(f"{tooltip} ({key_name})" if key_name else tooltip)
+        # NOTE: not setShortcut, which delays the click by 100 ms. Typing in a text field still goes to the field
+        self._shortcut = QtGui.QShortcut(key, self, self.click)
         self.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
         self.applyTheme()
 

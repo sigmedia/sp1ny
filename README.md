@@ -46,6 +46,39 @@ spiny -w examples/arctic_as.wav -c examples/arctic_as.neur -d -50 -f 6.4
 - the option `-d` indicates the dimension of the raw data; "-50" indicates a shape of (-1, 50)
 - the option `-f` indicates the frameshift in milliseconds
 
+## Keyboard shortcuts
+
+| Action | Key | | Action | Key |
+|---|---|---|---|---|
+| Play / pause | `Space` | | Zoom in / out | `Ctrl+=` / `Ctrl+-` |
+| Stop (back to where playback started) | `Esc` | | Show the whole signal | `Ctrl+0` |
+| Go to the start / end | `Home` / `End` | | Follow the playhead | `F` |
+| Back / forward 1 s | `Left` / `Right` | | Switch the theme | `Ctrl+T` |
+| Slower / faster | `[` / `]` | | Open a file | `Ctrl+O` |
+| Loop | `L` | | Quit | `Ctrl+Q` |
+| Mute | `M` | | Delete the selected annotation | `Delete` |
+
+A click on a plot moves the playhead. Changing the speed also changes the pitch, as on a tape.
+
+## Configuration
+
+The theme and the shortcuts are set in a YAML file: `spiny/config.yaml` in your configuration directory
+(`~/.config/spiny/config.yaml` on Linux), or any file given with `--config`. Only write what you want to change:
+
+```yaml
+theme: dark
+shortcuts:
+  play_pause: P
+  mute:          # no shortcut
+themes:
+  dark:
+    playhead: "#00ff00"
+```
+
+[`examples/config.yaml`](examples/config.yaml) lists every setting with its default value. A mistake in the file is
+reported in the log and that setting keeps its default. `--dark` takes priority over the `theme` of the file; the theme
+button only lasts for the session.
+
 ## Standalone application
 
 Ready-to-use builds for Windows, macOS (Apple Silicon and Intel) and Linux are attached to each

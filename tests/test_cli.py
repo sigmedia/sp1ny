@@ -12,6 +12,7 @@ from conftest import EXAMPLES
         (["--wav_file", "missing.wav"], "--wav-file"),
         (["-w", str(EXAMPLES / "arctic_a0002.wav"), "-a", "missing.lab"], "--annotation-file"),
         (["-w", str(EXAMPLES / "arctic_as.wav"), "-c", str(EXAMPLES / "arctic_as.neur")], "--dimension"),
+        (["-w", str(EXAMPLES / "arctic_a0002.wav"), "--config", "missing.yaml"], "--config"),
     ],
 )
 def test_invalid_arguments(monkeypatch, capsys, argv, message):

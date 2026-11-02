@@ -32,20 +32,23 @@ When the device accepts the native rate, the samples are copied as they are. Oth
 opened at the device default rate and the samples are interpolated *block by block*, inside the
 PortAudio callback, only for the block being played.
 
-With ρ = source rate / playback rate, the played sample p corresponds to the source position p × ρ.
-For a block of n played samples starting at p:
+The callback keeps a position counted in samples of the signal, fractional as soon as the signal is resampled.
+With ρ = source rate / playback rate and a speed v, each played sample moves the position by step = ρ × v. For a
+block of n played samples starting at position p:
 
 #+begin_example
-positions = (p + [0, 1, ..., n − 1]) × ρ
+positions = p + [0, 1, ..., n − 1] × step
 i0        = floor(positions)            (clipped to the last sample)
 i1        = min(i0 + 1, last sample)
 frac      = positions − i0
 out       = (1 − frac) × x[i0] + frac × x[i1]
+p         = p + n × step
 #+end_example
 
-The callback keeps a position counted in played samples. The playback boundaries are converted once
-when playing starts: played samples = ⌊(N − 1) / ρ⌋ + 1, start = start time × playback rate, and
-the position shown in the GUI is played position / playback rate.
+The block is simply copied when step = 1 and p is a whole number. Counting in samples of the signal means the
+boundaries do not depend on the device, the position shown in the GUI is p / source rate, and the speed can change
+between two blocks. A speed v is a tape-style change: the pitch follows it. Keeping the pitch would need a time
+stretching algorithm.
 
 The work per callback is proportional to the block size (a few hundred samples), which is negligible
 for the real-time thread, and nothing proportional to the signal is ever allocated.
@@ -60,7 +63,7 @@ usual case). It is never used for analysis: every plugin works on the signal at 
 The toolbar follows the transport of a DAW; it only needs two values in the player.
 
 - The *cursor* (in seconds) is where a playback starts. A click on any plot, or "return to start", moves it.
-- The *position* (in played samples) belongs to the audio callback during a playback.
+- The *position* (in samples of the signal) belongs to the audio callback during a playback.
 
 The time shown, and the playhead drawn over every plot, are the position during a playback and the cursor
 otherwise:
@@ -69,7 +72,7 @@ otherwise:
 play          start at the cursor (at 0 if the cursor is at the very end)
 pause/resume  the stream stays open and plays zeros, the position does not move
 stop          the position is dropped: the display is back at the cursor
-seek(t)       cursor = t; during a playback, position = t × playback rate
+seek(t)       cursor = t; during a playback, position = t × source rate
 loop          at the end of the played part, position = the sample where this playback started
 #+end_example
 

@@ -31,6 +31,8 @@ python = ">=3.13"
 # QT/Plotting
 pyqtgraph = "*"
 PySide6 = "*"
+# Configuration
+PyYAML = "*"
 # Audio
 soundfile = "*"
 sounddevice = "*"
