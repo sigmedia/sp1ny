@@ -196,3 +196,34 @@ def test_hidden_tier_keeps_a_readable_text_colour(qapp):
     item.toggleTierHidden()
     assert item.background().style() == QtCore.Qt.BrushStyle.NoBrush
     assert item.foreground().style() == QtCore.Qt.BrushStyle.NoBrush
+
+
+def test_failed_save_keeps_the_existing_file(controller, tmp_path, monkeypatch):
+    from spiny.annotations.io.json import JSONSerialiser
+
+    target = tmp_path / "a.json"
+    target.write_text("precious")
+
+    def failing_save(self, output_file, annotations):
+        pathlib.Path(output_file).write_text("half of the fi")
+        raise OSError("disk full")
+
+    monkeypatch.setattr(JSONSerialiser, "save", failing_save)
+    with pytest.raises(OSError):
+        controller._writeFile(JSONSerialiser(), target)
+    assert target.read_text() == "precious"
+    assert [path.name for path in tmp_path.iterdir()] == ["a.json"]
+
+
+def test_save_replaces_the_target_of_a_link_and_keeps_its_permissions(controller, tmp_path):
+    from spiny.annotations.io.json import JSONSerialiser
+
+    target = tmp_path / "a.json"
+    target.write_text("old")
+    target.chmod(0o640)
+    link = tmp_path / "link.json"
+    link.symlink_to(target)
+    controller._writeFile(JSONSerialiser(), link)
+    assert link.is_symlink()
+    assert "annotations" in json.loads(target.read_text())
+    assert target.stat().st_mode & 0o777 == 0o640

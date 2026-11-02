@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import os
 import pathlib
+import shutil
 from collections.abc import Callable
 from typing import Any
 
@@ -478,13 +480,33 @@ class ControlLayout(QtWidgets.QVBoxLayout):
             serialiser = serialiser_cls()
 
         try:
-            serialiser.save(annotation_file, self._model)
+            self._writeFile(serialiser, annotation_file)
         except Exception as ex:
             QtWidgets.QMessageBox.critical(self._file_box, "Save annotation file", f"Cannot save the file:\n{ex}")
             return False
         self._saved_contents = self._contents()
         self._wCurrentFile.setText(str(annotation_file.absolute()))
         return True
+
+    def _writeFile(self, serialiser: AnnotationSerialiser, annotation_file: pathlib.Path) -> None:
+        """Write the annotations in a temporary file which then replaces the file, so that a failure cannot damage it
+
+        Parameters
+        ----------
+        serialiser : AnnotationSerialiser
+            The serialiser of the format
+        annotation_file : pathlib.Path
+            The file
+        """
+        target = annotation_file.resolve()  # NOTE: a symbolic link must stay one
+        temporary = target.with_name(target.name + ".tmp")
+        try:
+            serialiser.save(temporary, self._model)
+            if target.exists():
+                shutil.copymode(target, temporary)
+            os.replace(temporary, target)
+        finally:
+            temporary.unlink(missing_ok=True)
 
     def update_current_annotation(self, new_annotation: AnnotationItem | None = None) -> None:
         """Make an annotation the selected one (or clear the selection) and show it in the edition box
