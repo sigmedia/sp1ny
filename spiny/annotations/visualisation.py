@@ -9,6 +9,7 @@ import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 from pyqtgraph.dockarea import Dock
 
+from spiny.gui import theme
 from spiny.gui.items import PlayheadLine, SegmentItem
 from .model import Annotation, AnnotationSet
 from spiny.core import player
@@ -161,7 +162,7 @@ class TierPlot(pg.PlotWidget):
     ) -> None:
         assert model is not None
         super().__init__(*args, **kwargs)
-        self.getViewBox().setBackgroundColor((0, 0, 0, 25))  # light shade, to tell the tiers apart
+        self.applyTheme()
         self._tier_name = tier_name
         self._model = model
         self._handle_segment = handle_segment
@@ -179,6 +180,10 @@ class TierPlot(pg.PlotWidget):
 
         # Connect the rangeChanged signal to update visible regions
         self.getPlotItem().getViewBox().sigXRangeChanged.connect(self.updateVisibleRegions)
+
+    def applyTheme(self) -> None:
+        """Shade the background with the colour of the current theme, to tell the tiers apart"""
+        self.getViewBox().setBackgroundColor(theme.color("tier_background"))
 
     @property
     def annotation_items(self) -> list[AnnotationItem]:
@@ -334,24 +339,23 @@ class AnnotationItem(SegmentItem):
         self._next_annotation_item = None
         self._handle_edit = handle_edit
 
-        # Some adaptations
-        # NOTE: the label uses the text colour of the palette, so the background must come from the palette too
-        palette = QtWidgets.QApplication.instance().palette()
-        brush = QtGui.QBrush(palette.color(QtGui.QPalette.AlternateBase))
-        self.setBrush(brush)
-        self._default_brush = brush
-        hover_brush = QtGui.QBrush(QtGui.QColor(0, 0, 255, 100))
-        self.setHoverBrush(hover_brush)
-
         # Add label
+        self._text: Any = None
         if showLabel:
-            self._text = pg.TextItem(
-                text=self._segment.label,
-                anchor=(0.5, 0.5),
-                color=palette.color(QtGui.QPalette.Text),
-            )
+            self._text = pg.TextItem(text=self._segment.label, anchor=(0.5, 0.5))
             self._text.setPos((self._segment.start_time + self._segment.end_time) / 2, 0.5)
             self._text.setParentItem(self)
+
+        self.applyTheme()
+
+    def applyTheme(self) -> None:
+        """Draw the annotation with the colours of the current theme"""
+        self.setBrush(QtGui.QBrush(theme.color("annotation_selected" if self._selected else "annotation")))
+        self.setHoverBrush(QtGui.QBrush(theme.color("annotation_hover")))
+        for line in self.lines:
+            line.setPen(theme.color("annotation_border"))
+        if self._text is not None:
+            self._text.setColor(theme.color("annotation_text"))
 
     def hoverEvent(self, ev: HoverEvent) -> None:
         """Override hoverEvent to relax some conditions
@@ -423,10 +427,7 @@ class AnnotationItem(SegmentItem):
     def setSelectedState(self, selected: bool) -> None:
         """Update the visual selection state (does not notify the controller)"""
         self._selected = selected
-        if selected:
-            self.setBrush(QtGui.QBrush(QtGui.QColor(255, 0, 0, 50)))
-        else:
-            self.setBrush(self._default_brush)
+        self.applyTheme()
         self.update()
 
     def updateLabel(self, label: str) -> None:

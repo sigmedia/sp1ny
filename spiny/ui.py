@@ -18,7 +18,7 @@ import importlib
 import pkgutil
 
 # spiny internal packages
-from .gui.theme import define_palette
+from .gui.theme import apply_theme
 from .gui.colormaps import COLORMAP_NAMES, colormap_ticks
 from .gui.helpers.widgets import ExtendedComboBox
 from .core.wav.visualisation import WavDock
@@ -356,7 +356,7 @@ def build_gui(app: QtWidgets.QApplication, dark_activated: bool = False) -> None
         Use the dark theme. (default: False)
     """
     # Generate application
-    define_palette(app, dark_activated)
+    apply_theme("dark" if dark_activated else "light")
     app.aboutToQuit.connect(player.stop)
 
     # Plugins create widgets, so they are discovered only now that the application exists

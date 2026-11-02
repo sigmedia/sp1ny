@@ -9,6 +9,7 @@ from ipapy.ipachar import IPAConsonant, IPASuprasegmental, IPADiacritic, IPAVowe
 from pyqtgraph import QtCore, QtGui, QtWidgets
 from pyqtgraph.Qt import isQObjectAlive
 
+from ..gui import theme
 from ..gui.widgets import CollapsibleBox
 from .io import AnnotationSerialiser
 from .model import AnnotationSet
@@ -49,8 +50,6 @@ class QListWidgetItemHideable(QtWidgets.QListWidgetItem):
     hidden from the list, which is not the case here.
     """
 
-    HIDDEN_COLOR = QtGui.QColor.fromRgb(234, 167, 153)
-
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self._hidden = False
@@ -58,9 +57,13 @@ class QListWidgetItemHideable(QtWidgets.QListWidgetItem):
     def toggleTierHidden(self) -> None:
         """Hide the tier if it is shown, show it if it is hidden; a hidden tier is highlighted in the list"""
         self._hidden = not self._hidden
-        # NOTE: an empty brush means the colours of the palette, so a shown tier is readable in every theme
-        self.setBackground(QtGui.QBrush(self.HIDDEN_COLOR) if self._hidden else QtGui.QBrush())
-        self.setForeground(QtGui.QBrush(QtGui.QColor("black")) if self._hidden else QtGui.QBrush())
+        self.applyTheme()
+
+    def applyTheme(self) -> None:
+        """Show the state of the tier with the colours of the current theme"""
+        # NOTE: an empty brush means the colours of the palette
+        self.setBackground(QtGui.QBrush(theme.color("hidden_tier")) if self._hidden else QtGui.QBrush())
+        self.setForeground(QtGui.QBrush(theme.color("hidden_tier_text")) if self._hidden else QtGui.QBrush())
 
     def isTierHidden(self) -> bool:
         """Tell if the tier is hidden
@@ -71,6 +74,15 @@ class QListWidgetItemHideable(QtWidgets.QListWidgetItem):
             True if the tier is hidden
         """
         return self._hidden
+
+
+class TierList(QtWidgets.QListWidget):
+    """List of the tiers, whose entries follow the theme"""
+
+    def applyTheme(self) -> None:
+        """Show the entries with the colours of the current theme"""
+        for row in range(self.count()):
+            self.item(row).applyTheme()
 
 
 class QLabelClickable(QtWidgets.QLabel):
@@ -224,7 +236,7 @@ class ControlLayout(QtWidgets.QVBoxLayout):
         tier_box_layout.addLayout(buttons_layout)
 
         # Add the list
-        self._list_tiers_widget = QtWidgets.QListWidget(tier_box)
+        self._list_tiers_widget = TierList(tier_box)
         self._list_tiers_widget.setSelectionMode(QtWidgets.QAbstractItemView.MultiSelection)
         self._list_tiers_widget.setDragDropMode(QtWidgets.QAbstractItemView.InternalMove)
         self._list_tiers_widget.model().rowsMoved.connect(self._update_order)
@@ -369,9 +381,6 @@ class ControlLayout(QtWidgets.QVBoxLayout):
         box = CollapsibleBox(title)
         lay = QtWidgets.QGridLayout()
 
-        # setting background color to label when mouse hover over it
-        hover_style = "QLabel:hover {{background-color: {}; color: white;}}".format(QtGui.QColor(134, 125, 125).name())
-
         ipa_chars: list[Any] = [cur_unicode for cur_unicode in IPA_CHARS if type(cur_unicode) is ipa_cls]
         for j, cur_unicode in enumerate(ipa_chars):
             label = QLabelClickable(str(cur_unicode))
@@ -380,7 +389,6 @@ class ControlLayout(QtWidgets.QVBoxLayout):
                 label.setFont(font)
             label.setAlignment(QtCore.Qt.AlignCenter)
             label.setToolTip(" ".join(cur_unicode.descriptors))
-            label.setStyleSheet(hover_style)
             lay.addWidget(label, j // nb_columns, j % nb_columns)
 
         box.setContentLayout(lay)

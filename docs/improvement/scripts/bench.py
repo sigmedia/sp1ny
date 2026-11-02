@@ -98,7 +98,7 @@ def main(data: str, name: str, only: list[str]) -> None:
     from spiny.raw_data import controller as raw
 
     raw.loadCoefficientFile(f"{data}/{name}.neur", -50, 5)
-    ui.define_palette(app)
+    ui.apply_theme("light")
     stage("discover_plugins", ui.discover_plugins)
     window = stage("build_window", lambda: ui.GUIVisu())
     window.resize(1600, 1000)

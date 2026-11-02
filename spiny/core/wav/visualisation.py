@@ -11,6 +11,7 @@ from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 from pyqtgraph.dockarea import Dock
 
 # SpINY
+from spiny.gui import theme
 from spiny.gui.items import PlayheadLine, SelectablePlotItem
 from .player import player
 
@@ -33,11 +34,6 @@ class WaveformItem(pg.GraphicsObject):
     The pyramid costs about 3% of the signal memory, and painting costs O(pixels) whatever the length
     of the signal.
 
-    Parameters
-    ----------
-    pen : QPen or color, optional
-        The pen used to draw the signal (any argument accepted by pg.mkPen). (default: None)
-
     Attributes
     ----------
     RAW_SAMPLES_PER_PIXEL : float
@@ -49,15 +45,20 @@ class WaveformItem(pg.GraphicsObject):
     RAW_SAMPLES_PER_PIXEL = 2.0
     PYRAMID_FACTORS = (64, 1024, 16384)
 
-    def __init__(self, pen: Any = None) -> None:
+    def __init__(self) -> None:
         super().__init__()
-        self._pen = pg.mkPen(pen)
+        self.applyTheme()
         self._signal = np.zeros(0, dtype=np.float32)
         self._sampling_rate = 1
         self._levels: list[tuple[int, np.ndarray, np.ndarray]] = []  # (factor, mins, maxs), finest first
         self._y_range = (-1.0, 1.0)
         self._path = QtGui.QPainterPath()
         self._path_key: tuple[int, int, int] | None = None  # What self._path shows: (first, last, nb_columns)
+
+    def applyTheme(self) -> None:
+        """Draw the signal in the colour of the current theme"""
+        self._pen = pg.mkPen(theme.color("waveform"))
+        self.update()
 
     def setSignal(self, signal: np.ndarray, sampling_rate: int) -> None:
         """Define the signal to draw and (re)build its min/max pyramid
@@ -259,8 +260,7 @@ class WavPlotWidget(pg.PlotWidget):
         # NOTE: given to the constructor, because PlotWidget binds its setXRange, setLimits, ... to this item
         super().__init__(parent=parent, plotItem=SelectablePlotItem(lock_y_axis=True, default_padding=0, **kwargs))
 
-        color = QtWidgets.QApplication.instance().palette().color(QtGui.QPalette.Text)
-        self._waveform = WaveformItem(pen=color)
+        self._waveform = WaveformItem()
         self.plotItem.addItem(self._waveform)
         self.refresh()
 

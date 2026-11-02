@@ -10,6 +10,7 @@ from spiny.core.segment import Segment
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui
 from spiny.core import player
+from spiny.gui import theme
 
 
 ###############################################################################
@@ -70,12 +71,17 @@ class PlayheadLine(pg.InfiniteLine):
     """Vertical line following the position of the player (polled: the audio thread must never touch Qt objects)"""
 
     def __init__(self) -> None:
-        super().__init__(pos=0, movable=False, angle=90, pen=pg.mkPen({"color": "#e5484d", "width": 2}))
+        super().__init__(pos=0, movable=False, angle=90)
+        self.applyTheme()
         self.setZValue(1000)  # Above everything, the annotation items are opaque
         self._timer = QtCore.QTimer(self)
         self._timer.setInterval(30)
         self._timer.timeout.connect(self._follow)
         self._timer.start()
+
+    def applyTheme(self) -> None:
+        """Draw the line in the colour of the current theme"""
+        self.setPen(pg.mkPen(theme.color("playhead"), width=2))
 
     def _follow(self) -> None:
         """Move the line to the position of the player, when it is visible and it would really move on the screen"""
@@ -164,10 +170,7 @@ class SegmentItem(pg.LinearRegionItem):
             LinkedInfiniteLine(pos=QtCore.QPointF(self._segment.end_time, 0), angle=90, **lineKwds),
         ]
 
-        brush = QtGui.QBrush(QtGui.QColor(0, 0, 255, 50))
-        self.setBrush(brush)
-        hover_brush = QtGui.QBrush(QtGui.QColor(255, 0, 0, 50))
-        self.setHoverBrush(hover_brush)
+        SegmentItem.applyTheme(self)  # NOTE: not self.applyTheme, a subclass is not initialised yet
 
         self.setMovable(movable)
 
@@ -203,6 +206,11 @@ class SegmentItem(pg.LinearRegionItem):
 
         for s in self._related:
             s.setRegion(bounds)
+
+    def applyTheme(self) -> None:
+        """Fill the segment with the colours of the current theme"""
+        self.setBrush(QtGui.QBrush(theme.color("selection")))
+        self.setHoverBrush(QtGui.QBrush(theme.color("selection_hover")))
 
     def mouseClickEvent(self, ev: MouseClickEvent) -> None:
         """The click event handler.

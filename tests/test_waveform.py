@@ -11,7 +11,7 @@ def waveform(qapp):
 
     plot = pg.PlotWidget()
     plot.resize(400, 200)
-    item = WaveformItem(pen="k")
+    item = WaveformItem()
     plot.addItem(item)
     plot.show()
     yield plot, item

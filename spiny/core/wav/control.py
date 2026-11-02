@@ -10,7 +10,8 @@ import sounddevice as sd
 # SpINY
 from pyqtgraph.Qt import QtCore, QtGui, QtWidgets, isQObjectAlive
 
-from spiny.gui.icons import transport_icon
+from spiny.gui import theme
+from spiny.gui.icons import ToolBarButton, transport_icon
 
 from .player import player
 
@@ -69,31 +70,12 @@ class TransportWidget(QtWidgets.QWidget):
         The parent widget. (default: None)
     """
 
-    #: The colour of the play button
-    PLAY_COLOR = QtGui.QColor("#2fa66a")
-
-    STYLE_SHEET = """
-        QToolButton { border: none; border-radius: 6px; padding: 5px; }
-        QToolButton:hover { background: rgba(127, 127, 127, 50); }
-        QToolButton:pressed { background: rgba(127, 127, 127, 90); }
-        QToolButton:checked { background: #2a78d6; }
-        QToolButton:disabled { background: transparent; }
-        QLabel#time { background: #17181a; color: #7fe3a8; border-radius: 6px; padding: 4px 10px; }
-        QLabel#duration { background: #17181a; color: #7c8088; border-radius: 6px; padding: 4px 10px; }
-    """
-
     def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
         super().__init__(parent)
-        self.setStyleSheet(self.STYLE_SHEET)
-        icon_color = self.palette().color(QtGui.QPalette.ColorRole.ButtonText)
-
-        self._play_icon = transport_icon("play", self.PLAY_COLOR)
-        self._pause_icon = transport_icon("pause", self.PLAY_COLOR)
-        self._bStart = self._transportButton(transport_icon("start", icon_color), "Return to start", "Home")
-        self._bPlay = self._transportButton(self._play_icon, "Play / Pause", "Space")
-        self._showing_pause = False
-        self._bStop = self._transportButton(transport_icon("stop", icon_color), "Stop", "Esc")
-        self._bLoop = self._transportButton(transport_icon("loop", icon_color, QtGui.QColor("white")), "Loop", "L")
+        self._bStart = ToolBarButton("start", "Return to start", "Home")
+        self._bPlay = ToolBarButton("play", "Play / Pause", "Space", color_name="play")
+        self._bStop = ToolBarButton("stop", "Stop", "Esc")
+        self._bLoop = ToolBarButton("loop", "Loop", "L")
         self._bLoop.setCheckable(True)
         self._bLoop.setChecked(player.loop_activated)
         self._bStart.clicked.connect(lambda: player.seek(0.0))
@@ -131,40 +113,11 @@ class TransportWidget(QtWidgets.QWidget):
         self._refresh_timer.timeout.connect(self._refresh)
         self._refresh_timer.start()
 
-    def _transportButton(self, icon: QtGui.QIcon, tooltip: str, shortcut: str) -> QtWidgets.QToolButton:
-        """Create a button of the transport
-
-        Parameters
-        ----------
-        icon : QtGui.QIcon
-            The icon
-        tooltip : str
-            What the button does
-        shortcut : str
-            The keyboard shortcut
-
-        Returns
-        -------
-        QtWidgets.QToolButton
-            The button
-        """
-        button = QtWidgets.QToolButton()
-        button.setIcon(icon)
-        button.setIconSize(QtCore.QSize(22, 22))
-        button.setToolTip(f"{tooltip} ({shortcut})")
-        button.setShortcut(QtGui.QKeySequence(shortcut))  # NOTE: typing in a text field still goes to the field
-        button.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
-        return button
-
     def _refresh(self) -> None:
         """Show the state of the player: position, duration and play or pause icon"""
         self._lTime.setText(format_time(player.position))
         self._lDuration.setText(format_time(player.duration))
-        # NOTE: setting an icon repaints the button, even when it is the same one
-        playing = player.is_playing and not player.is_paused
-        if playing != self._showing_pause:
-            self._showing_pause = playing
-            self._bPlay.setIcon(self._pause_icon if playing else self._play_icon)
+        self._bPlay.setIconName("pause" if player.is_playing and not player.is_paused else "play")
 
     def playPause(self) -> None:
         """Play from the cursor, or pause/resume a playback (a message box reports a device which cannot play)"""
@@ -186,19 +139,9 @@ class OutputWidget(QtWidgets.QWidget):
         The parent widget. (default: None)
     """
 
-    STYLE_SHEET = """
-        QSlider::groove:horizontal { height: 4px; border-radius: 2px; background: rgba(127, 127, 127, 90); }
-        QSlider::sub-page:horizontal { border-radius: 2px; background: #2a78d6; }
-        QSlider::handle:horizontal {
-            width: 12px; margin: -4px 0; border-radius: 6px; background: palette(button-text);
-        }
-    """
-
     def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
         super().__init__(parent)
-        self.setStyleSheet(self.STYLE_SHEET)
         self.setSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Policy.Preferred)
-        icon_color = self.palette().color(QtGui.QPalette.ColorRole.ButtonText)
 
         self._devices, default_device = output_devices()
 
@@ -219,8 +162,8 @@ class OutputWidget(QtWidgets.QWidget):
         self._boxDevices.currentTextChanged.connect(self.device_changed)
 
         # Define volume slider
-        volume_icon = QtWidgets.QLabel()
-        volume_icon.setPixmap(transport_icon("volume", icon_color).pixmap(20, 20))
+        self._volume_icon = QtWidgets.QLabel()
+        self.applyTheme()
         self._sVolume = QtWidgets.QSlider(QtCore.Qt.Horizontal)
         self._sVolume.setRange(0, 100)
         self._sVolume.setValue(round(player.volume * 100))
@@ -238,9 +181,13 @@ class OutputWidget(QtWidgets.QWidget):
         layout.setSpacing(4)
         layout.addWidget(self._boxDevices)
         layout.addSpacing(12)
-        layout.addWidget(volume_icon)
+        layout.addWidget(self._volume_icon)
         layout.addWidget(self._sVolume)
         layout.addWidget(self._lVolume)
+
+    def applyTheme(self) -> None:
+        """Draw the volume icon with the colours of the current theme"""
+        self._volume_icon.setPixmap(transport_icon("volume", theme.color("button_text")).pixmap(20, 20))
 
     def device_changed(self, name: str) -> None:
         """Use the selected output device; a device which cannot play the signal is refused and the previous one kept

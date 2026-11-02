@@ -169,7 +169,6 @@ class DataWidget(pg.GraphicsLayoutWidget):
             The parent widget
         """
         super().__init__(parent, border=False)
-        self.setBackground(QtWidgets.QApplication.instance().palette().color(QtGui.QPalette.Base))
         self.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
         self.enableMouse(False)
 

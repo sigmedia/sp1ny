@@ -1,8 +1,10 @@
-"""Icons of the player toolbar, drawn as vector shapes so that they look the same on every system"""
+"""Icons and buttons of the toolbars, drawn as vector shapes so that they look the same on every system"""
 
 from __future__ import annotations
 
-from pyqtgraph.Qt import QtCore, QtGui
+from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
+
+from spiny.gui import theme
 
 
 def _polygon(*points: tuple[float, float]) -> QtGui.QPainterPath:
@@ -120,6 +122,49 @@ def _pixmap(name: str, color: QtGui.QColor) -> QtGui.QPixmap:
     painter.fillPath(_shape(name), color)
     painter.end()
     return pixmap
+
+
+class ToolBarButton(QtWidgets.QToolButton):
+    """Button of a toolbar: an icon drawn in the colours of the current theme
+
+    Parameters
+    ----------
+    icon_name : str
+        The icon, see transport_icon
+    tooltip : str
+        What the button does
+    shortcut : str
+        The keyboard shortcut
+    color_name : str, optional
+        The name of the colour of the icon in the theme. (default: "button_text")
+    """
+
+    def __init__(self, icon_name: str, tooltip: str, shortcut: str, color_name: str = "button_text") -> None:
+        super().__init__()
+        self._icon_name = icon_name
+        self._color_name = color_name
+        self.setIconSize(QtCore.QSize(22, 22))
+        self.setToolTip(f"{tooltip} ({shortcut})")
+        self.setShortcut(QtGui.QKeySequence(shortcut))  # NOTE: typing in a text field still goes to the field
+        self.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
+        self.applyTheme()
+
+    def setIconName(self, icon_name: str) -> None:
+        """Change the icon
+
+        Parameters
+        ----------
+        icon_name : str
+            The icon, see transport_icon
+        """
+        # NOTE: setting an icon repaints the button, even when it is the same one
+        if icon_name != self._icon_name:
+            self._icon_name = icon_name
+            self.applyTheme()
+
+    def applyTheme(self) -> None:
+        """Draw the icon with the colours of the current theme"""
+        self.setIcon(transport_icon(self._icon_name, theme.color(self._color_name), theme.color("accent_text")))
 
 
 def transport_icon(name: str, color: QtGui.QColor, checked_color: QtGui.QColor | None = None) -> QtGui.QIcon:

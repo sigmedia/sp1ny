@@ -168,29 +168,31 @@ def test_load_errors_are_reported(controller, view, monkeypatch, no_dialogs):
     assert [name for name, _ in no_dialogs] == ["critical"]
 
 
-def test_annotation_label_is_readable_in_the_dark_theme(qapp):
-    from pyqtgraph.Qt import QtGui
+def test_annotation_label_is_readable_in_every_theme(qapp):
     from spiny.annotations.model import Annotation
     from spiny.annotations.visualisation import AnnotationItem
-    from spiny.gui.theme import define_dark_palette
+    from spiny.gui.theme import THEMES, apply_theme, color
 
-    previous = qapp.palette()
-    qapp.setPalette(define_dark_palette())
+    item = AnnotationItem(Annotation(0.1, 0.2, "a"))
     try:
-        item = AnnotationItem(Annotation(0.1, 0.2, "a"))
-        assert item._default_brush.color() == QtGui.QColor(53, 53, 53)
-        assert item._text.textItem.defaultTextColor() == QtGui.QColor("white")
+        for name in THEMES:
+            apply_theme(name)
+            item.applyTheme()
+            assert item.brush.color() == color("annotation")
+            assert item._text.textItem.defaultTextColor() == color("annotation_text")
+            assert color("annotation") != color("annotation_text")
     finally:
-        qapp.setPalette(previous)
+        apply_theme("light")
 
 
 def test_hidden_tier_keeps_a_readable_text_colour(qapp):
-    from pyqtgraph.Qt import QtCore, QtGui
+    from pyqtgraph.Qt import QtCore
     from spiny.annotations.control import QListWidgetItemHideable
+    from spiny.gui.theme import color
 
     item = QListWidgetItemHideable()
     item.toggleTierHidden()
-    assert item.foreground().color() == QtGui.QColor("black")
+    assert item.foreground().color() == color("hidden_tier_text")
     item.toggleTierHidden()
     assert item.background().style() == QtCore.Qt.BrushStyle.NoBrush
     assert item.foreground().style() == QtCore.Qt.BrushStyle.NoBrush

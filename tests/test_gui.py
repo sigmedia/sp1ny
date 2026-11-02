@@ -317,3 +317,32 @@ def test_playhead_only_moves_when_visible_on_screen(window):
     line._follow()
     assert line.value() == player.position
     player.seek(0.0)
+
+
+def test_every_theme_defines_the_same_colours_and_they_are_valid():
+    from pyqtgraph.Qt import QtGui
+    from spiny.gui.theme import THEMES
+
+    names = {frozenset(colors) for colors in THEMES.values()}
+    assert len(names) == 1
+    assert all(QtGui.QColor(value).isValid() for colors in THEMES.values() for value in colors.values())
+
+
+def test_switching_the_theme_updates_what_is_on_the_screen(window):
+    from spiny.gui.items import PlayheadLine
+    from spiny.gui.theme import apply_theme, color, current_theme, toggle_theme
+
+    wav_plot = window._visualisation_area._dock_wav.wav_plot
+    apply_theme("light")
+    try:
+        toggle_theme()
+        assert current_theme() == "dark"
+        assert QtWidgets.QApplication.instance().palette().color(QtGui.QPalette.ColorRole.Window) == color("window")
+        assert wav_plot.backgroundBrush().color() == color("plot_background")
+        assert wav_plot._waveform._pen.color() == color("waveform")
+        assert wav_plot.getAxis("bottom").pen().color() == color("plot_foreground")
+        line = next(item for item in wav_plot.getPlotItem().items if isinstance(item, PlayheadLine))
+        assert line.pen.color() == color("playhead")
+        window.grab()
+    finally:
+        apply_theme("light")
