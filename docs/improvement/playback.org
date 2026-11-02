@@ -86,6 +86,49 @@ full view (measured offscreen); on a 20 s view the line moves at nearly every po
 A new playback first waits for the end of the stream which was just stopped: its last callback would otherwise
 continue with the new playback, or its end would stop it.
 
+* Parametric equalizer
+
+Implementation: [[file:../../spiny/core/wav/equalizer.py]]. Five bands (a low shelf, three peaks, a high shelf), each
+with a frequency, a gain and a Q. Every change is heard at once.
+
+** The filters
+
+Each band is a biquad of the Audio EQ Cookbook (R. Bristow-Johnson), computed at the playback rate. The filter acts on
+what is sent to the device: after the resampling and the speed change, so a band at 1 kHz stays at 1 kHz at any speed.
+
+** Filtering in the audio callback
+
+A biquad is recursive: each output sample needs the previous one. numpy has no recursive filter, a Python loop per
+sample is far too slow for the real-time thread, and scipy is a heavy dependency for one function. The cascade of the
+biquads is applied instead through its impulse response:
+
+#+begin_example
+H(f) = product over the bands of (b0 + b1 z + b2 z²) / (1 + a1 z + a2 z²),  z = exp(−2iπ f / rate)
+h    = inverse FFT of H, first 7168 samples, faded out over the last 8th
+G    = FFT of h on 8192 points
+#+end_example
+
+Each block of at most 1024 samples is then convolved by overlap-save, on the last 8192 samples played:
+
+#+begin_example
+buffer = last 8192 samples, ending with the block
+out    = inverse FFT of (FFT(buffer) × G), last samples only (the others wrap around)
+#+end_example
+
+The biquads are minimum phase, so the impulse response starts at once: the equalizer adds no delay. The output matches
+the recursive filter within −60 dB, unless a very narrow band at a very low frequency rings for longer than the 7168
+samples kept.
+
+** Changing a band during the playback
+
+The GUI thread computes the new filter (about 1 ms) and publishes it with one assignment: the audio thread never waits.
+At its next block, the audio thread computes the output with the old and the new filter and fades from one to the
+other, as switching at once would be a click. When no band has a gain, nothing is computed and the samples are
+untouched.
+
+The cost in the callback is two FFTs per block of up to 1024 samples: about 0.1 ms, which is 1.7 % of the time
+available for a block of 256 samples at 48 kHz. A boost can go over full scale: the output is then clipped.
+
 * Results
 
 | Measure                        | Before (librosa) | After (soundfile) |
