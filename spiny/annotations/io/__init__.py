@@ -27,6 +27,21 @@ class AnnotationSerialiser:
         """
         raise NotImplementedError("")
 
+    def droppedTiers(self, annotation_set: AnnotationSet) -> list[str]:
+        """Give the tiers the format cannot store (none for most formats)
+
+        Parameters
+        ----------
+        annotation_set : AnnotationSet
+            The annotations
+
+        Returns
+        -------
+        list(str)
+            The names of the tiers which are not saved
+        """
+        return []
+
     def save(self, output_file: pathlib.Path, annotations: AnnotationSet) -> None:
         """Write an annotation file
 

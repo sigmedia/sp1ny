@@ -73,7 +73,7 @@ class HTKLabelSerialiser(AnnotationSerialiser):
                 # Convert to seconds
                 start_time = int(elts[0]) / HTK_UNIT
                 end_time = int(elts[1]) / HTK_UNIT if nb_times == 2 else None
-                entries.append([start_time, end_time, self._extractLabel(elts[nb_times])])
+                entries.append([start_time, end_time, elts[nb_times]])
 
         # Fill the missing end times with the start time of the next segment
         for i, entry in enumerate(entries):
@@ -86,13 +86,21 @@ class HTKLabelSerialiser(AnnotationSerialiser):
         annotation_set: AnnotationSet = AnnotationSet(an_dict, set())
         return annotation_set
 
-    @staticmethod
-    def _extractLabel(label: str) -> str:
-        """Extract the monophone from a full-context label (e.g. "x^y-a+b=c..." => "a"), otherwise keep the label"""
-        m = re.search("-(.+?)\\+", label)
-        if m:
-            return m.group(1)
-        return label
+    def droppedTiers(self, annotation_set: AnnotationSet) -> list[str]:
+        """Give the tiers `save` leaves out: an HTK label file only contains the first visible tier
+
+        Parameters
+        ----------
+        annotation_set : AnnotationSet
+            The annotations
+
+        Returns
+        -------
+        list(str)
+            The names of the tiers which are not saved
+        """
+        visible = [name for name in annotation_set.annotations if name not in annotation_set.ignored]
+        return [name for name in annotation_set.annotations if name != visible[0]] if visible else []
 
     def save(self, output_file: str | pathlib.Path, annotation_set: AnnotationSet) -> None:
         """Save the first visible tier as an HTK label file (HTK labels contain only one tier)

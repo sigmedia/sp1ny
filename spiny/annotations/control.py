@@ -479,12 +479,26 @@ class ControlLayout(QtWidgets.QVBoxLayout):
             annotation_file = annotation_file.with_name(annotation_file.name + extension)
             serialiser = serialiser_cls()
 
+        dropped = serialiser.droppedTiers(self._model)
+        if dropped:
+            Button = QtWidgets.QMessageBox.StandardButton
+            answer = QtWidgets.QMessageBox.question(
+                self._file_box,
+                "Save annotation file",
+                f"This format holds one tier. These tiers will not be saved:\n{', '.join(dropped)}\n\nSave anyway?",
+                Button.Save | Button.Cancel,
+                Button.Cancel,
+            )
+            if answer != Button.Save:
+                return False
+
         try:
             self._writeFile(serialiser, annotation_file)
         except Exception as ex:
             QtWidgets.QMessageBox.critical(self._file_box, "Save annotation file", f"Cannot save the file:\n{ex}")
             return False
-        self._saved_contents = self._contents()
+        if not dropped:  # NOTE: otherwise, closing must still warn about the tiers which are not in any file
+            self._saved_contents = self._contents()
         self._wCurrentFile.setText(str(annotation_file.absolute()))
         return True
 

@@ -1,6 +1,24 @@
+import re
 from dataclasses import dataclass
 
 from ..core import Segment
+
+
+def display_label(label: str) -> str:
+    """Give the text to show for a label: the monophone of a full-context label ("x^y-a+b=c..." => "a")
+
+    Parameters
+    ----------
+    label : str
+        The label
+
+    Returns
+    -------
+    str
+        The text to show (the label itself if it is not a full-context one)
+    """
+    match = re.search("-(.+?)\\+", label)
+    return match.group(1) if match else label
 
 
 @dataclass(slots=True)

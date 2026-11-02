@@ -12,7 +12,7 @@ from pyqtgraph.dockarea import Dock
 from spiny.gui import theme
 from spiny.gui.items import PlayheadLine, SegmentItem
 from spiny.gui.shortcuts import shortcut
-from .model import Annotation, AnnotationSet
+from .model import Annotation, AnnotationSet, display_label
 from spiny.core import player
 
 
@@ -343,7 +343,7 @@ class AnnotationItem(SegmentItem):
         # Add label
         self._text: Any = None
         if showLabel:
-            self._text = pg.TextItem(text=self._segment.label, anchor=(0.5, 0.5))
+            self._text = pg.TextItem(text=display_label(self._segment.label), anchor=(0.5, 0.5))
             self._text.setPos((self._segment.start_time + self._segment.end_time) / 2, 0.5)
             self._text.setParentItem(self)
 
@@ -440,7 +440,7 @@ class AnnotationItem(SegmentItem):
             The new label
         """
         self._segment.label = label
-        self._text.setText(label)
+        self._text.setText(display_label(label))
         self._text.setPos((self._segment.start_time + self._segment.end_time) / 2, 0.5)
 
     def setBounds(self, start_time: float, end_time: float) -> None:

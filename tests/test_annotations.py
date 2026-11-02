@@ -325,3 +325,46 @@ def test_click_on_an_annotation_cancels_the_first_click(empty_tier):
     separate_clicks()
     click(empty_tier, 0.8)
     assert len(times(empty_tier)) == 1
+
+
+def test_full_context_label_shows_its_monophone(controller):
+    from spiny.annotations.visualisation import AnnotationItem
+
+    item = AnnotationItem(Annotation(0.1, 0.2, "x^y-aa+b=c"))
+    assert item._text.textItem.toPlainText() == "aa"
+    item.updateLabel("p^q-bb+c=d")
+    assert item._text.textItem.toPlainText() == "bb"
+    assert item._segment.label == "p^q-bb+c=d"
+
+
+@pytest.fixture
+def two_tiers(controller, monkeypatch, tmp_path):
+    from spiny.annotations.model import AnnotationSet
+
+    target = tmp_path / "out.lab"
+    monkeypatch.setattr(QtWidgets.QFileDialog, "getSaveFileName", lambda *a, **k: (str(target), ""))
+    controller.setAnnotationModel(AnnotationSet({"a": [Annotation(0, 1, "x")], "b": [Annotation(0, 1, "y")]}, set()))
+    yield target
+    controller.setAnnotationModel(AnnotationSet({}, set()))
+
+
+def test_saving_several_tiers_as_lab_can_be_cancelled(controller, two_tiers, monkeypatch):
+    asked = []
+    Button = QtWidgets.QMessageBox.StandardButton
+    monkeypatch.setattr(QtWidgets.QMessageBox, "question", lambda *a, **k: asked.append(a[2]) or Button.Cancel)
+    assert not controller._save_annotation_file()
+    assert not two_tiers.exists() and "b" in asked[0]
+
+
+def test_edited_tier_left_out_of_a_lab_still_counts_as_unsaved(controller, two_tiers, monkeypatch):
+    controller.model.annotations["b"][0].label = "edited"
+    asked = []
+    Button = QtWidgets.QMessageBox.StandardButton
+    monkeypatch.setattr(QtWidgets.QMessageBox, "question", lambda *a, **k: asked.append(a[2]) or Button.Save)
+    assert controller._save_annotation_file()
+    assert two_tiers.read_text() == "0 10000000 x\n"
+    assert len(asked) == 1
+
+    monkeypatch.setattr(QtWidgets.QMessageBox, "question", lambda *a, **k: asked.append(a[2]) or Button.Cancel)
+    assert not controller.confirmDiscardChanges()
+    assert "unsaved" in asked[1]

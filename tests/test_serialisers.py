@@ -22,7 +22,7 @@ def load_htk(tmp_path, content):
         ("0 100000 ə\n", [(0.0, 0.01, "ə")]),
         ("0 100000 a -12.5\n100000 200000 b -3\n", [(0.0, 0.01, "a"), (0.01, 0.02, "b")]),
         ("0 a\n100000 b\n", [(0.0, 0.01, "a"), (0.01, 0.01, "b")]),
-        ("0 100000 x^y-aa+b=c@1_2\n", [(0.0, 0.01, "aa")]),
+        ("0 100000 x^y-aa+b=c@1_2\n", [(0.0, 0.01, "x^y-aa+b=c@1_2")]),
     ],
 )
 def test_htk_load_variants(tmp_path, content, expected):
@@ -86,3 +86,20 @@ def test_serialiser_for_extension(qapp):
     assert isinstance(serialiser_for(pathlib.Path("a.lab")), HTKLabelSerialiser)
     with pytest.raises(ValueError):
         serialiser_for(pathlib.Path("a.wav"))
+
+
+def test_htk_save_keeps_full_context_labels(tmp_path):
+    content = "0 100000 x^y-aa+b=c@1_2\n100000 200000 sil\n"
+    (tmp_path / "in.lab").write_text(content, encoding="utf-8")
+    HTKLabelSerialiser().save(tmp_path / "out.lab", HTKLabelSerialiser().load(tmp_path / "in.lab"))
+    assert (tmp_path / "out.lab").read_text(encoding="utf-8") == content
+
+
+@pytest.mark.parametrize(
+    "ignored, dropped",
+    [(set(), ["b", "c"]), ({"a"}, ["a", "c"]), ({"a", "b", "c"}, [])],
+)
+def test_htk_lists_the_tiers_it_leaves_out(ignored, dropped):
+    tiers = {name: [] for name in ("a", "b", "c")}
+    assert HTKLabelSerialiser().droppedTiers(AnnotationSet(tiers, ignored)) == dropped
+    assert JSONSerialiser().droppedTiers(AnnotationSet(tiers, ignored)) == []
