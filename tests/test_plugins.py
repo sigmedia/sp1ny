@@ -1,3 +1,5 @@
+import time
+
 import numpy as np
 import pytest
 from pyqtgraph.Qt import QtWidgets
@@ -161,12 +163,12 @@ def test_full_scale_sine_is_at_0_db_whatever_the_analysed_part(player):
 def test_spectrum_matches_librosa(player):
     """The numpy STFT reproduces librosa's stft + amplitude_to_db (up to one 8-bit code)"""
     librosa = pytest.importorskip("librosa")
-    from spiny.plugins.spectrum.extractor import SpectrogramSettings, SpectrumExtractor, get_window
+    from spiny.plugins.spectrum.extractor import SpectrogramSettings, SpectrumExtractor, fft_length, get_window
 
     settings = SpectrogramSettings(frameshift=5, framelength=25, window="hann", max_frequency=4000)
     codes = SpectrumExtractor(settings).extract().codes.astype(int)
 
-    n_fft = 4096  # fft_length() of a 400-sample window
+    n_fft = fft_length(400)
     signal = player.signal[:, 0]
     reference = np.abs(signal).max() * get_window("hann", 400, n_fft).sum() / 2
     sp = np.abs(librosa.stft(signal, n_fft=n_fft, hop_length=80, win_length=400, window="hann", center=True))
@@ -265,3 +267,52 @@ def test_duplicate_plugin_names_are_rejected(qapp):
             register_plugin(DataController(name, None, None))
     finally:
         plugin_entry_dict.pop(name, None)  # do not leak the dummy plugin into the other tests
+
+
+def test_reusing_a_previous_part_gives_the_same_frames(player, monkeypatch):
+    from spiny.plugins.spectrum import extractor
+
+    signal = np.sin(np.arange(16000 * 20) ** 1.2 / 500).astype(np.float32)
+    settings = extractor.SpectrogramSettings()
+    expected = extractor.compute_spectrogram(signal, 16000, settings, 5.0, 12.0)
+    previous = extractor.compute_spectrogram(signal, 16000, settings, 7.0, 10.0)
+
+    computed = []
+    stft = extractor.stft_magnitude
+    monkeypatch.setattr(
+        extractor,
+        "stft_magnitude",
+        lambda s, first, last, *args: computed.append(last - first) or stft(s, first, last, *args),
+    )
+    result = extractor.compute_spectrogram(signal, 16000, settings, 5.0, 12.0, previous)
+    assert result.start_time == expected.start_time
+    assert np.array_equal(result.codes, expected.codes)
+    assert sum(computed) == expected.codes.shape[0] - previous.codes.shape[0]
+
+    # Nothing in common, and nothing to compute at all
+    far = extractor.compute_spectrogram(signal, 16000, settings, 15.0, 18.0)
+    assert np.array_equal(extractor.compute_spectrogram(signal, 16000, settings, 5.0, 12.0, far).codes, expected.codes)
+    computed.clear()
+    same = extractor.compute_spectrogram(signal, 16000, settings, 5.0, 12.0, expected)
+    assert np.array_equal(same.codes, expected.codes) and not computed
+
+
+def test_moving_all_the_time_does_not_delay_the_analysis(spectrogram):
+    controller, _, _ = spectrogram
+    controller._scheduleAnalysis()
+    time.sleep(0.015)
+    remaining = controller._analysis_timer.remainingTime()
+    controller._scheduleAnalysis()  # a new mouse event during a drag
+    assert controller._analysis_timer.remainingTime() <= remaining
+
+
+def test_small_pans_are_covered_by_the_margin(spectrogram):
+    controller, refreshes, wav_plot = spectrogram
+    wav_plot.setXRange(40, 50, padding=0)
+    wait_for_analysis(controller)
+    result = controller._extractor.spectrogram
+    assert result.covers(35, 55)
+    refreshes.clear()
+    wav_plot.setXRange(41, 51, padding=0)
+    wait_for_analysis(controller)
+    assert not refreshes and controller._extractor.spectrogram is result

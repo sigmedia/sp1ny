@@ -29,9 +29,10 @@ class SpectrumController(DataController):
 
     - The display settings (frequency range, maximum level, dynamic range) are applied instantly.
     - A change of the visible range or of an analysis setting (window, window length, time step) starts
-      a new analysis in a background thread, `ANALYSIS_DELAY_MS` after the last change: the current
-      spectrogram stays visible until the new one is ready, and the result of an outdated analysis is
-      dropped. Nothing is computed if the current spectrogram already covers the visible range.
+      a new analysis in a background thread: the current spectrogram stays visible until the new one is
+      ready, and an analysis asked for in the meantime waits for it, so the view keeps being updated during
+      a drag. Each analysis also covers a margin around the view, and only computes the frames it does not
+      have yet. Nothing is computed if the current spectrogram covers the view and half of its margin.
     - When the visible range is longer than `max_duration`, nothing is computed: the spectrogram is freed
       and a message is shown instead, until the user zooms in.
 
@@ -48,8 +49,12 @@ class SpectrumController(DataController):
         The longest visible range for which a spectrogram is computed, in seconds
     """
 
-    #: Delay between the last change of the view or of an analysis setting and the start of the analysis
-    ANALYSIS_DELAY_MS = 150
+    #: Delay between a change of the view or of a setting and the analysis: gathers one burst of mouse events
+    ANALYSIS_DELAY_MS = 30
+
+    #: The part computed on each side of the view, as a fraction of its width and in seconds at most
+    MARGIN_FRACTION = 0.5
+    MAX_MARGIN = 30.0
 
     def __init__(self, extractor: SpectrumExtractor, widget: SpectrogramPlotWidget) -> None:
         super().__init__("Spectrogram", extractor, widget)
@@ -57,7 +62,7 @@ class SpectrumController(DataController):
         self._signals = _AnalysisSignals()
         self._signals.finished.connect(self._onAnalysisFinished)
 
-        # Restarted at every change, so that dragging a slider starts a single analysis
+        # NOTE: not restarted by a change: during a drag, the view must keep being updated
         self._analysis_timer = QtCore.QTimer()
         self._analysis_timer.setSingleShot(True)
         self._analysis_timer.setInterval(self.ANALYSIS_DELAY_MS)
@@ -146,14 +151,14 @@ class SpectrumController(DataController):
         )
 
     def _scheduleAnalysis(self, *args: Any) -> None:
-        """Restart the delay before the next analysis, so that dragging or panning starts a single one
+        """Start the delay before the next analysis, if it is not running already
 
         Parameters
         ----------
         args : list
             The arguments of the signal triggering the update (unused)
         """
-        if self._active:
+        if self._active and not self._analysis_timer.isActive():
             self._analysis_timer.start()
 
     def _requestAnalysis(self) -> None:
@@ -170,9 +175,12 @@ class SpectrumController(DataController):
 
         self._widget.setMessage("")
         settings = self._panelSettings()
-        if self._extractor.covers(settings, start_time, end_time) and not self._running:
+        margin = min((end_time - start_time) * self.MARGIN_FRACTION, self.MAX_MARGIN)
+        # NOTE: half of the margin is enough to wait for: the rest is seen while the next analysis is running
+        needed = max(start_time - margin / 2, 0.0), min(end_time + margin / 2, player.duration)
+        if self._extractor.covers(settings, *needed) and not self._running:
             return  # nothing would change
-        self._pending = (settings, start_time, end_time)
+        self._pending = (settings, max(start_time - margin, 0.0), min(end_time + margin, player.duration))
         if not self._running:
             self._startAnalysis()
 
@@ -187,8 +195,9 @@ class SpectrumController(DataController):
         self._running = True
         self._setStatus("Updating…")
 
+        previous = self._extractor.spectrogram if settings == self._extractor.settings else None
         future = self._executor.submit(
-            compute_spectrogram, player.signal[:, 0], player.sampling_rate, settings, start_time, end_time
+            compute_spectrogram, player.signal[:, 0], player.sampling_rate, settings, start_time, end_time, previous
         )
         future.add_done_callback(lambda done: self._signals.finished.emit((generation, settings, done)))
 

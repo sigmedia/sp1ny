@@ -192,8 +192,9 @@ def quantize_db(magnitude: np.ndarray, reference: float, amin: float = 1e-5) -> 
 def fft_length(win_length: int) -> int:
     """Choose the FFT length for a window of `win_length` samples
 
-    The frames are zero-padded to at least 4096 samples: this does not add information, but gives a
-    smooth frequency axis even for short (wideband) windows.
+    The frames are zero-padded to at least 2048 samples and twice the window: this does not add information, but
+    gives a smooth frequency axis even for short (wideband) windows. More would only cost time and memory: the
+    analysis and the drawing are proportional to the number of frequencies, and a plot is a few hundred pixels high.
 
     Parameters
     ----------
@@ -205,8 +206,8 @@ def fft_length(win_length: int) -> int:
     int
         The FFT length (a power of two)
     """
-    n_fft = 4096
-    while n_fft < win_length:
+    n_fft = 2048
+    while n_fft < 2 * win_length:
         n_fft *= 2
     return n_fft
 
@@ -290,6 +291,7 @@ def compute_spectrogram(
     settings: SpectrogramSettings,
     start_time: float = 0.0,
     end_time: float = math.inf,
+    previous: SpectrogramSlice | None = None,
 ) -> SpectrogramSlice:
     """Compute the 8-bit spectrogram of a part of a signal
 
@@ -311,6 +313,9 @@ def compute_spectrogram(
         The start of the part to analyse, in seconds. (default: 0.0)
     end_time : float, optional
         The end of the part to analyse, in seconds. (default: the end of the signal)
+    previous : SpectrogramSlice, optional
+        A spectrogram of the same signal with the same settings: its frames are not computed again, which makes
+        panning cheap. (default: None)
 
     Returns
     -------
@@ -336,7 +341,7 @@ def compute_spectrogram(
     signal = np.ascontiguousarray(signal, dtype=np.float32)
     nb_bins = min(int(settings.max_frequency * n_fft / sampling_rate) + 1, n_fft // 2 + 1)
     # A sine of amplitude A gives a magnitude of A × sum(window) / 2; the floor is for silent signals
-    peak = float(np.abs(signal).max(initial=0.0))
+    peak = max(float(signal.max(initial=0.0)), -float(signal.min(initial=0.0)))  # NOTE: np.abs would copy the signal
     reference = max(peak * float(window.sum()) / 2, float(np.finfo(np.float32).tiny))
 
     frame_duration = hop_length / sampling_rate
@@ -346,20 +351,36 @@ def compute_spectrogram(
     end_frame = max(min(end_frame, nb_signal_frames), first_frame + 1)
     codes = np.empty((end_frame - first_frame, nb_bins), dtype=np.uint8)
 
-    def process_block(block_start: int) -> None:
+    # What remains to compute: everything, or what is on each side of the frames known from `previous`
+    missing = [(first_frame, end_frame)]
+    if previous is not None:
+        previous_first = round(previous.start_time / frame_duration)
+        known_first = max(first_frame, previous_first)
+        known_last = min(end_frame, previous_first + previous.codes.shape[0])
+        if known_first < known_last:
+            codes[known_first - first_frame : known_last - first_frame] = previous.codes[
+                known_first - previous_first : known_last - previous_first
+            ]
+            missing = [(first_frame, known_first), (known_last, end_frame)]
+
+    def process_block(block: tuple[int, int]) -> None:
         """Compute and quantize one block of frames (each block writes its own rows of `codes`)
 
         Parameters
         ----------
-        block_start : int
-            The first frame of the block
+        block : tuple(int, int)
+            The first frame of the block and the frame after its last one
         """
-        block_end = min(block_start + BLOCK_SIZE, end_frame)
-        magnitude = stft_magnitude(signal, block_start, block_end, n_fft, hop_length, window)
-        codes[block_start - first_frame : block_end - first_frame] = quantize_db(magnitude[:, :nb_bins], reference)
+        magnitude = stft_magnitude(signal, block[0], block[1], n_fft, hop_length, window)
+        codes[block[0] - first_frame : block[1] - first_frame] = quantize_db(magnitude[:, :nb_bins], reference)
 
+    blocks = [
+        (block_start, min(block_start + BLOCK_SIZE, last))
+        for first, last in missing
+        for block_start in range(first, last, BLOCK_SIZE)
+    ]
     with ThreadPoolExecutor(max_workers=NB_WORKERS) as pool:
-        list(pool.map(process_block, range(first_frame, end_frame, BLOCK_SIZE)))  # list(): raises the errors
+        list(pool.map(process_block, blocks))  # list(): raises the errors
 
     return SpectrogramSlice(codes, first_frame * frame_duration, frame_duration, nb_bins * sampling_rate / n_fft)
 
