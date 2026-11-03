@@ -681,7 +681,7 @@ def wait_for_analysis(overlay, condition=None):
 def test_overlays_are_listed_according_to_the_visualisation(window, overlays):
     panel = window._overlay_panel
     names = {panel._list.item(row).text() for row in range(panel._list.count())}
-    assert {"Formants", "F0"} == names
+    assert {"Formants", "F0", "Mask"} == names
     assert not panel._none.isVisibleTo(panel)
 
     window._plugin_list.setCurrentText("Raw DATA")  # it does not support overlays
@@ -956,3 +956,141 @@ def test_reset_button_of_the_overlay(window, overlays):
     assert panel._panels["Formants"] is not old_panel and panel._panels["Formants"].isVisibleTo(panel)
     sliders = panel._panels["Formants"].findChildren(QtWidgets.QSlider)
     assert any(slider.value() == 5500 for slider in sliders)
+
+
+@pytest.fixture
+def mask_overlay(window, overlays, tmp_path):
+    """The mask overlay with a mask: everything is visible on the left half of the signal, nothing on the right one"""
+    from spiny.core import player
+
+    window._visualisation_area._dock_wav.wav_plot.setXRange(0, player.duration, padding=0)
+    spectrogram = window._current_controller._extractor
+    deadline = time.time() + 10
+    while not spectrogram.spectrogram.covers(0, player.duration) and time.time() < deadline:
+        QtWidgets.QApplication.processEvents()
+    mask = np.ones((1000, 200), dtype=np.float32)
+    mask[500:] = 0.0
+    filename = tmp_path / "mask.npy"
+    np.save(filename, mask)
+    overlay = overlays["Mask"]
+    overlay.loadMask(filename)
+    yield overlay
+    overlay.resetConfiguration()
+    overlay._file_mask = None
+
+
+def pixels_of_the_plot(window):
+    """Grab the plot of the spectrogram: the colour at 25 % and at 75 % of the time, in the middle of the height"""
+    from spiny.core import player
+
+    process_events()
+    plot = window._current_controller.widget
+    view = plot._plotItem.getViewBox()
+    image = plot.grab().toImage()
+    y = view.viewRange()[1][1] * 0.5
+
+    def pixel(time_position):
+        point = plot.mapFromScene(view.mapViewToScene(QtCore.QPointF(time_position * player.duration, y)))
+        return image.pixelColor(point)
+
+    return pixel(0.25), pixel(0.75)
+
+
+def test_mask_hides_where_the_opacity_is_zero(window, mask_overlay):
+    from spiny.gui import theme
+
+    # Without the mask: the plot is not the colour of its background
+    left, right = pixels_of_the_plot(window)
+    background = theme.color("plot_background")
+    assert right != background
+
+    tick(window, "Mask")
+    masked_left, masked_right = pixels_of_the_plot(window)
+    assert masked_left == left
+    assert masked_right == background
+
+    # The colour and the strength
+    mask_overlay.setColor("", QtGui.QColor("#ff0000"))
+    assert pixels_of_the_plot(window)[1] == QtGui.QColor("#ff0000")
+    mask_overlay.setConfiguration(strength=0.0)
+    assert pixels_of_the_plot(window)[1] == right
+    mask_overlay.setConfiguration(strength=1.0)
+
+    # Inverted: the other side is hidden
+    mask_overlay.setConfiguration(invert=True)
+    inverted_left, inverted_right = pixels_of_the_plot(window)
+    assert inverted_left == QtGui.QColor("#ff0000") and inverted_right == right
+
+
+def test_mask_layout_in_the_file(window, overlays, tmp_path):
+    overlay = overlays["Mask"]
+    filename = tmp_path / "wide.npy"
+    np.save(filename, np.ones((30, 400), dtype=np.float32))
+    overlay.loadMask(filename)
+    assert overlay.mask.shape == (30, 400)
+    overlay.setConfiguration(swap_axes=True)
+    assert overlay.mask.shape == (400, 30)
+    overlay.resetConfiguration()
+    assert overlay.mask.shape == (30, 400)
+    overlay._file_mask = None
+
+
+def test_mask_is_placed_in_time_and_frequency(window, mask_overlay):
+    from spiny.core import player
+
+    tick(window, "Mask")
+    process_events()
+    rect = mask_overlay._image.mapRectToParent(mask_overlay._image.boundingRect())
+    assert rect.left() == pytest.approx(0, abs=1e-6)
+    assert rect.right() == pytest.approx(player.duration, rel=0.01)
+    assert rect.top() == pytest.approx(0, abs=1e-6)
+    assert rect.bottom() == pytest.approx(player.sampling_rate / 2, rel=0.01)
+
+    mask_overlay.setConfiguration(frame_shift=1.0, max_frequency=4000.0)
+    rect = mask_overlay._image.mapRectToParent(mask_overlay._image.boundingRect())
+    assert rect.right() == pytest.approx(1.0, rel=0.01)  # 1000 frames of 1 ms
+    assert rect.bottom() == pytest.approx(4000.0, rel=0.01)
+
+
+def test_mask_is_not_drawn_when_nothing_is_plotted(window, mask_overlay):
+    tick(window, "Mask")
+    process_events()
+    assert mask_overlay._image.isVisible()
+    window._current_controller.widget.clearImageData()
+    assert not mask_overlay.is_active and not mask_overlay._image.isVisible()
+    window._current_controller.extract()
+    process_events()
+    assert mask_overlay._image.isVisible()
+
+
+def test_nothing_is_drawn_without_a_mask(window, overlays):
+    overlay = overlays["Mask"]
+    tick(window, "Mask")
+    process_events()
+    assert overlay.mask is None and not overlay._image.isVisible()
+
+
+def test_panel_loads_a_mask_and_reports_errors(window, overlays, tmp_path, monkeypatch):
+    overlay = overlays["Mask"]
+    panel = window._overlay_panel
+    names = [panel._list.item(row).text() for row in range(panel._list.count())]
+    panel._list.setCurrentRow(names.index("Mask"))
+    good, bad = tmp_path / "good.npy", tmp_path / "bad.npy"
+    np.save(good, np.ones((10, 20)))
+    np.save(bad, np.ones((10, 20)) * 3)
+
+    monkeypatch.setattr(QtWidgets.QFileDialog, "getOpenFileName", lambda *a, **k: (str(good), ""))
+    overlay._askFile()
+    assert overlay.mask.shape == (10, 20) and "10 frames" in overlay._lFile.text()
+
+    window.dialogs.clear()
+    monkeypatch.setattr(QtWidgets.QFileDialog, "getOpenFileName", lambda *a, **k: (str(bad), ""))
+    overlay._askFile()
+    assert window.dialogs and "between 0 and 1" in window.dialogs[0][2]
+    assert str(overlay.filename) == str(good)  # the mask stays
+    window.dialogs.clear()
+
+    panel._bReset.click()
+    process_events()
+    assert overlay.mask is not None  # a reset keeps the mask, only the configuration changes
+    overlay._file_mask = None

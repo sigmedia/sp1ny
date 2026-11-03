@@ -230,6 +230,7 @@ class DataWidget(pg.GraphicsLayoutWidget):
             "viewRect",
             "hideAxis",
             "getAxis",
+            "getViewBox",
         ]:
             setattr(self, m, getattr(self._plotItem, m))
 

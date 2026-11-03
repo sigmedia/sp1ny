@@ -72,12 +72,16 @@ The *Audio* tab has a parametric equalizer, and every change is heard at once.
 ## Overlays
 
 The *Overlay* tab lists what can be drawn over the current visualisation: tick an overlay to show it, select it to
-configure it. The spectrograms support the formants and the F0. An overlay is only drawn when the visualisation shows
+configure it. The spectrograms support the formants, the F0 and the mask. An overlay is only drawn when the visualisation shows
 something, and everything is computed in the background for the part of the signal around the view.
 
 - **Formants:** choose the formants shown and their colours, the maximum frequency, the number of formants, the window
   length, the time step, the silence level and the maximum bandwidth.
 - **F0:** choose its colour, the F0 range, the voicing threshold, the silence level and the time step.
+- **Mask:** load a numpy file (`.npy`) with a matrix of opacities between 0 and 1, by default of shape (frames, frequency
+  bins): where the opacity is 1 the spectrogram is visible, and where it is 0 it is transparent. The mask spans the whole
+  signal and all the frequencies unless you give the time between two frames and the frequency of the last bin. It can
+  also be inverted, applied partly, and show a colour instead of the background.
 
 ## Configuration
 

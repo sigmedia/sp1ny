@@ -1,6 +1,6 @@
-"""Overlays: what is drawn over the plot of a visualisation plugin (formants, F0, ...)
+"""Overlays: what is drawn over the plot of a visualisation plugin (formants, F0, a mask, ...)
 
-An overlay plugin provides tracks, which are values in the unit of the y axis of the plot at regular times. To follow
+Many overlays provide tracks, which are values in the unit of the y axis of the plot at regular times. To follow
 the view in real time, the tracks are computed by chunks of `CHUNK_DURATION` seconds in background threads, those
 closest to the view first, and the chunks are kept: a track only takes a few bytes per frame, and coming back to a
 part of the signal needs no new analysis. Only the visible part of the tracks is given to the plot.
@@ -99,8 +99,131 @@ def connected_points(values: np.ndarray) -> np.ndarray:
     return np.append(joined, False).astype(np.int32)
 
 
-class TrackOverlay(QtCore.QObject):
-    """An overlay plugin: subclasses give the tracks, the analysis and the configuration of the analysis
+class Overlay(QtCore.QObject):
+    """An overlay plugin: what is drawn over the plot of a visualisation plugin, with its configuration panel
+
+    Parameters
+    ----------
+    name : str
+        The name of the overlay, as displayed in the list of the overlays
+    """
+
+    def __init__(self, name: str) -> None:
+        super().__init__()
+        self._name = name
+        self.enabled = False
+        self._plot: Any = None
+        self._wav_plot: Any = None
+        self._items: list[Any] = []
+
+    @property
+    def name(self) -> str:
+        """str: The name of the overlay, as displayed in the list of the overlays"""
+        return self._name
+
+    @property
+    def is_active(self) -> bool:
+        """bool: True if the overlay is to be shown: it is enabled, and the visualisation plugin plots something"""
+        return self.enabled and self._plot is not None and self._plot.isPlotting()
+
+    def buildPanel(self) -> QtWidgets.QWidget:
+        """Create the configuration panel of the overlay
+
+        Returns
+        -------
+        QtWidgets.QWidget
+            The panel
+        """
+        raise NotImplementedError
+
+    def resetConfiguration(self) -> None:
+        """Go back to the default configuration (whether the overlay is shown does not change)"""
+        raise NotImplementedError
+
+    def applyTheme(self) -> None:
+        """Draw the overlay with the colours of the current theme"""
+
+    def _createItems(self) -> list[Any]:
+        """Create what is added to the plot
+
+        Returns
+        -------
+        list(pg.GraphicsObject)
+            The graphics items
+        """
+        raise NotImplementedError
+
+    def _update(self) -> None:
+        """Show or hide the items, depending on `is_active`"""
+        raise NotImplementedError
+
+    def _onViewChanged(self, *args: Any) -> None:
+        """Follow the view
+
+        Parameters
+        ----------
+        args : list
+            The arguments of the signal (unused)
+        """
+        raise NotImplementedError
+
+    def setEnabled(self, enabled: bool) -> None:
+        """Show the overlay or not
+
+        Parameters
+        ----------
+        enabled : bool
+            True to show it
+        """
+        self.enabled = enabled
+        self._update()
+
+    def setHost(self, plot: Any, wav_plot: Any) -> None:
+        """Define the plot of the visualisation plugin to draw on
+
+        Parameters
+        ----------
+        plot : spiny.gui.widgets.DataWidget or None
+            The plot, None if the visualisation plugin does not support this overlay
+        wav_plot : pg.PlotWidget
+            The waveform plot: it gives the time axis
+        """
+        if plot is not self._plot:
+            if self._plot is not None and isQObjectAlive(self._plot):
+                self._plot.plottingChanged.disconnect(self._update)
+                for item in self._items:
+                    self._plot.removeItem(item)
+            self._items = []
+            self._plot = plot
+            if plot is not None:
+                plot.plottingChanged.connect(self._update)
+                self._items = self._createItems()
+                for item in self._items:
+                    plot.addItem(item, ignoreBounds=True)
+                self.applyTheme()
+
+        if wav_plot is not self._wav_plot:
+            if self._wav_plot is not None and isQObjectAlive(self._wav_plot):
+                self._wav_plot.getViewBox().sigXRangeChanged.disconnect(self._onViewChanged)
+            self._wav_plot = wav_plot
+            wav_plot.getViewBox().sigXRangeChanged.connect(self._onViewChanged)
+
+        self._update()
+
+    def _visibleRange(self) -> tuple[float, float]:
+        """Give the visible part of the signal
+
+        Returns
+        -------
+        tuple(float, float)
+            The (start, end) times, in seconds
+        """
+        (start, end), _ = self._wav_plot.getViewBox().viewRange()
+        return max(start, 0.0), min(end, player.duration)
+
+
+class TrackOverlay(Overlay):
+    """An overlay made of tracks: subclasses give the tracks, the analysis and the configuration of the analysis
 
     Attributes
     ----------
@@ -127,14 +250,10 @@ class TrackOverlay(QtCore.QObject):
     _chunkFinished = QtCore.Signal(object)  # NOTE: emitted by a worker thread, so delivered in the GUI thread
 
     def __init__(self, name: str, settings: Any) -> None:
-        super().__init__()
-        self._name = name
+        super().__init__(name)
         self._settings = settings
         self._default_settings = settings
-        self.enabled = False
 
-        self._plot: Any = None
-        self._wav_plot: Any = None
         self._curves: dict[str, pg.PlotCurveItem] = {}
         self._shown = {track: track not in self.HIDDEN_TRACKS for track in self.TRACKS}
         self._colors: dict[str, QtGui.QColor] = {}  # The colours chosen by the user
@@ -152,11 +271,6 @@ class TrackOverlay(QtCore.QObject):
         self._draw_timer.setSingleShot(True)
         self._draw_timer.setInterval(30)
         self._draw_timer.timeout.connect(self._draw)
-
-    @property
-    def name(self) -> str:
-        """str: The name of the overlay, as displayed in the list of the overlays"""
-        return self._name
 
     @property
     def settings(self) -> Any:
@@ -187,16 +301,6 @@ class TrackOverlay(QtCore.QObject):
         -------
         np.ndarray
             The tracks, shape (nb_frames, nb_tracks), NaN where there is no value
-        """
-        raise NotImplementedError
-
-    def buildPanel(self) -> QtWidgets.QWidget:
-        """Create the configuration panel of the overlay
-
-        Returns
-        -------
-        QtWidgets.QWidget
-            The panel
         """
         raise NotImplementedError
 
@@ -303,62 +407,36 @@ class TrackOverlay(QtCore.QObject):
         for track, curve in self._curves.items():
             curve.setPen(pg.mkPen(self.color(track), width=self._line_width))
 
-    ###########################################################################
-    # Host
-    ###########################################################################
-
-    def setEnabled(self, enabled: bool) -> None:
-        """Show the overlay or not
-
-        Parameters
-        ----------
-        enabled : bool
-            True to show it
-        """
-        self.enabled = enabled
-        self._update()
-
     def setHost(self, plot: Any, wav_plot: Any) -> None:
-        """Define the plot of the visualisation plugin to draw on
+        """Define the plot to draw on, see Overlay.setHost; a new file also makes the tracks outdated
 
         Parameters
         ----------
         plot : spiny.gui.widgets.DataWidget or None
-            The plot, None if the visualisation plugin does not support this overlay
+            The plot
         wav_plot : pg.PlotWidget
-            The waveform plot: it gives the time axis
+            The waveform plot
         """
-        if plot is not self._plot:
-            if self._plot is not None and isQObjectAlive(self._plot):
-                self._plot.plottingChanged.disconnect(self._update)
-                for curve in self._curves.values():
-                    self._plot.removeItem(curve)
-            self._curves = {}
-            self._plot = plot
-            if plot is not None:
-                plot.plottingChanged.connect(self._update)
-                self._curves = {track: pg.PlotCurveItem(connect="finite") for track in self.TRACKS}
-                for curve in self._curves.values():
-                    curve.setZValue(5)  # NOTE: above the image and below the playhead
-                    plot.addItem(curve, ignoreBounds=True)
-                self.applyTheme()
-                self._drawn = None
-
-        if wav_plot is not self._wav_plot:
-            if self._wav_plot is not None and isQObjectAlive(self._wav_plot):
-                self._wav_plot.getViewBox().sigXRangeChanged.disconnect(self._onViewChanged)
-            self._wav_plot = wav_plot
-            wav_plot.getViewBox().sigXRangeChanged.connect(self._onViewChanged)
-
-        if player.signal is not self._signal:  # A new file has been loaded
+        if player.signal is not self._signal:
             self._signal = player.signal
             self._forgetChunks()
-        self._update()
+        if plot is None:
+            self._curves = {}
+        super().setHost(plot, wav_plot)
 
-    @property
-    def is_active(self) -> bool:
-        """bool: True if the overlay is to be shown: it is enabled, and the visualisation plugin plots something"""
-        return self.enabled and self._plot is not None and self._plot.isPlotting()
+    def _createItems(self) -> list[Any]:
+        """Create one curve per track
+
+        Returns
+        -------
+        list(pg.PlotCurveItem)
+            The curves
+        """
+        self._curves = {track: pg.PlotCurveItem(connect="finite") for track in self.TRACKS}
+        self._drawn = None
+        for curve in self._curves.values():
+            curve.setZValue(5)  # NOTE: above the image and the mask, below the playhead
+        return list(self._curves.values())
 
     def _update(self) -> None:
         """Show or hide the curves, and start what is missing if the overlay is shown"""
@@ -391,17 +469,6 @@ class TrackOverlay(QtCore.QObject):
         """
         hop = frame_hop(self._settings.time_step, player.sampling_rate)
         return hop, max(round(self.CHUNK_DURATION * player.sampling_rate / hop), 1)
-
-    def _visibleRange(self) -> tuple[float, float]:
-        """Give the visible part of the signal
-
-        Returns
-        -------
-        tuple(float, float)
-            The (start, end) times, in seconds
-        """
-        (start, end), _ = self._wav_plot.getViewBox().viewRange()
-        return max(start, 0.0), min(end, player.duration)
 
     def _analyse(self) -> None:
         """Start the analysis of the chunks missing around the view, the closest ones first"""
@@ -622,15 +689,15 @@ class OverlayPanel(QtWidgets.QWidget):
             overlay.applyTheme()
 
 
-overlay_entry_dict: dict[str, TrackOverlay] = dict()
+overlay_entry_dict: dict[str, Overlay] = dict()
 
 
-def register_overlay(overlay: TrackOverlay) -> None:
+def register_overlay(overlay: Overlay) -> None:
     """Register an overlay plugin under its name
 
     Parameters
     ----------
-    overlay : TrackOverlay
+    overlay : Overlay
         The overlay
 
     Raises
@@ -663,7 +730,7 @@ def track_display_box(overlay: TrackOverlay, tracks: tuple[str, ...]) -> QtWidge
         show = QtWidgets.QCheckBox(track)
         show.setChecked(overlay.isTrackShown(track))
         show.toggled.connect(partial(overlay.setTrackShown, track))
-        swatch = _ColorSwatch(overlay, track)
+        swatch = ColorSwatch(overlay, track)
         grid.addWidget(show, row, 0)
         grid.addWidget(swatch, row, 1)
     grid.setColumnStretch(1, 1)
@@ -678,18 +745,18 @@ def track_display_box(overlay: TrackOverlay, tracks: tuple[str, ...]) -> QtWidge
     return box
 
 
-class _ColorSwatch(QtWidgets.QPushButton):
+class ColorSwatch(QtWidgets.QPushButton):
     """Button showing the colour of a track: a click opens the colour dialog
 
     Parameters
     ----------
-    overlay : TrackOverlay
-        The overlay
+    overlay : Any
+        The overlay: it provides color(name) and setColor(name, color)
     track : str
-        The track
+        The name of what is coloured
     """
 
-    def __init__(self, overlay: TrackOverlay, track: str) -> None:
+    def __init__(self, overlay: Any, track: str) -> None:
         super().__init__()
         self._overlay = overlay
         self._track = track
