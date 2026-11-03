@@ -1,4 +1,4 @@
-#+TITLE: Overlays: formants and F0 in real time
+#+TITLE: Overlays: formants, F0 and mask in real time
 #+OPTIONS: toc:nil num:t
 
 Implementation: [[file:../../spiny/core/overlay.py]], [[file:../../spiny/overlays/formants/extractor.py]] and
@@ -98,8 +98,24 @@ The audio callback is Python code: it has to wait for the interpreter, and by de
 every 5 ms, as long as a block at 48 kHz. Lowering this interval to 1 ms (=sys.setswitchinterval=) brought the latest
 callback, while panning, from 26 to 1.5 ms without overlays, and from 10 to 4 ms with both.
 
+* Mask
+
+Implementation: [[file:../../spiny/overlays/mask/__init__.py]]. The coefficients of a numpy file are the opacity of the
+spectrogram. An image above the spectrogram hides it with the background colour, with an alpha of (1 − opacity) ×
+strength, which looks the same as making the spectrogram transparent and leaves it alone.
+
+The file is memory-mapped and only read for the part which is drawn, whatever its size. The image has the resolution of
+the plot (frames and bins between two pixels are skipped), and covers the view and half a view on each side, so a small
+pan does not touch it. =allow_pickle=False= means that a file can never run code when it is read, and a mask with
+another shape or values outside [0, 1] is refused with a message, the current one being kept.
+
+On a mask of 10 minutes (120 000 frames × 1 025 bins, 469 MB), checking the file takes 76 to 144 ms, and updating
+the image and painting the plot 30 to 44 ms; a drag inside the margin costs no update of the image.
+
 * Limits
 
 - The formants are numbered in each frame by frequency, without tracking across frames: when a resonance appears or
   disappears, the following ones change number for these frames, as in Praat.
 - On very clean signals with a high F0, linear prediction pulls F1 towards a harmonic, as in Praat.
+- The mask skips frames and bins between two pixels instead of averaging them: a detail thinner than a pixel can
+  disappear until one zooms in.
