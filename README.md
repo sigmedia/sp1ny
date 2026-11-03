@@ -62,8 +62,12 @@ A click on a plot moves the playhead. Changing the speed also changes the pitch,
 
 ## Equalizer
 
-The *Audio* tab has a parametric equalizer with five bands. Drag a handle on the curve to change the frequency and the
-gain of its band, or use the sliders for the selected band, which also set its Q. Every change is heard at once.
+The *Audio* tab has a parametric equalizer, and every change is heard at once.
+
+- **Add a band:** double-click on the curve, or use the `+` button.
+- **Remove a band:** double-click or right-click its handle, or select it and use the `−` button.
+- **Change a band:** drag its handle for the frequency and the gain, and turn the wheel over it for the Q. The controls
+  below the curve act on the selected band, and also set its type (bell, low shelf or high shelf).
 
 ## Configuration
 

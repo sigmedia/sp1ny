@@ -60,6 +60,20 @@ THEMES: dict[str, dict[str, str]] = {
         "display_background": "#17181a",
         "display_text": "#7fe3a8",
         "display_dim_text": "#7c8088",
+        # Equalizer
+        "eq_background": "#fbfcfe",
+        "eq_grid": "#e6e9ef",
+        "eq_zero_line": "#b4bac6",
+        "eq_curve": "#2a78d6",
+        "eq_fill": "#262a78d6",
+        "eq_text": "#6b7280",
+        "eq_node_border": "#1f2430",
+        "eq_band_1": "#e5484d",
+        "eq_band_2": "#e8930c",
+        "eq_band_3": "#2fa66a",
+        "eq_band_4": "#12a5b8",
+        "eq_band_5": "#6e56cf",
+        "eq_band_6": "#d6409f",
     },
     "dark": {
         "window": "#353535",
@@ -100,6 +114,19 @@ THEMES: dict[str, dict[str, str]] = {
         "display_background": "#17181a",
         "display_text": "#7fe3a8",
         "display_dim_text": "#7c8088",
+        "eq_background": "#14161b",
+        "eq_grid": "#262a33",
+        "eq_zero_line": "#4b5261",
+        "eq_curve": "#6db1ff",
+        "eq_fill": "#2e6db1ff",
+        "eq_text": "#8b93a3",
+        "eq_node_border": "#f2f4f8",
+        "eq_band_1": "#ff6369",
+        "eq_band_2": "#ffb224",
+        "eq_band_3": "#3dd68c",
+        "eq_band_4": "#39c5d8",
+        "eq_band_5": "#9d8cff",
+        "eq_band_6": "#f76bbe",
     },
 }
 
@@ -135,13 +162,13 @@ _STYLE_SHEET = Template("""
     QLabel#time, QLabel#speed { color: $display_text; }
     QLabel#duration { color: $display_dim_text; }
 
-    ParametricEqWidget QPushButton:checked {
-        background: $accent; color: $accent_text; border: none; border-radius: 3px; padding: 4px;
+    OutputWidget QSlider::groove:horizontal, ParametricEqWidget QSlider::groove:horizontal {
+        height: 4px; border-radius: 2px; background: $slider_groove;
     }
-
-    OutputWidget QSlider::groove:horizontal { height: 4px; border-radius: 2px; background: $slider_groove; }
-    OutputWidget QSlider::sub-page:horizontal { border-radius: 2px; background: $accent; }
-    OutputWidget QSlider::handle:horizontal {
+    OutputWidget QSlider::sub-page:horizontal, ParametricEqWidget QSlider::sub-page:horizontal {
+        border-radius: 2px; background: $accent;
+    }
+    OutputWidget QSlider::handle:horizontal, ParametricEqWidget QSlider::handle:horizontal {
         width: 12px; margin: -4px 0; border-radius: 6px; background: $button_text;
     }
 """)
@@ -163,6 +190,26 @@ def color(name: str) -> QtGui.QColor:
         The colour
     """
     return QtGui.QColor(THEMES[_current_theme][name])
+
+
+def band_chip_style(band_color: QtGui.QColor) -> str:
+    """Give the style sheet of the button of an equalizer band
+
+    Parameters
+    ----------
+    band_color : QtGui.QColor
+        The colour of the band
+
+    Returns
+    -------
+    str
+        The style sheet: outlined in the colour of the band, filled when selected
+    """
+    name = band_color.name()
+    return (
+        f"QPushButton {{ border: 1.5px solid {name}; border-radius: 5px; background: transparent; }}"
+        f"QPushButton:checked {{ background: {name}; color: {color('eq_background').name()}; font-weight: bold; }}"
+    )
 
 
 def current_theme() -> str:

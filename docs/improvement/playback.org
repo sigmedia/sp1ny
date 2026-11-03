@@ -88,7 +88,7 @@ continue with the new playback, or its end would stop it.
 
 * Parametric equalizer
 
-Implementation: [[file:../../spiny/core/wav/equalizer.py]]. Five bands (a low shelf, three peaks, a high shelf), each
+Implementation: [[file:../../spiny/core/wav/equalizer.py]]. Any number of bands (five to start with: a low shelf, three peaks, a high shelf), each
 with a frequency, a gain and a Q. Every change is heard at once.
 
 ** The filters

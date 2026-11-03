@@ -2,9 +2,10 @@ import dataclasses
 
 import numpy as np
 import pytest
-from pyqtgraph.Qt import QtTest, QtWidgets
+from pyqtgraph.Qt import QtCore, QtGui, QtTest, QtWidgets
 
 from spiny.core.wav.equalizer import DEFAULT_BANDS, Equalizer, EqBand, biquad_coefficients
+from spiny.core.wav.equalizer_widget import MAX_FREQUENCY, MAX_GAIN_DB, MIN_FREQUENCY
 
 RATE = 16000
 
@@ -119,10 +120,13 @@ def test_several_channels():
 
 @pytest.fixture
 def widget(player):
-    from spiny.core.wav.control import ParametricEqWidget
+    from spiny.core.wav.equalizer_widget import ParametricEqWidget
 
     bands = list(player.equalizer.bands)
     widget = ParametricEqWidget()
+    widget.resize(380, 600)
+    widget.show()
+    QtWidgets.QApplication.processEvents()
     yield widget
     player.equalizer.setBands(bands)
     player.equalizer.setEnabled(True)
@@ -139,8 +143,8 @@ def test_sliders_change_the_selected_band_at_once(widget, player):
     band = player.equalizer.bands[1]
     assert (band.gain_db, band.q) == (6.0, 3.0)
     assert player.equalizer.active
-    assert widget._curve.yData.max() == pytest.approx(6.0, abs=0.2)
-    assert widget._nodes[1].pos().y() == 6.0
+    assert widget._plot._curve.yData.max() == pytest.approx(6.0, abs=0.2)
+    assert widget._plot._nodes[1].pos().y() == 6.0
 
     widget._cBand.setChecked(False)
     assert not player.equalizer.active
@@ -154,10 +158,10 @@ def test_selecting_a_band_changes_nothing(widget, player):
 
 
 def test_dragging_a_handle_changes_frequency_and_gain_of_its_band(widget, player):
-    widget._nodes[3].setPos(np.log10(2000.0), 30.0)  # above the largest gain
+    widget._plot._nodes[3].setPos(np.log10(2000.0), 30.0)  # above the largest gain
     band = player.equalizer.bands[3]
     assert band.frequency == pytest.approx(2000.0)
-    assert band.gain_db == widget.MAX_GAIN_DB
+    assert band.gain_db == MAX_GAIN_DB
     assert widget._selected == 3
     assert widget._sFrequency.value() == widget._stepOfFrequency(2000.0)
 
@@ -166,7 +170,7 @@ def test_flat_and_enabled(widget, player):
     widget._sGain.setValue(60)
     widget._cEnabled.setChecked(False)
     assert not player.equalizer.active
-    assert np.abs(widget._curve.yData).max() == 0
+    assert np.abs(widget._plot._curve.yData).max() == 0
     widget._cEnabled.setChecked(True)
     assert player.equalizer.active
     widget._bFlat.click()
@@ -177,6 +181,139 @@ def test_flat_and_enabled(widget, player):
 def test_every_frequency_slider_step_is_stable(widget):
     for step in (0, widget.FREQUENCY_STEPS):
         assert widget._stepOfFrequency(widget._frequencyOfStep(step)) == step
+
+
+def position_of(widget, frequency, gain=0.0):
+    """The position in the curve widget of a frequency and a gain"""
+    plot = widget._plot
+    return plot.mapFromScene(plot.getViewBox().mapViewToScene(QtCore.QPointF(np.log10(frequency), gain)))
+
+
+def double_click(plot, position):
+    left = QtCore.Qt.MouseButton.LeftButton
+    # NOTE: what a real double click sends: mouseDClick alone has no release, so it would not be a click for pyqtgraph
+    QtTest.QTest.mouseClick(plot.viewport(), left, pos=position)
+    QtTest.QTest.mouseDClick(plot.viewport(), left, pos=position)
+    QtTest.QTest.mouseRelease(plot.viewport(), left, pos=position)
+    QtWidgets.QApplication.processEvents()
+
+
+def test_double_click_on_the_curve_adds_a_band_there(widget, player):
+    before = len(player.equalizer.bands)
+    double_click(widget._plot, position_of(widget, 2000.0, 6.0))
+    bands = player.equalizer.bands
+    assert len(bands) == before + 1
+    assert bands[-1].kind == "peak"
+    assert bands[-1].frequency == pytest.approx(2000.0, rel=0.05)
+    assert bands[-1].gain_db == pytest.approx(6.0, abs=0.5)
+    assert widget._selected == before
+    assert len(widget._plot._nodes) == before + 1 and len(widget._chip_group.buttons()) == before + 1
+    assert player.equalizer.active
+
+
+def test_double_click_on_a_handle_removes_its_band(widget, player):
+    bands = list(player.equalizer.bands)
+    double_click(widget._plot, position_of(widget, bands[2].frequency))
+    assert player.equalizer.bands == bands[:2] + bands[3:]
+    assert len(widget._plot._nodes) == len(bands) - 1
+
+
+def test_right_click_on_a_handle_removes_its_band(widget, player):
+    bands = list(player.equalizer.bands)
+    position = position_of(widget, bands[1].frequency)
+    QtTest.QTest.mouseClick(widget._plot.viewport(), QtCore.Qt.MouseButton.RightButton, pos=position)
+    QtWidgets.QApplication.processEvents()
+    assert player.equalizer.bands == bands[:1] + bands[2:]
+
+
+def test_click_on_a_handle_selects_its_band(widget, player):
+    bands = list(player.equalizer.bands)
+    QtTest.QTest.mouseClick(
+        widget._plot.viewport(), QtCore.Qt.MouseButton.LeftButton, pos=position_of(widget, bands[3].frequency)
+    )
+    QtWidgets.QApplication.processEvents()
+    assert widget._selected == 3 and player.equalizer.bands == bands
+
+
+def test_mouse_drag_moves_a_handle(widget, player):
+    bands = list(player.equalizer.bands)
+    start = position_of(widget, bands[1].frequency)
+    end = position_of(widget, 1000.0, 9.0)
+    viewport = widget._plot.viewport()
+    left = QtCore.Qt.MouseButton.LeftButton
+    QtTest.QTest.mousePress(viewport, left, pos=start)
+    for fraction in (0.25, 0.5, 0.75, 1.0):
+        position = start + (end - start) * fraction
+        event = QtGui.QMouseEvent(
+            QtCore.QEvent.Type.MouseMove,
+            QtCore.QPointF(position),
+            QtCore.QPointF(viewport.mapToGlobal(position)),
+            QtCore.Qt.MouseButton.NoButton,
+            left,
+            QtCore.Qt.KeyboardModifier.NoModifier,
+        )
+        QtWidgets.QApplication.sendEvent(viewport, event)
+    QtTest.QTest.mouseRelease(viewport, left, pos=end)
+    QtWidgets.QApplication.processEvents()
+    band = player.equalizer.bands[1]
+    assert band.frequency == pytest.approx(1000.0, rel=0.1)
+    assert band.gain_db == pytest.approx(9.0, abs=1.0)
+    assert widget._selected == 1
+
+
+def test_wheel_on_a_handle_changes_its_q(widget, player):
+    band = player.equalizer.bands[1]
+    position = QtCore.QPointF(position_of(widget, band.frequency))
+    event = QtGui.QWheelEvent(
+        position,
+        QtCore.QPointF(widget._plot.viewport().mapToGlobal(position)),
+        QtCore.QPoint(0, 0),
+        QtCore.QPoint(0, 120),
+        QtCore.Qt.MouseButton.NoButton,
+        QtCore.Qt.KeyboardModifier.NoModifier,
+        QtCore.Qt.ScrollPhase.NoScrollPhase,
+        False,
+    )
+    QtWidgets.QApplication.sendEvent(widget._plot.viewport(), event)
+    QtWidgets.QApplication.processEvents()
+    assert player.equalizer.bands[1].q > band.q and widget._selected == 1
+
+
+def test_buttons_add_and_remove_bands_down_to_none(widget, player):
+    count = len(player.equalizer.bands)
+    widget._bAdd.click()
+    assert len(player.equalizer.bands) == count + 1
+    assert player.equalizer.bands[-1].gain_db == 0.0
+    assert all(MIN_FREQUENCY <= band.frequency <= MAX_FREQUENCY for band in player.equalizer.bands)
+
+    for _ in range(count + 1):
+        widget._bRemove.click()
+    assert player.equalizer.bands == []
+    assert widget._selected is None
+    assert not widget._bRemove.isEnabled() and not widget._band_controls.isEnabled()
+    assert not player.equalizer.active
+
+    widget._bAdd.click()  # from nothing
+    assert len(player.equalizer.bands) == 1 and widget._selected == 0
+    assert widget._band_controls.isEnabled()
+
+
+def test_kind_of_a_band_can_change(widget, player):
+    widget._select(1)
+    widget._boxKind.setCurrentIndex(widget._boxKind.findData("high_shelf"))
+    assert player.equalizer.bands[1].kind == "high_shelf"
+
+
+def test_panel_follows_the_theme(widget):
+    from spiny.gui.theme import apply_theme, color
+
+    try:
+        apply_theme("dark")
+        assert widget._plot.backgroundBrush().color() == color("eq_background")
+        assert widget._plot._curve.opts["pen"].color() == color("eq_curve")
+        assert widget._plot.getAxis("bottom").textPen().color() == color("eq_text")
+    finally:
+        apply_theme("light")
 
 
 def test_equalizer_is_heard_during_playback(player, monkeypatch):
