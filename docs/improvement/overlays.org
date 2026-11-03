@@ -1,0 +1,105 @@
+#+TITLE: Overlays: formants and F0 in real time
+#+OPTIONS: toc:nil num:t
+
+Implementation: [[file:../../spiny/core/overlay.py]], [[file:../../spiny/overlays/formants/extractor.py]] and
+[[file:../../spiny/overlays/f0/extractor.py]].
+
+An overlay draws tracks over the plot of a visualisation plugin. A visualisation plugin says which overlays it supports
+(=DataController.overlays=), which needs a y axis in Hz: both spectrograms support all of them. Overlays are only drawn,
+and only computed, when the visualisation shows something (=DataWidget.isPlotting=): when a view is too long for the
+spectrogram, they disappear with it.
+
+* Following the view
+
+A track takes very little memory: 4 bytes per value, so about 4 MB for the 5 formants of one hour at a 5 ms time step.
+So, unlike the spectrogram, nothing has to be freed:
+
+1. The tracks are computed by chunks of 5 s, on a fixed grid of frames: frame t is centred on the time t × time step.
+2. The chunks missing around the view are computed by two background threads, those closest to the view first, also
+   one view width on each side: a pan shows what is already there.
+3. The chunks are kept. Coming back to a part of the signal needs no new analysis, and a view of any length works: the
+   track fills in progressively, without blocking anything.
+4. A change of the analysis settings forgets the chunks: a generation number drops the results still being computed.
+   The old curves stay until the new ones arrive.
+5. Only the part of the tracks around the view is given to the plot, at most 4000 points, as a screen has far fewer
+   columns than a long view has frames.
+
+The line is cut at gaps, and where a value changes by more than 25 % between two points: a line across a jump is a
+vertical stroke which looks like data.
+
+* Formants
+
+numpy has no linear prediction, and Burg's method of Praat is a loop per frame. Everything here is computed on a whole
+batch of frames at once:
+
+#+begin_example
+P(f)  = |FFT(frame × Hamming window)|² × pre-emphasis (+6 dB per octave above 50 Hz), up to the maximum frequency
+r     = inverse FFT of P                    the autocorrelation of the signal limited to this band
+R a   = −r[1..p]                            the normal equations, one small linear system per frame
+z     = eigenvalues of the companion matrix of a           the roots of the prediction polynomial
+F     = angle(z) × Fmax / π                 for the roots with a positive imaginary part
+B     = −log|z| × 2 Fmax / π
+#+end_example
+
+Limiting the power spectrum to the band avoids resampling the signal. =numpy.linalg.solve= and =numpy.linalg.eigvals=
+work on batches of matrices and release the interpreter during the computation. The order p is twice the number of
+formants, as in Praat.
+
+Resonances are numbered by frequency before the wide ones (above the maximum bandwidth) are hidden: otherwise, a wide
+F2 would make F3 appear as F2.
+
+* F0
+
+The normalized autocorrelation of P. Boersma (1993), the method of Praat:
+
+#+begin_example
+window = Hanning of 3 periods of the lowest F0
+a(τ)   = autocorrelation(frame × window) / autocorrelation(window)      computed by FFT, normalized at τ = 0
+#+end_example
+
+Dividing by the autocorrelation of the window removes the decay due to the window: a periodic signal gets close to 1 at
+its period. Only the band up to 4 times the highest F0 is kept before the inverse FFT, which makes it much smaller, and
+a parabola through the three points around each peak gives the period precisely.
+
+Each frame keeps its 6 best peaks as candidates, plus the candidate "unvoiced", and a Viterbi search finds the best path:
+a voiced candidate is worth its height minus a small octave cost, the unvoiced one depends on the voicing threshold and
+on how quiet the frame is, and a jump costs 0.35 per octave. This removes almost all octave errors: choosing the best
+peak of each frame alone gave 6 to 14 % of gross errors. To join the chunks, each one is computed with 25 more frames on
+each side.
+
+* Results
+
+On the two example recordings (at 16 and 48 kHz), against Praat with the same settings, on the
+voiced frames:
+
+| Track | Median difference | 90 % of the frames within |
+|-------+-------------------+---------------------------|
+| F0    | 0.14 Hz           | gross errors (> 20 %): 0.0 to 0.2 % of the frames |
+| F1    | 4 Hz              | 22 Hz                     |
+| F2    | 5 to 8 Hz         | 25 Hz                     |
+| F3    | 9 to 12 Hz        | 46 Hz                     |
+
+Praat and this analysis agree on voicing for 90 to 97 % of the frames.
+
+On the 10-minute recording, at 16 kHz:
+
+| Measure                                          | Result                       |
+|--------------------------------------------------+------------------------------|
+| A chunk of 5 s, formants                         | 22 ms                        |
+| A chunk of 5 s, F0                               | 31 ms                        |
+| Drag at 5.6 s of audio per second, tracks missing | never                       |
+| Longest interface freeze during that drag        | 50 to 84 ms                  |
+| Moving playhead, one core                        | 23 % (13 % without overlays) |
+| 391 kB for 20 chunks of formants                 | about 20 kB per 5 s          |
+
+* Audio during the analyses
+
+The audio callback is Python code: it has to wait for the interpreter, and by default a running thread only gives it up
+every 5 ms, as long as a block at 48 kHz. Lowering this interval to 1 ms (=sys.setswitchinterval=) brought the latest
+callback, while panning, from 26 to 1.5 ms without overlays, and from 10 to 4 ms with both.
+
+* Limits
+
+- The formants are numbered in each frame by frequency, without tracking across frames: when a resonance appears or
+  disappears, the following ones change number for these frames, as in Praat.
+- On very clean signals with a high F0, linear prediction pulls F1 towards a harmonic, as in Praat.

@@ -121,6 +121,7 @@ measured effect.
 | [[file:image-rendering.org]] | visible-slice rendering of the data images, update hysteresis, release of hidden plugins     | d367a61, 197bc4c |
 | [[file:praat.org]]           | Praat analysis by chunks with margins, two passes, 8-bit quantization                       | 570e7d5, 3aab772 |
 | [[file:playback.org]]        | soundfile loading, linear resampling block by block in the audio callback                   | 386e8f2          |
+| [[file:overlays.org]]        | formants and F0 on batches of frames, kept by chunks, computed around the view              |                  |
 | [[file:other.org]]           | memory-mapped coefficients, colormaps without matplotlib, import blocking, slotted annotations | 658e847, ae18410, a9bd03a, 489ec93 |
 
 The common idea is that *only what can be seen needs to be computed or kept at full precision*:
