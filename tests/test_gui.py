@@ -515,3 +515,129 @@ def test_loading_a_file_asks_about_unsaved_annotations(window, monkeypatch, tmp_
     controller._load_annotation_file()
     assert controller.model is model
     controller.setAnnotationModel(AnnotationSet({}, set()))
+
+
+def process_events():
+    for _ in range(5):
+        QtWidgets.QApplication.processEvents()
+
+
+def test_ratio_between_plots_and_controls_follows_the_user_and_survives_resizing(window):
+    splitter = window._main_splitter
+    window.resize(1600, 900)
+    process_events()
+    assert splitter.sizes()[0] == pytest.approx(3 * splitter.sizes()[1], rel=0.02)
+
+    splitter.setSizes([800, 800])  # the same as dragging the handle
+    process_events()
+    for size in ((1000, 700), (1800, 1000), (1600, 900)):
+        window.resize(*size)
+        process_events()
+        assert splitter.sizes()[0] == pytest.approx(splitter.sizes()[1], rel=0.03)
+    splitter.setSizes([1200, 400])
+
+
+def test_vertical_ratio_of_the_plots_survives_resizing(window):
+    area = window._visualisation_area
+
+    def fractions():
+        heights = [dock.height() for dock in (area._dock_coef, area._dock_annotation, area._dock_wav)]
+        return [height / sum(heights) for height in heights]
+
+    window.resize(1600, 900)
+    process_events()
+    before = fractions()
+    window.resize(1600, 1100)
+    process_events()
+    assert fractions() == pytest.approx(before, abs=0.01)
+
+
+def test_window_can_get_small_and_the_toolbars_wrap(window):
+    from spiny.ui import GUIVisu
+
+    toolbars = window.findChildren(QtWidgets.QToolBar)
+    window.resize(1600, 900)
+    process_events()
+    assert not any(window.toolBarBreak(toolbar) for toolbar in toolbars)
+
+    window.resize(GUIVisu.MINIMUM_SIZE)
+    process_events()
+    assert window.size() == GUIVisu.MINIMUM_SIZE
+    assert any(window.toolBarBreak(toolbar) for toolbar in toolbars)
+    assert all(toolbar.width() >= toolbar.sizeHint().width() for toolbar in toolbars)  # nothing is cut
+
+    window.resize(1600, 900)
+    process_events()
+    assert not any(window.toolBarBreak(toolbar) for toolbar in toolbars)
+
+
+def test_control_groups_are_at_the_top_with_the_height_they_need(window):
+    window.resize(1600, 1200)
+    previous_plugin = window._plugin_list.currentText()
+    window._plugin_list.setCurrentText("Spectrogram")
+    process_events()
+    general = window._plugin_list.parentWidget()
+    assert general.height() <= general.sizeHint().height() + 2
+    assert general.y() < 30
+    panel = window._plugin_panel
+    assert panel.y() == pytest.approx(general.geometry().bottom(), abs=30)
+    assert panel.height() <= panel.sizeHint().height() + 2
+    window._plugin_list.setCurrentText(previous_plugin)
+
+
+def test_groups_of_the_other_tabs_have_the_height_they_need(window):
+    tabs = window.findChild(QtWidgets.QTabWidget)
+    window.resize(1600, 1200)
+    for index, boxes in ((1, ("_file_box", "_tier_box", "_ipa_box")), (2, ("_file_box", "_eq_widget"))):
+        tabs.setCurrentIndex(index)
+        process_events()
+        layout = window._annotation_layout if index == 1 else window._audio_layout
+        for name in boxes:
+            box = getattr(layout, name)
+            assert box.height() <= box.sizeHint().height() + 2, name
+    tabs.setCurrentIndex(0)
+
+
+def test_tier_list_is_only_as_high_as_its_tiers(qapp):
+    from spiny.annotations.control import QListWidgetItemHideable, TierList
+
+    tiers = TierList()
+    empty = tiers.height()
+    for name in "ab":
+        QListWidgetItemHideable(tiers).setText(name)
+    two = tiers.height()
+    assert empty < two < 3 * empty
+    for name in "cdefghij":
+        QListWidgetItemHideable(tiers).setText(name)
+    assert tiers.height() == tiers.MAX_VISIBLE_ROWS * tiers.sizeHintForRow(0) + 2 * tiers.frameWidth()
+    tiers.clear()
+    assert tiers.height() == empty
+
+
+@pytest.mark.parametrize(
+    "seconds, spacing, text",
+    [
+        (0, 1, "0 s"),
+        (12.5, 0.5, "12.5 s"),
+        (45, 15, "45 s"),
+        (60, 30, "1:00 min"),
+        (150, 30, "2:30 min"),
+        (61.25, 0.05, "1:01.25 min"),
+        (600, 60, "10:00 min"),
+        (3600, 600, "1:00:00 h"),
+        (3750, 30, "1:02:30 h"),
+        (36000, 3600, "10:00:00 h"),
+    ],
+)
+def test_time_ticks_use_seconds_minutes_and_hours(seconds, spacing, text):
+    from spiny.core.wav.visualisation import format_axis_time
+
+    assert format_axis_time(seconds, spacing) == text
+
+
+def test_time_axis_never_uses_kiloseconds(window):
+    axis = window._visualisation_area._dock_wav.wav_plot.getAxis("bottom")
+    assert axis.tickSpacing(0, 600, 1000)[0][0] == 60
+    assert axis.tickSpacing(0, 7200, 1000)[0][0] == 900
+    assert axis.tickSpacing(0, 1, 1000)[0][0] < 1
+    assert not axis.autoSIPrefix and "x0" not in axis.labelString()

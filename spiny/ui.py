@@ -48,7 +48,7 @@ class VisualisationArea(DockArea):
 
         # NOTE: the sizes are only initial proportions, the docks can be resized by the user
         self._dock_wav = WavDock("Signal", (950, 20))
-        self._dock_wav.wav_plot.setLabel("bottom", "Time", units="s")
+        self._dock_wav.wav_plot.setLabel("bottom", "Time")
         self._dock_coef = DataDock((950, 200))
         self._dock_annotation = AnnotationDock("Annotations", (950, 20), self._dock_wav.wav_plot)
 
@@ -121,6 +121,9 @@ def discover_plugins() -> dict[str, types.ModuleType]:
 class GUIVisu(QtWidgets.QMainWindow):
     """Main window: player toolbars, plots (data, annotations, waveform) on the left, control tabs on the right"""
 
+    DEFAULT_SIZE = QtCore.QSize(1400, 850)
+    MINIMUM_SIZE = QtCore.QSize(720, 480)
+
     def __init__(self) -> None:
         super().__init__()
         self._createMenuBar()
@@ -136,16 +139,43 @@ class GUIVisu(QtWidgets.QMainWindow):
         tabs.addTab(self._createAnnotationTab(), "Annotations")
         tabs.addTab(self._createAudioTab(), "Audio")
 
-        main_layout = QtWidgets.QHBoxLayout()
-        main_layout.addWidget(self._visualisation_area, 9)
-        main_layout.addWidget(tabs, 3)
-        central_widget = QtWidgets.QWidget()
-        central_widget.setLayout(main_layout)
-        self.setCentralWidget(central_widget)
+        # NOTE: without stretch factors, a splitter shares a new size in proportion to the current ones: the ratio stays
+        self._main_splitter = QtWidgets.QSplitter(QtCore.Qt.Orientation.Horizontal)
+        self._main_splitter.addWidget(self._visualisation_area)
+        self._main_splitter.addWidget(tabs)
+        self._main_splitter.setChildrenCollapsible(False)
+        self._main_splitter.setSizes([3 * self.DEFAULT_SIZE.width() // 4, self.DEFAULT_SIZE.width() // 4])
+        self.setCentralWidget(self._main_splitter)
+
+        # NOTE: an explicit minimum: otherwise, the toolbars of one row would forbid a window narrower than all of them
+        self.setMinimumSize(self.MINIMUM_SIZE)
+        self.resize(self.DEFAULT_SIZE)
 
         # Show the default plugin with the default colormap
         self.selectPlugin(self._plugin_list.currentText())
         self.selectColorMap(self._cmap_list.currentText())
+
+    def resizeEvent(self, event: QtGui.QResizeEvent) -> None:
+        """Put the toolbars on as many rows as the new width needs
+
+        Parameters
+        ----------
+        event : QtGui.QResizeEvent
+            The resize event
+        """
+        super().resizeEvent(event)
+        used_widths: dict[QtCore.Qt.ToolBarArea, int] = {}
+        for toolbar in self.findChildren(QtWidgets.QToolBar):
+            area = self.toolBarArea(toolbar)
+            used = used_widths.get(area, 0)
+            width = toolbar.sizeHint().width()
+            new_row = 0 < used and self.width() < used + width
+            if new_row != self.toolBarBreak(toolbar):
+                if new_row:
+                    self.insertToolBarBreak(toolbar)
+                else:
+                    self.removeToolBarBreak(toolbar)
+            used_widths[area] = width if new_row else used + width
 
     def closeEvent(self, event: QtGui.QCloseEvent) -> None:
         """Close the window, unless the user wants to keep working on unsaved annotations
@@ -222,10 +252,14 @@ class GUIVisu(QtWidgets.QMainWindow):
 
         self._control_layout = QtWidgets.QVBoxLayout()
         self._control_layout.addWidget(general_box)
+        self._control_layout.addStretch(1)  # The groups only take the height they need, from the top
         self._plugin_panel: QtWidgets.QWidget | None = None  # Added below the general box by selectPlugin
 
-        tab = QtWidgets.QWidget()
-        tab.setLayout(self._control_layout)
+        content = QtWidgets.QWidget()
+        content.setLayout(self._control_layout)
+        tab = QtWidgets.QScrollArea()  # The window can be smaller than the panel of a plugin
+        tab.setWidgetResizable(True)
+        tab.setWidget(content)
         return tab
 
     def _createAnnotationTab(self) -> QtWidgets.QWidget:
@@ -315,7 +349,7 @@ class GUIVisu(QtWidgets.QMainWindow):
         panel_layout = QtWidgets.QVBoxLayout(self._plugin_panel)
         panel_layout.setContentsMargins(0, 0, 0, 0)
         controller.setControlPanel(panel_layout)
-        self._control_layout.addWidget(self._plugin_panel)
+        self._control_layout.insertWidget(1, self._plugin_panel)
         self._visualisation_area.selectPlugin(controller)
         self.selectColorMap(self._cmap_list.currentText())
 

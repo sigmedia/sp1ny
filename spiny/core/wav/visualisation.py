@@ -238,6 +238,86 @@ class WaveformItem(pg.GraphicsObject):
         return pg.arrayToQPath(x, y, connect="pairs")
 
 
+def format_axis_time(seconds: float, spacing: float) -> str:
+    """Format a tick of the time axis: in seconds, then in minutes and in hours when the time gets longer
+
+    Parameters
+    ----------
+    seconds : float
+        The time, in seconds
+    spacing : float
+        The time between two ticks, which gives the number of decimals needed, in seconds
+
+    Returns
+    -------
+    str
+        The text, such as "12.5 s", "2:30 min" or "1:02:30 h"
+    """
+    decimals = max(-int(np.floor(np.log10(spacing))), 0)
+    if seconds < 60:
+        return f"{seconds:.{decimals}f} s"
+    minutes, rest = divmod(seconds, 60)
+    rest_text = f"{rest:0{decimals + 3 if decimals else 2}.{decimals}f}"
+    if minutes < 60:
+        return f"{minutes:.0f}:{rest_text} min"
+    hours, minutes = divmod(minutes, 60)
+    return f"{hours:.0f}:{minutes:02.0f}:{rest_text} h"
+
+
+class TimeAxisItem(pg.AxisItem):
+    """Time axis in seconds, minutes and hours, with ticks on round values of these units (such as every 30 s)"""
+
+    #: The spacings of the major ticks above one second, with the room each label needs
+    SPACINGS = (1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 900, 1800, 3600, 7200, 14400, 28800, 86400)
+    LABEL_WIDTH = 90
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.enableAutoSIPrefix(False)  # NOTE: otherwise, a long axis is scaled in kiloseconds
+
+    def tickSpacing(self, minVal: float, maxVal: float, size: float) -> list[tuple[float, float]]:
+        """Choose the spacing of the ticks
+
+        Parameters
+        ----------
+        minVal : float
+            The start of the axis, in seconds
+        maxVal : float
+            The end of the axis, in seconds
+        size : float
+            The length of the axis, in pixels
+
+        Returns
+        -------
+        list(tuple(float, float))
+            The (spacing, offset) of each level of ticks
+        """
+        wanted = (maxVal - minVal) * self.LABEL_WIDTH / max(size, 1.0)
+        if wanted < 1:
+            return super().tickSpacing(minVal, maxVal, size)
+        major = next((spacing for spacing in self.SPACINGS if spacing >= wanted), self.SPACINGS[-1])
+        return [(major, 0.0), (major / 5, 0.0)]
+
+    def tickStrings(self, values: list[float], scale: float, spacing: float) -> list[str]:
+        """Give the text of the ticks
+
+        Parameters
+        ----------
+        values : list(float)
+            The times of the ticks, in seconds
+        scale : float
+            The scale of the axis (unused: the times are never scaled)
+        spacing : float
+            The time between two ticks, in seconds
+
+        Returns
+        -------
+        list(str)
+            The text of each tick
+        """
+        return [format_axis_time(value, spacing) for value in values]
+
+
 class WavPlotWidget(pg.PlotWidget):
     """Waveform plot of the signal loaded in the player, with region selection and a playback cursor
 
@@ -258,7 +338,15 @@ class WavPlotWidget(pg.PlotWidget):
             arguments passed to spiny.gui.items.SelectablePlotItem
         """
         # NOTE: given to the constructor, because PlotWidget binds its setXRange, setLimits, ... to this item
-        super().__init__(parent=parent, plotItem=SelectablePlotItem(lock_y_axis=True, default_padding=0, **kwargs))
+        super().__init__(
+            parent=parent,
+            plotItem=SelectablePlotItem(
+                lock_y_axis=True,
+                default_padding=0,
+                axisItems={"bottom": TimeAxisItem(orientation="bottom")},
+                **kwargs,
+            ),
+        )
 
         self._waveform = WaveformItem()
         self.plotItem.addItem(self._waveform)

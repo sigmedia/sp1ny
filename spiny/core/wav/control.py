@@ -383,7 +383,6 @@ class ControlLayout(QtWidgets.QVBoxLayout):
 
         # Prepare scrollbar
         scroll = QtWidgets.QScrollArea()
-        scroll.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
         scroll.setWidgetResizable(True)
 
         # Generate the necessary widgets
@@ -393,6 +392,7 @@ class ControlLayout(QtWidgets.QVBoxLayout):
         # Add the widgets
         box_layout.addWidget(self._file_box)
         box_layout.addWidget(self._eq_widget)
+        box_layout.addStretch(1)  # The groups only take the height they need, from the top
 
         # Generate Configuration Widget
         configuration_widget = QtWidgets.QWidget()

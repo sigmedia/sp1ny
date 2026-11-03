@@ -79,7 +79,22 @@ class QListWidgetItemHideable(QtWidgets.QListWidgetItem):
 
 
 class TierList(QtWidgets.QListWidget):
-    """List of the tiers, whose entries follow the theme"""
+    """List of the tiers, only as high as its entries (it scrolls above `MAX_VISIBLE_ROWS`), which follow the theme"""
+
+    MAX_VISIBLE_ROWS = 6
+
+    def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.model().rowsInserted.connect(self._fitToRows)
+        self.model().rowsRemoved.connect(self._fitToRows)
+        self.model().modelReset.connect(self._fitToRows)
+        self._fitToRows()
+
+    def _fitToRows(self) -> None:
+        """Take the height of the entries"""
+        row_height = self.sizeHintForRow(0) if self.count() else self.fontMetrics().height()
+        nb_rows = min(max(self.count(), 1), self.MAX_VISIBLE_ROWS)
+        self.setFixedHeight(nb_rows * row_height + 2 * self.frameWidth())
 
     def applyTheme(self) -> None:
         """Show the entries with the colours of the current theme"""
@@ -131,7 +146,6 @@ class ControlLayout(QtWidgets.QVBoxLayout):
 
         # Prepare scrollbar
         scroll = QtWidgets.QScrollArea()
-        scroll.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
         scroll.setWidgetResizable(True)
 
         # Generate the necessary widgets
@@ -146,6 +160,7 @@ class ControlLayout(QtWidgets.QVBoxLayout):
         box_layout.addWidget(self._tier_box)
         box_layout.addWidget(self._info_box)
         box_layout.addWidget(self._ipa_box)
+        box_layout.addStretch(1)  # The groups only take the height they need, from the top
 
         # Nothing selected => no info to show
         self._info_box.setVisible(False)
