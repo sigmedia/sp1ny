@@ -24,7 +24,9 @@ import sys
 from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 
 # The plugins are discovered at runtime (pkgutil), so PyInstaller cannot find them by itself
-hiddenimports = collect_submodules("spiny.plugins") + collect_submodules("spiny.raw_data")
+hiddenimports = (
+    collect_submodules("spiny.plugins") + collect_submodules("spiny.overlays") + collect_submodules("spiny.raw_data")
+)
 
 # pyqtgraph's colormap tables and ipapy's IPA tables are data files
 datas = collect_data_files("pyqtgraph", includes=["colors/maps/*"]) + collect_data_files("ipapy")

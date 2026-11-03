@@ -12,7 +12,7 @@ from .visualisation import SpectrogramPraatPlotWidget
 
 sp_extractor = SpectrumPraatExtractor()
 sp_widget = SpectrogramPraatPlotWidget(sp_extractor)
-controller = DataController("Spectrogram (Praat)", sp_extractor, sp_widget)  # no configuration needed
+controller = DataController("Spectrogram (Praat)", sp_extractor, sp_widget, overlays="all")  # no configuration needed
 register_plugin(controller)
 
 __all__ = ["SpectrumPraatExtractor", "SpectrogramPraatPlotWidget", "controller"]

@@ -3,7 +3,26 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from pyqtgraph.Qt.QtCore import QAbstractItemModel, QSortFilterProxyModel, Qt, Signal
-from pyqtgraph.Qt.QtWidgets import QComboBox, QCompleter, QHBoxLayout, QLabel, QSlider, QWidget
+from pyqtgraph.Qt.QtWidgets import QComboBox, QCompleter, QHBoxLayout, QLabel, QListWidget, QSlider, QWidget
+
+
+class CompactList(QListWidget):
+    """List only as high as its entries (it scrolls above `MAX_VISIBLE_ROWS`)"""
+
+    MAX_VISIBLE_ROWS = 6
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.model().rowsInserted.connect(self._fitToRows)
+        self.model().rowsRemoved.connect(self._fitToRows)
+        self.model().modelReset.connect(self._fitToRows)
+        self._fitToRows()
+
+    def _fitToRows(self) -> None:
+        """Take the height of the entries"""
+        row_height = self.sizeHintForRow(0) if self.count() else self.fontMetrics().height()
+        nb_rows = min(max(self.count(), 1), self.MAX_VISIBLE_ROWS)
+        self.setFixedHeight(nb_rows * row_height + 2 * self.frameWidth())
 
 
 class ExtendedComboBox(QComboBox):

@@ -18,6 +18,7 @@ LICENSE
 from __future__ import annotations
 
 import os
+import sys
 from typing import Any
 
 
@@ -30,6 +31,9 @@ import sounddevice as sd
 import soundfile as sf
 
 from .equalizer import Equalizer
+
+# NOTE: the audio callback needs the interpreter: with the default 5 ms, waiting for it can take more than a whole block
+sys.setswitchinterval(0.001)
 
 
 ###############################################################################

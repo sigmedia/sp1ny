@@ -69,6 +69,16 @@ The *Audio* tab has a parametric equalizer, and every change is heard at once.
 - **Change a band:** drag its handle for the frequency and the gain, and turn the wheel over it for the Q. The controls
   below the curve act on the selected band, and also set its type (bell, low shelf or high shelf).
 
+## Overlays
+
+The *Overlay* tab lists what can be drawn over the current visualisation: tick an overlay to show it, select it to
+configure it. The spectrograms support the formants and the F0. An overlay is only drawn when the visualisation shows
+something, and everything is computed in the background for the part of the signal around the view.
+
+- **Formants:** choose the formants shown and their colours, the maximum frequency, the number of formants, the window
+  length, the time step, the silence level and the maximum bandwidth.
+- **F0:** choose its colour, the F0 range, the voicing threshold, the silence level and the time step.
+
 ## Configuration
 
 The theme and the shortcuts are set in a YAML file: `spiny/config.yaml` in your configuration directory

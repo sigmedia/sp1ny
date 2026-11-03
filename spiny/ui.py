@@ -3,6 +3,7 @@ from __future__ import annotations
 import types
 from collections.abc import Iterator
 
+import itertools
 import os
 import sys
 
@@ -26,10 +27,12 @@ from .core.wav import get_controller as get_audio_controller
 from .annotations.visualisation import AnnotationDock
 from .core import DataController, DataDock
 from .core import player
+from .core.overlay import OverlayPanel
 from .core.wav import OutputWidget, TransportWidget, ViewWidget
 from .core import plugin_entry_dict
 from .annotations import get_controller as get_annotation_controller
 
+import spiny.overlays
 import spiny.plugins  # NOTE: we can't use relative import as the prefix is used to validate the plugins
 
 #####################################################################################################
@@ -102,14 +105,14 @@ def iter_namespace(ns_pkg: types.ModuleType) -> Iterator[pkgutil.ModuleInfo]:
 
 
 def discover_plugins() -> dict[str, types.ModuleType]:
-    """Import every plugin package of spiny.plugins
+    """Import every plugin package of spiny.plugins and spiny.overlays
 
     A plugin which fails to import (missing optional dependency, incompatible version, bug, ...) is
     reported and skipped: it must never prevent the application from starting.
     """
     logger = logging.getLogger(__name__)
     plugins = dict()
-    for _, name, _ in iter_namespace(spiny.plugins):
+    for _, name, _ in itertools.chain(iter_namespace(spiny.plugins), iter_namespace(spiny.overlays)):
         try:
             plugins[name] = importlib.import_module(name)
         except Exception as ex:
@@ -138,6 +141,8 @@ class GUIVisu(QtWidgets.QMainWindow):
         tabs.addTab(self._createDataTab(), "Data/Visualization")
         tabs.addTab(self._createAnnotationTab(), "Annotations")
         tabs.addTab(self._createAudioTab(), "Audio")
+        self._overlay_panel = OverlayPanel()
+        tabs.addTab(self._overlay_panel, "Overlay")
 
         # NOTE: without stretch factors, a splitter shares a new size in proportion to the current ones: the ratio stays
         self._main_splitter = QtWidgets.QSplitter(QtCore.Qt.Orientation.Horizontal)
@@ -351,6 +356,7 @@ class GUIVisu(QtWidgets.QMainWindow):
         controller.setControlPanel(panel_layout)
         self._control_layout.insertWidget(1, self._plugin_panel)
         self._visualisation_area.selectPlugin(controller)
+        self._overlay_panel.setVisualisation(controller, self._visualisation_area._dock_wav.wav_plot)
         self.selectColorMap(self._cmap_list.currentText())
 
     def selectColorMap(self, cmap_name: str) -> None:

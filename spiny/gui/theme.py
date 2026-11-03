@@ -74,6 +74,13 @@ THEMES: dict[str, dict[str, str]] = {
         "eq_band_4": "#12a5b8",
         "eq_band_5": "#6e56cf",
         "eq_band_6": "#d6409f",
+        # Overlays
+        "overlay_f0": "#00e5ff",
+        "overlay_f1": "#ff453a",
+        "overlay_f2": "#ff9f0a",
+        "overlay_f3": "#ffd60a",
+        "overlay_f4": "#ff66c4",
+        "overlay_f5": "#bf5af2",
     },
     "dark": {
         "window": "#353535",
@@ -127,6 +134,12 @@ THEMES: dict[str, dict[str, str]] = {
         "eq_band_4": "#39c5d8",
         "eq_band_5": "#9d8cff",
         "eq_band_6": "#f76bbe",
+        "overlay_f0": "#00e5ff",
+        "overlay_f1": "#ff453a",
+        "overlay_f2": "#ff9f0a",
+        "overlay_f3": "#ffd60a",
+        "overlay_f4": "#ff66c4",
+        "overlay_f5": "#bf5af2",
     },
 }
 
@@ -210,6 +223,22 @@ def band_chip_style(band_color: QtGui.QColor) -> str:
         f"QPushButton {{ border: 1.5px solid {name}; border-radius: 5px; background: transparent; }}"
         f"QPushButton:checked {{ background: {name}; color: {color('eq_background').name()}; font-weight: bold; }}"
     )
+
+
+def color_swatch_style(swatch_color: QtGui.QColor) -> str:
+    """Give the style sheet of a button showing a colour
+
+    Parameters
+    ----------
+    swatch_color : QtGui.QColor
+        The colour
+
+    Returns
+    -------
+    str
+        The style sheet
+    """
+    return f"QPushButton {{ background: {swatch_color.name()}; border: 1px solid {color('window_text').name()}; }}"
 
 
 def current_theme() -> str:

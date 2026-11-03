@@ -12,6 +12,7 @@ from pyqtgraph import QtCore, QtGui, QtWidgets
 from pyqtgraph.Qt import isQObjectAlive
 
 from ..gui import theme
+from ..gui.helpers.widgets import CompactList
 from ..gui.widgets import CollapsibleBox
 from .io import AnnotationSerialiser
 from .model import AnnotationSet
@@ -78,23 +79,8 @@ class QListWidgetItemHideable(QtWidgets.QListWidgetItem):
         return self._hidden
 
 
-class TierList(QtWidgets.QListWidget):
-    """List of the tiers, only as high as its entries (it scrolls above `MAX_VISIBLE_ROWS`), which follow the theme"""
-
-    MAX_VISIBLE_ROWS = 6
-
-    def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
-        super().__init__(parent)
-        self.model().rowsInserted.connect(self._fitToRows)
-        self.model().rowsRemoved.connect(self._fitToRows)
-        self.model().modelReset.connect(self._fitToRows)
-        self._fitToRows()
-
-    def _fitToRows(self) -> None:
-        """Take the height of the entries"""
-        row_height = self.sizeHintForRow(0) if self.count() else self.fontMetrics().height()
-        nb_rows = min(max(self.count(), 1), self.MAX_VISIBLE_ROWS)
-        self.setFixedHeight(nb_rows * row_height + 2 * self.frameWidth())
+class TierList(CompactList):
+    """List of the tiers, whose entries follow the theme"""
 
     def applyTheme(self) -> None:
         """Show the entries with the colours of the current theme"""

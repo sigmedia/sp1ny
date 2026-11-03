@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Any
+from collections.abc import Collection
+from typing import Any, Literal
 
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtWidgets
@@ -22,11 +23,15 @@ class DataController:
         The object computing the data (it provides extract() and optionally release())
     widget : Any
         The widget rendering the data (a spiny.gui.widgets.DataWidget)
+    overlays : collection(str) or "all", optional
+        The names of the overlays which can be drawn on the data. This needs a y axis in Hz. (default: none)
     """
 
     _wav_plot: pg.PlotWidget
+    overlays: Collection[str] | Literal["all"] = ()
 
-    def __init__(self, name: str, extractor: Any, widget: Any) -> None:
+    def __init__(self, name: str, extractor: Any, widget: Any, overlays: Collection[str] | Literal["all"] = ()) -> None:
+        self.overlays = overlays
         self._name = name
         self._extractor = extractor
         self._widget = widget
@@ -40,6 +45,21 @@ class DataController:
     def widget(self) -> QtWidgets.QWidget:
         """QtWidgets.QWidget: The widget rendering the data of the plugin"""
         return self._widget
+
+    def supportsOverlay(self, name: str) -> bool:
+        """Tell if an overlay can be drawn on the data of this plugin
+
+        Parameters
+        ----------
+        name : str
+            The name of the overlay
+
+        Returns
+        -------
+        bool
+            True if it can
+        """
+        return self.overlays == "all" or name in self.overlays
 
     def setWavPlot(self, wav_plot: pg.PlotWidget) -> None:
         """Define the waveform plot the data plot is linked to (x axis)

@@ -157,6 +157,9 @@ class DataWidget(pg.GraphicsLayoutWidget):
 
     SLICE_MARGIN = 0.5
 
+    #: Emitted when the widget starts or stops showing data
+    plottingChanged = QtCore.Signal()
+
     def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
         """Initialisation of the widget
 
@@ -322,12 +325,15 @@ class DataWidget(pg.GraphicsLayoutWidget):
         """
         if levels is None:
             levels = self._estimateLevels(data)
+        was_plotting = self.isPlotting()
         self._data = data
         self._data_transform = QtGui.QTransform(transform) if transform is not None else QtGui.QTransform()
         self._levels = levels
         self._slice = (0, 0)
         self._histItem.setLevels(*levels)
         self._updateVisibleSlice()
+        if not was_plotting:
+            self.plottingChanged.emit()
 
     @staticmethod
     def _estimateLevels(data: np.ndarray, max_values: int = 1_000_000) -> tuple[float, float]:
@@ -403,6 +409,19 @@ class DataWidget(pg.GraphicsLayoutWidget):
 
     def clearImageData(self) -> None:
         """Stop displaying the data, so that its memory can be released"""
+        was_plotting = self.isPlotting()
         self._data = None
         self._slice = (0, 0)
         self._imageItem.clear()
+        if was_plotting:
+            self.plottingChanged.emit()
+
+    def isPlotting(self) -> bool:
+        """Tell if the widget shows data
+
+        Returns
+        -------
+        bool
+            True if it does
+        """
+        return self._data is not None

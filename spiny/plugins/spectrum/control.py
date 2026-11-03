@@ -57,7 +57,7 @@ class SpectrumController(DataController):
     MAX_MARGIN = 30.0
 
     def __init__(self, extractor: SpectrumExtractor, widget: SpectrogramPlotWidget) -> None:
-        super().__init__("Spectrogram", extractor, widget)
+        super().__init__("Spectrogram", extractor, widget, overlays="all")
         self._executor = ThreadPoolExecutor(max_workers=1)
         self._signals = _AnalysisSignals()
         self._signals.finished.connect(self._onAnalysisFinished)

@@ -1,6 +1,8 @@
 import gc
 import sys
+import time
 
+import numpy as np
 import pytest
 from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 
@@ -641,3 +643,165 @@ def test_time_axis_never_uses_kiloseconds(window):
     assert axis.tickSpacing(0, 7200, 1000)[0][0] == 900
     assert axis.tickSpacing(0, 1, 1000)[0][0] < 1
     assert not axis.autoSIPrefix and "x0" not in axis.labelString()
+
+
+@pytest.fixture
+def overlays(window):
+    """The overlays and the window on the spectrogram, with nothing enabled at the start and at the end"""
+    from spiny.core.overlay import overlay_entry_dict
+
+    previous = window._plugin_list.currentText()
+    window._plugin_list.setCurrentText("Spectrogram")
+    process_events()
+    yield overlay_entry_dict
+    for overlay in overlay_entry_dict.values():
+        overlay.setEnabled(False)
+    window._plugin_list.setCurrentText(previous)
+
+
+def tick(window, name, checked=True):
+    panel = window._overlay_panel
+    item = panel._list.findItems(name, QtCore.Qt.MatchFlag.MatchExactly)[0]
+    item.setCheckState(QtCore.Qt.CheckState.Checked if checked else QtCore.Qt.CheckState.Unchecked)
+
+
+def wait_for_analysis(overlay, condition=None):
+    deadline = time.time() + 10
+    while time.time() < deadline:
+        QtWidgets.QApplication.processEvents()
+        if not overlay._running and not overlay._draw_timer.isActive() and (condition is None or condition()):
+            return
+        time.sleep(0.002)
+    pytest.fail("the analysis of the overlay did not end")
+
+
+def test_overlays_are_listed_according_to_the_visualisation(window, overlays):
+    panel = window._overlay_panel
+    names = {panel._list.item(row).text() for row in range(panel._list.count())}
+    assert {"Formants", "F0"} == names
+    assert not panel._none.isVisibleTo(panel)
+
+    window._plugin_list.setCurrentText("Raw DATA")  # it does not support overlays
+    assert panel._list.count() == 0
+    assert panel._none.isVisibleTo(panel)
+    assert overlays["Formants"]._plot is None
+
+
+def test_several_overlays_can_be_shown_and_they_are_drawn_on_the_plot(window, overlays):
+    window._visualisation_area._dock_wav.wav_plot.setXRange(0, 3, padding=0)
+    tick(window, "Formants")
+    tick(window, "F0")
+    formants, f0 = overlays["Formants"], overlays["F0"]
+    wait_for_analysis(formants, lambda: formants._chunks)
+    wait_for_analysis(f0, lambda: f0._chunks)
+
+    plot = window._current_controller.widget
+    assert formants._curves["F1"] in plot._plotItem.items and f0._curves["F0"] in plot._plotItem.items
+    assert formants._curves["F1"].isVisible() and f0._curves["F0"].isVisible()
+    assert not formants._curves["F5"].isVisible()  # not shown by default
+    assert np.isfinite(formants._curves["F1"].yData).any() and np.isfinite(f0._curves["F0"].yData).any()
+
+    tick(window, "F0", False)
+    assert formants.enabled and not f0.enabled and not f0._curves["F0"].isVisible()
+
+
+def test_panel_shows_the_configuration_of_the_highlighted_overlay(window, overlays):
+    panel = window._overlay_panel
+    for row in range(panel._list.count()):
+        panel._list.setCurrentRow(row)
+        name = panel._list.item(row).text()
+        assert [n for n, p in panel._panels.items() if p.isVisibleTo(panel)] == [name]
+        assert not panel._list.item(row).checkState() == QtCore.Qt.CheckState.Checked  # highlighting is not showing
+
+
+def test_overlay_is_not_drawn_nor_computed_when_nothing_is_plotted(window, overlays):
+    controller = window._current_controller
+    wav_plot = window._visualisation_area._dock_wav.wav_plot
+    overlay = overlays["Formants"]
+    controller.max_duration = 1
+    try:
+        wav_plot.setXRange(0, 3, padding=0)
+        controller._scheduleAnalysis()
+        deadline = time.time() + 10
+        while controller.widget.isPlotting() and time.time() < deadline:
+            QtWidgets.QApplication.processEvents()
+        assert not controller.widget.isPlotting()
+
+        tick(window, "Formants")
+        process_events()
+        assert not overlay.is_active and not overlay._running
+        assert not overlay._curves["F1"].isVisible()
+
+        wav_plot.setXRange(0, 0.5, padding=0)  # zooming in: the spectrogram is back, and the overlay too
+        deadline = time.time() + 10
+        while not controller.widget.isPlotting() and time.time() < deadline:
+            QtWidgets.QApplication.processEvents()
+        wait_for_analysis(overlay, lambda: overlay._chunks)
+        assert overlay.is_active and overlay._curves["F1"].isVisible()
+    finally:
+        controller.max_duration = 30
+
+
+def test_changing_the_settings_computes_again_and_the_look_does_not(window, overlays):
+    import dataclasses
+
+    window._visualisation_area._dock_wav.wav_plot.setXRange(0, 3, padding=0)
+    overlay = overlays["Formants"]
+    tick(window, "Formants")
+    wait_for_analysis(overlay, lambda: overlay._chunks)
+    chunks = overlay._chunks
+
+    overlay.setColor("F1", QtGui.QColor("#123456"))
+    assert overlay._curves["F1"].opts["pen"].color() == QtGui.QColor("#123456")
+    del overlay._colors["F1"]
+    overlay.setLineWidth(4)
+    assert overlay._curves["F1"].opts["pen"].widthF() == 4
+    overlay.setLineWidth(2)
+    assert overlay._chunks is chunks
+
+    settings = overlay.settings
+    overlay.setSettings(dataclasses.replace(settings, max_frequency=4500.0))
+    assert overlay._chunks is not chunks
+    wait_for_analysis(overlay, lambda: overlay._chunks)
+    overlay.setSettings(settings)
+
+
+def test_a_new_file_forgets_the_tracks(window, overlays):
+    from spiny.core import player
+
+    window._visualisation_area._dock_wav.wav_plot.setXRange(0, 3, padding=0)
+    overlay = overlays["F0"]
+    tick(window, "F0")
+    wait_for_analysis(overlay, lambda: overlay._chunks)
+    before = overlay._chunks
+    window.loadWav(str(player.filename))
+    assert overlay._chunks is not before
+
+
+def test_failed_analysis_is_reported_once(window, overlays, monkeypatch, caplog):
+    window._visualisation_area._dock_wav.wav_plot.setXRange(0, 3, padding=0)
+    overlay = overlays["F0"]
+    overlay._forgetChunks()
+    calls = []
+
+    def fail(*args):
+        calls.append(args)
+        raise ValueError("no way")
+
+    monkeypatch.setattr(overlay, "compute", fail)
+    tick(window, "F0")
+    wait_for_analysis(overlay, lambda: overlay._chunks)
+    nb_calls = len(calls)
+    assert "failed" in caplog.text and nb_calls >= 1
+    window._visualisation_area._dock_wav.wav_plot.setXRange(0, 2, padding=0)
+    wait_for_analysis(overlay)
+    assert len(calls) == nb_calls
+    monkeypatch.undo()
+    overlay._forgetChunks()
+
+
+def test_line_breaks_at_gaps_and_jumps():
+    from spiny.core.overlay import connected_points
+
+    values = np.array([100, 101, np.nan, 200, 202, 900, 905], dtype=np.float32)
+    assert connected_points(values).tolist() == [1, 0, 0, 1, 0, 1, 0]
