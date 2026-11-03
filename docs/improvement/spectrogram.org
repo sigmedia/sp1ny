@@ -43,7 +43,7 @@ no copy), multiplied by the window and transformed by a real FFT along each row.
 
 ** FFT length
 
-The FFT length is chosen automatically: the frames are zero-padded to at least 4096 samples (more for
+The FFT length is chosen automatically: the frames are zero-padded to at least 2048 samples and twice the window (more for
 very long windows). Zero-padding adds no information but gives a smooth frequency axis, even for a
 short (wideband) window. Only the bins up to the maximum frequency of the analysis are kept.
 
@@ -101,8 +101,8 @@ For F visible frames and K kept bins:
 | uint8 result                       | F × K bytes          | kept                      |
 | per thread: frames, FFT, magnitude | ≈ 128 × n_fft × 12 B | during one block (≈ 6 MB) |
 
-With the default settings (5 ms, K = 1 281), the maximum visible duration of 30 s gives F = 6 001:
-about 8 MB, whatever the length of the recording.
+With the default settings (5 ms, K = 641), a view of 30 s and its margins (see below) give F = 12 001:
+about 7 MB, whatever the length of the recording.
 
 * Live update of the spectrogram
 
@@ -123,16 +123,20 @@ Only a maximum frequency above the analysed ones starts a new analysis (to compu
 A change of the visible range, of the window, of the window length or of the time step needs a new
 analysis. To keep the interface responsive:
 
-1. *Debounce*: every change restarts a 150 ms timer, so a pan, a zoom or a drag of a slider starts one
-   analysis, once the user stops moving, not one per mouse event.
-2. *Nothing to do?* If the current spectrogram has the same settings and already contains the
+1. *Throttle*: a change starts a 30 ms timer, unless it is already running, so a burst of mouse events starts one
+   analysis, and the view keeps being updated during a drag. (Restarting the timer at each event, as a debounce does,
+   would compute nothing until the user stops moving.)
+2. *Margin*: an analysis also covers half of the width of the view on each side (30 s at most), so a drag first
+   reveals what is already computed. The next analysis starts when half of this margin has been used.
+3. *Reuse*: with the same settings, the frames of the current spectrogram are copied, and only the new ones are computed.
+4. *Nothing to do?* If the current spectrogram has the same settings and already contains the
    visible range (after a zoom-in, for example), nothing is computed.
-3. *Background thread*: the analysis (=compute_spectrogram=, which only reads its arguments) runs in
+5. *Background thread*: the analysis (=compute_spectrogram=, which only reads its arguments) runs in
    a single worker thread; the current spectrogram stays visible meanwhile, with an "Updating…"
    message under the panel.
-4. *Back to the GUI thread*: when the analysis ends, the worker emits a Qt signal of an object living
+6. *Back to the GUI thread*: when the analysis ends, the worker emits a Qt signal of an object living
    in the GUI thread; Qt queues it, so the result is always stored and drawn by the GUI thread.
-5. *Only the latest result*: each analysis has a generation number. A result whose generation is not
+7. *Only the latest result*: each analysis has a generation number. A result whose generation is not
    the latest one is dropped (the view became too long, a new signal was loaded, or another plugin was
    selected). A request made while an analysis is running waits for it, and only the latest request
    is kept.
@@ -166,10 +170,12 @@ On the 10-minute recording, with the maximum of 30 s:
 | Measure                                      | Before                       | After                   |
 |----------------------------------------------+------------------------------+-------------------------|
 | Open the recording (full view)               | killed (> 4 GB)              | message, nothing computed |
-| Show a 30 s view                             | whole spectrogram required   | 0.44 s                  |
-| Pan a 30 s view: result in the background    | not applicable               | 0.42 s                  |
-| Longest interface freeze during that pan     | not applicable               | 21 ms                   |
+| Show a 30 s view                             | whole spectrogram required   | 47 ms                   |
+| Pan a 30 s view by a page: shown after       | not applicable               | 94 ms                   |
+| Pan a 30 s view by 2 %                       | not applicable               | already computed        |
+| Longest interface freeze during a fast drag  | not applicable               | 57 ms                   |
 | Peak memory of the session                   | killed (> 4 GB)              | 313 MB                  |
 
 On the 2-minute recording, the old code took 5.53 s and 1 324 MB to open the spectrogram of the whole
-recording. librosa is no longer used by spiny, which also saves its import (about 1 s and 100 MB).
+recording. With the debounce and an FFT of 4096 points, the page took 261 ms to show, and nothing was updated during a
+drag: the margin, the reuse and the throttle fixed this. librosa is no longer used by spiny, which also saves its import (about 1 s and 100 MB).

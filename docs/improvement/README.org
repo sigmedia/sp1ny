@@ -13,7 +13,7 @@ described here (branch =perf=) make it:
   spectrogram included), where the old code was killed above 4 GB; a 2-minute recording peaks at 432 MB
   instead of 1641 MB;
 - *start and load faster*: loading the audio is 37 to 200 times faster (librosa is gone), the first
-  paint 5 to 19 times faster; only the visible part of the spectrogram is computed (0.44 s for 30 s);
+  paint 5 to 19 times faster; only the visible part of the spectrogram is computed (47 ms for 30 s);
 - *stay responsive*: panning a 5 s view costs about 50 ms per frame instead of 276 ms, and a colormap
   change about 30 ms instead of 320 ms (2-minute file).
 
