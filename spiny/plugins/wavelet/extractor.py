@@ -31,6 +31,9 @@ class WaveletExtractor:
         self._num_scales = 34
         self._scale_distance = 0.25
 
+        self.resetParameters()
+
+    def resetParameters(self):
         # Parameters controlled by the GUI (defaults reproduce the previous hard-coded behaviour)
         self._min_f0 = 50.0
         self._max_f0 = 400.0

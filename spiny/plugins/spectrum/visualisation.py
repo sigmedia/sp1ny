@@ -4,7 +4,7 @@ from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 
 from spiny.core import player
 from spiny.gui.widgets import DataWidget
-from .extractor import SpectrumExtractor, db_to_code
+from .extractor import DEFAULT_DB_RANGE, SpectrumExtractor, db_to_code
 
 
 class SpectrogramPlotWidget(DataWidget):
@@ -33,7 +33,7 @@ class SpectrogramPlotWidget(DataWidget):
         super().__init__(parent)
         self._spectrum_extractor = spectrum_extractor
         self.frequency_range = (0.0, spectrum_extractor.settings.max_frequency)
-        self.db_range = (-70.0, 0.0)
+        self.db_range = DEFAULT_DB_RANGE
 
         self._message = QtWidgets.QLabel()
         self._message.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)

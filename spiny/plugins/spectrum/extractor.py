@@ -147,6 +147,10 @@ def stft_magnitude(
 DB_FLOOR = -80.0
 
 
+#: The levels mapped to the ends of the colormap by default, in dB
+DEFAULT_DB_RANGE = (-70.0, 0.0)
+
+
 def db_to_code(db: float) -> float:
     """Convert a level in dB into the 8-bit code representing it
 

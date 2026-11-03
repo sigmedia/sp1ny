@@ -354,10 +354,23 @@ class GUIVisu(QtWidgets.QMainWindow):
         panel_layout = QtWidgets.QVBoxLayout(self._plugin_panel)
         panel_layout.setContentsMargins(0, 0, 0, 0)
         controller.setControlPanel(panel_layout)
+        reset = QtWidgets.QPushButton("Reset to defaults")
+        reset.setToolTip("Go back to the default configuration of this plugin and to the default colormap")
+        reset.setAutoDefault(False)
+        reset.clicked.connect(self.resetPluginConfiguration)
+        panel_layout.addWidget(reset)
         self._control_layout.insertWidget(1, self._plugin_panel)
         self._visualisation_area.selectPlugin(controller)
         self._overlay_panel.setVisualisation(controller, self._visualisation_area._dock_wav.wav_plot)
         self.selectColorMap(self._cmap_list.currentText())
+
+    def resetPluginConfiguration(self) -> None:
+        """Go back to the default configuration of the current plugin, and to the default colormap"""
+        controller = self._current_controller
+        if controller is not None:
+            controller.resetConfiguration()
+            self._cmap_list.setCurrentIndex(0)
+            self.selectPlugin(controller.name)
 
     def selectColorMap(self, cmap_name: str) -> None:
         """Apply a colormap to the data plot

@@ -7,8 +7,9 @@ from pyqtgraph.Qt.QtWidgets import QComboBox, QCompleter, QHBoxLayout, QLabel, Q
 
 
 class CompactList(QListWidget):
-    """List only as high as its entries (it scrolls above `MAX_VISIBLE_ROWS`)"""
+    """List only as high as its entries, between `MIN_VISIBLE_ROWS` and `MAX_VISIBLE_ROWS` (it scrolls above)"""
 
+    MIN_VISIBLE_ROWS = 1
     MAX_VISIBLE_ROWS = 6
 
     def __init__(self, parent: QWidget | None = None) -> None:
@@ -21,7 +22,7 @@ class CompactList(QListWidget):
     def _fitToRows(self) -> None:
         """Take the height of the entries"""
         row_height = self.sizeHintForRow(0) if self.count() else self.fontMetrics().height()
-        nb_rows = min(max(self.count(), 1), self.MAX_VISIBLE_ROWS)
+        nb_rows = min(max(self.count(), self.MIN_VISIBLE_ROWS), self.MAX_VISIBLE_ROWS)
         self.setFixedHeight(nb_rows * row_height + 2 * self.frameWidth())
 
 

@@ -152,7 +152,7 @@ def define_argument_parser() -> argparse.ArgumentParser:
         "--config",
         default=None,
         type=str,
-        help="The configuration file: theme and shortcuts (default: spiny/config.yaml in the user config directory)",
+        help="The configuration file: theme, shortcuts, wheel (default: spiny/config.yaml in the config directory)",
     )
     parser.add_argument(
         "-w",

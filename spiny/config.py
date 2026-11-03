@@ -1,4 +1,4 @@
-"""The configuration file of the user: the theme and the keyboard shortcuts
+"""The configuration file of the user: the theme, the keyboard shortcuts and the wheel
 
 See examples/config.yaml for every setting and its default value. A mistake in the file is reported in the log and
 that setting keeps its default: it must never prevent the application from starting.
@@ -14,7 +14,7 @@ from typing import Any
 import yaml
 from pyqtgraph.Qt import QtCore
 
-from spiny.gui.shortcuts import configure_shortcuts
+from spiny.gui.shortcuts import configure_shortcuts, configure_wheel
 from spiny.gui.theme import THEMES, configure_themes
 
 logger = logging.getLogger(__name__)
@@ -82,11 +82,12 @@ def load_config(path: str | os.PathLike | None = None) -> str:
         logger.warning('The configuration file "%s" must contain a mapping, it is ignored', path)
         return "light"
 
-    for key in config.keys() - {"theme", "themes", "shortcuts"}:
+    for key in config.keys() - {"theme", "themes", "shortcuts", "wheel"}:
         logger.warning('Configuration: unknown setting "%s"', key)
 
     configure_themes(_section(config, "themes"))
     configure_shortcuts(_section(config, "shortcuts"))
+    configure_wheel(_section(config, "wheel"))
 
     theme_name = config.get("theme", "light")
     if not isinstance(theme_name, str) or theme_name not in THEMES:

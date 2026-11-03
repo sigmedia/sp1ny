@@ -600,20 +600,23 @@ def test_groups_of_the_other_tabs_have_the_height_they_need(window):
     tabs.setCurrentIndex(0)
 
 
-def test_tier_list_is_only_as_high_as_its_tiers(qapp):
+def test_tier_list_shows_at_least_four_rows_and_scrolls_above_six(qapp):
     from spiny.annotations.control import QListWidgetItemHideable, TierList
 
+    def height_of(nb_rows, tiers):
+        return nb_rows * tiers.sizeHintForRow(0) + 2 * tiers.frameWidth()
+
     tiers = TierList()
-    empty = tiers.height()
+    assert tiers.MIN_VISIBLE_ROWS == 4
     for name in "ab":
         QListWidgetItemHideable(tiers).setText(name)
-    two = tiers.height()
-    assert empty < two < 3 * empty
-    for name in "cdefghij":
+    assert tiers.height() == height_of(4, tiers)
+    for name in "cde":
         QListWidgetItemHideable(tiers).setText(name)
-    assert tiers.height() == tiers.MAX_VISIBLE_ROWS * tiers.sizeHintForRow(0) + 2 * tiers.frameWidth()
-    tiers.clear()
-    assert tiers.height() == empty
+    assert tiers.height() == height_of(5, tiers)
+    for name in "fghij":
+        QListWidgetItemHideable(tiers).setText(name)
+    assert tiers.height() == height_of(tiers.MAX_VISIBLE_ROWS, tiers)
 
 
 @pytest.mark.parametrize(
@@ -805,3 +808,151 @@ def test_line_breaks_at_gaps_and_jumps():
 
     values = np.array([100, 101, np.nan, 200, 202, 900, 905], dtype=np.float32)
     assert connected_points(values).tolist() == [1, 0, 0, 1, 0, 1, 0]
+
+
+def turn_wheel(plot, x=0, y=0, shift=False):
+    """Send what a mouse wheel or two fingers on a trackpad send, over the centre of the plot"""
+    view = plot.getViewBox() if hasattr(plot, "getViewBox") else plot._plotItem.getViewBox()
+    position = QtCore.QPointF(plot.mapFromScene(view.sceneBoundingRect().center()))
+    modifiers = QtCore.Qt.KeyboardModifier.ShiftModifier if shift else QtCore.Qt.KeyboardModifier.NoModifier
+    event = QtGui.QWheelEvent(
+        position,
+        QtCore.QPointF(plot.viewport().mapToGlobal(position)),
+        QtCore.QPoint(0, 0),
+        QtCore.QPoint(x, y),
+        QtCore.Qt.MouseButton.NoButton,
+        modifiers,
+        QtCore.Qt.ScrollPhase.NoScrollPhase,
+        False,
+    )
+    QtWidgets.QApplication.sendEvent(plot.viewport(), event)
+    QtWidgets.QApplication.processEvents()
+
+
+@pytest.fixture
+def plots(window):
+    """The three kinds of plot which show the time, on a view with room around"""
+    from spiny.annotations import get_controller
+    from spiny.annotations.model import Annotation, AnnotationSet
+
+    window._plugin_list.setCurrentText("Spectrogram")
+    get_controller().setAnnotationModel(AnnotationSet({"t": [Annotation(0.1, 0.2, "a")]}, set()))
+    area = window._visualisation_area
+    wav_plot = area._dock_wav.wav_plot
+    wav_plot.setXRange(1, 2, padding=0)
+    process_events()
+    yield {
+        "waveform": wav_plot,
+        "spectrogram": window._current_controller.widget,
+        "tier": area._dock_annotation.tiers_dict["t"],
+    }
+    get_controller().setAnnotationModel(AnnotationSet({}, set()))
+    window._plugin_list.setCurrentText("Raw DATA")
+
+
+@pytest.mark.parametrize("name", ["waveform", "spectrogram", "tier"])
+def test_wheel_up_and_down_zoom_on_every_plot(window, plots, name):
+    wav_range = plots["waveform"].getViewBox().viewRange
+    before = wav_range()[0]
+    turn_wheel(plots[name], y=120)
+    x_min, x_max = wav_range()[0]
+    assert x_max - x_min < before[1] - before[0]
+    assert wav_range()[1] == plots["waveform"].getViewBox().viewRange()[1]
+
+    width = x_max - x_min
+    turn_wheel(plots[name], y=-120)
+    assert wav_range()[0][1] - wav_range()[0][0] > width
+
+
+@pytest.mark.parametrize("name", ["waveform", "spectrogram", "tier"])
+@pytest.mark.parametrize("gesture", [{"x": 120}, {"y": 120, "shift": True}, {"x": 120, "shift": True}])
+def test_two_fingers_sideways_and_shift_wheel_move_on_every_plot(window, plots, name, gesture):
+    wav_range = plots["waveform"].getViewBox().viewRange
+    x_min, x_max = wav_range()[0]
+    turn_wheel(plots[name], **gesture)
+    # NOTE: a tier is a little narrower than the waveform (scroll bar): the link between them is not exact to the pixel
+    assert wav_range()[0][0] == pytest.approx(x_min - 0.1 * (x_max - x_min), abs=5e-3)
+    assert wav_range()[0][1] - wav_range()[0][0] == pytest.approx(x_max - x_min, abs=5e-3)
+
+    opposite = {key: -value if key != "shift" else value for key, value in gesture.items()}
+    turn_wheel(plots[name], **opposite)
+    assert wav_range()[0][0] == pytest.approx(x_min, abs=5e-3)
+
+
+def test_wheel_follows_the_configuration(window, plots, monkeypatch):
+    from spiny.gui import shortcuts
+
+    monkeypatch.setitem(shortcuts.WHEEL_ACTIONS, "wheel_up_down", "pan")
+    monkeypatch.setitem(shortcuts.WHEEL_ACTIONS, "wheel_left_right", "zoom")
+    wav_range = plots["waveform"].getViewBox().viewRange
+    x_min, x_max = wav_range()[0]
+    turn_wheel(plots["waveform"], y=120)
+    assert wav_range()[0][1] - wav_range()[0][0] == pytest.approx(x_max - x_min, abs=1e-3)
+    assert wav_range()[0][0] < x_min
+
+    width = wav_range()[0][1] - wav_range()[0][0]
+    turn_wheel(plots["waveform"], x=120)
+    assert wav_range()[0][1] - wav_range()[0][0] < width
+
+    monkeypatch.setitem(shortcuts.WHEEL_ACTIONS, "wheel_up_down", "none")
+    before = wav_range()
+    turn_wheel(plots["waveform"], y=120)
+    assert wav_range() == before
+
+
+def test_reset_button_of_the_plugin(window, plots):
+    from spiny.plugins.spectrum.extractor import SpectrogramSettings
+
+    controller = window._current_controller
+    controller._time_step.setValue(12)
+    controller._window_length.setValue(50)
+    controller._max_level.setValue(-20)
+    controller._max_frequency.setValue(3000)
+    controller._max_duration.setValue(100)
+    window._cmap_list.setCurrentIndex(2)
+    process_events()
+
+    button = next(
+        b for b in window._plugin_panel.findChildren(QtWidgets.QPushButton) if b.text() == "Reset to defaults"
+    )
+    button.click()
+    process_events()
+    assert controller._extractor.settings == SpectrogramSettings()
+    assert controller.max_duration == 30
+    assert controller._max_level.value() == 0 and controller._time_step.value() == 5
+    assert controller._max_frequency.value() == 5000 and controller._max_duration.value() == 30
+    assert controller.widget.db_range == (-70.0, 0.0)
+    assert window._cmap_list.currentIndex() == 0
+
+
+def test_every_plugin_has_a_reset_button(window):
+    previous = window._plugin_list.currentText()
+    window._plugin_list.setCurrentText("Raw DATA")
+    assert [b for b in window._plugin_panel.findChildren(QtWidgets.QPushButton) if b.text() == "Reset to defaults"]
+    window._plugin_list.setCurrentText(previous)
+
+
+def test_reset_button_of_the_overlay(window, overlays):
+    panel = window._overlay_panel
+    panel._list.setCurrentRow([panel._list.item(row).text() for row in range(panel._list.count())].index("Formants"))
+    overlay = overlays["Formants"]
+    tick(window, "Formants")
+    defaults = overlay.settings
+
+    overlay.setSettings(type(defaults)(max_frequency=4000.0))
+    overlay.setColor("F1", QtGui.QColor("#123456"))
+    overlay.setTrackShown("F1", False)
+    overlay.setTrackShown("F5", True)
+    overlay.setLineWidth(5)
+    old_panel = panel._panels["Formants"]
+
+    panel._bReset.click()
+    process_events()
+    assert overlay.settings == defaults
+    assert overlay.isTrackShown("F1") and not overlay.isTrackShown("F5")
+    assert overlay.line_width == overlay.DEFAULT_LINE_WIDTH
+    assert overlay.color("F1").name() != "#123456"
+    assert overlay.enabled  # still shown
+    assert panel._panels["Formants"] is not old_panel and panel._panels["Formants"].isVisibleTo(panel)
+    sliders = panel._panels["Formants"].findChildren(QtWidgets.QSlider)
+    assert any(slider.value() == 5500 for slider in sliders)

@@ -12,6 +12,9 @@ class WaveletController(DataController):
         self._panel_built = False
         get_annotation_controller().list_registered_modules.add(self._tier_list_updated)
 
+    def resetConfiguration(self):
+        self._extractor.resetParameters()
+
     def setWavPlot(self, wav_plot):
         self._wav_plot = wav_plot
 

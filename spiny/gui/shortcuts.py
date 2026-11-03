@@ -1,4 +1,4 @@
-"""The keyboard shortcuts of the application: every key is defined here, and only here
+"""The keyboard shortcuts and the wheel of the application: every binding is defined here, and only here
 
 The code only refers to an action by its name (see `shortcut`). An empty string means no shortcut.
 """
@@ -36,6 +36,55 @@ SHORTCUTS: dict[str, str] = {
     # Annotations
     "delete_annotation": "Delete",
 }
+
+
+#: What the wheel does: two fingers on a trackpad are a wheel with two directions
+WHEEL_ACTIONS: dict[str, str] = {
+    "wheel_up_down": "zoom",
+    "wheel_left_right": "pan",
+    "shift_wheel_up_down": "pan",
+    "shift_wheel_left_right": "pan",
+}
+
+#: What the wheel can do: "none" leaves the event to what is below (e.g. scrolling the tiers)
+WHEEL_CHOICES = ("zoom", "pan", "none")
+
+
+def configure_wheel(overrides: dict[str, Any]) -> None:
+    """Change what the wheel does; a mistake is reported in the log and that binding keeps its value
+
+    Parameters
+    ----------
+    overrides : dict
+        The action of each gesture which changes
+    """
+    for gesture, action in overrides.items():
+        if gesture not in WHEEL_ACTIONS:
+            logger.warning(
+                'Configuration: unknown gesture "%s", available ones are: %s', gesture, ", ".join(WHEEL_ACTIONS)
+            )
+        elif action not in WHEEL_CHOICES:
+            logger.warning('Configuration: invalid action for "%s": %s (%s)', gesture, action, ", ".join(WHEEL_CHOICES))
+        else:
+            WHEEL_ACTIONS[gesture] = action
+
+
+def wheel_action(horizontal: bool, shift: bool) -> str:
+    """Give what a turn of the wheel does
+
+    Parameters
+    ----------
+    horizontal : bool
+        True if the movement is left or right, False if it is up or down
+    shift : bool
+        True if the Shift key is pressed
+
+    Returns
+    -------
+    str
+        "zoom", "pan" or "none"
+    """
+    return WHEEL_ACTIONS[f"{'shift_' if shift else ''}wheel_{'left_right' if horizontal else 'up_down'}"]
 
 
 def configure_shortcuts(overrides: dict[str, Any]) -> None:

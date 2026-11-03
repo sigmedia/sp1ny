@@ -61,6 +61,9 @@ class DataController:
         """
         return self.overlays == "all" or name in self.overlays
 
+    def resetConfiguration(self) -> None:
+        """Go back to the default configuration (the control panel is built again afterwards)"""
+
     def setWavPlot(self, wav_plot: pg.PlotWidget) -> None:
         """Define the waveform plot the data plot is linked to (x axis)
 

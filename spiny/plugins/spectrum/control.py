@@ -8,7 +8,7 @@ from pyqtgraph.Qt import QtCore, QtWidgets, isQObjectAlive
 
 from spiny.core import DataController, player
 from spiny.gui.helpers.widgets import LabelledSlider
-from .extractor import DB_FLOOR, WINDOWS, SpectrogramSettings, SpectrumExtractor, compute_spectrogram
+from .extractor import DB_FLOOR, DEFAULT_DB_RANGE, WINDOWS, SpectrogramSettings, SpectrumExtractor, compute_spectrogram
 
 if TYPE_CHECKING:
     from .visualisation import SpectrogramPlotWidget
@@ -52,6 +52,8 @@ class SpectrumController(DataController):
     #: Delay between a change of the view or of a setting and the analysis: gathers one burst of mouse events
     ANALYSIS_DELAY_MS = 30
 
+    DEFAULT_MAX_DURATION = 30
+
     #: The part computed on each side of the view, as a fraction of its width and in seconds at most
     MARGIN_FRACTION = 0.5
     MAX_MARGIN = 30.0
@@ -68,7 +70,7 @@ class SpectrumController(DataController):
         self._analysis_timer.setInterval(self.ANALYSIS_DELAY_MS)
         self._analysis_timer.timeout.connect(self._requestAnalysis)
 
-        self.max_duration = 30
+        self.max_duration = self.DEFAULT_MAX_DURATION
         self._active = False  # True while the plugin is displayed
         self._wav_plot = None
         self._generation = 0  # incremented by every new analysis: only the latest one is shown
@@ -79,6 +81,14 @@ class SpectrumController(DataController):
     ###########################################################################
     # Analysis
     ###########################################################################
+
+    def resetConfiguration(self) -> None:
+        """Go back to the default analysis, display range and maximum visible duration"""
+        self._cancelAnalyses()
+        self._extractor.settings = SpectrogramSettings()
+        self._widget.frequency_range = (0.0, self._extractor.settings.max_frequency)
+        self._widget.db_range = DEFAULT_DB_RANGE
+        self.max_duration = self.DEFAULT_MAX_DURATION
 
     def setWavPlot(self, wav_plot: pg.PlotWidget) -> None:
         """Define the waveform plot: it gives the time axis, so its visible range is the one to analyse

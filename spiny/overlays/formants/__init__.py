@@ -16,10 +16,10 @@ class FormantOverlay(TrackOverlay):
     """The formants, drawn over a spectrogram"""
 
     TRACKS = ("F1", "F2", "F3", "F4", "F5")
+    HIDDEN_TRACKS = ("F4", "F5")
 
     def __init__(self) -> None:
         super().__init__("Formants", FormantSettings())
-        self._shown["F4"] = self._shown["F5"] = False
 
     def compute(
         self, signal: np.ndarray, rate: int, settings: FormantSettings, first_frame: int, last_frame: int

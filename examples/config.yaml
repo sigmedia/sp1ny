@@ -6,6 +6,7 @@
 # Colours are anything Qt understands: "#rrggbb", "#aarrggbb" (with transparency) or a name such as "red".
 # Quote them: an unquoted # starts a comment in YAML.
 # Shortcuts are written as in Qt ("Ctrl+Shift+P", "Space", "F5", ...); an empty value removes a shortcut.
+# The wheel can zoom, pan or do nothing (none); two fingers on a trackpad are a wheel with two directions.
 
 theme: light
 shortcuts:
@@ -27,6 +28,11 @@ shortcuts:
   follow: F
   switch_theme: Ctrl+T
   delete_annotation: Delete
+wheel:
+  wheel_up_down: zoom
+  wheel_left_right: pan
+  shift_wheel_up_down: pan
+  shift_wheel_left_right: pan
 themes:
   light:
     window: '#efefef'

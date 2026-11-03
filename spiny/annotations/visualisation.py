@@ -10,7 +10,7 @@ from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 from pyqtgraph.dockarea import Dock
 
 from spiny.gui import theme
-from spiny.gui.items import PlayheadLine, SegmentItem
+from spiny.gui.items import PlayheadLine, SegmentItem, WheelViewBox
 from spiny.gui.shortcuts import shortcut
 from .model import Annotation, AnnotationSet, display_label
 from spiny.core import player
@@ -162,7 +162,7 @@ class TierPlot(pg.PlotWidget):
         **kwargs: Any,
     ) -> None:
         assert model is not None
-        super().__init__(*args, **kwargs)
+        super().__init__(*args, viewBox=WheelViewBox(), **kwargs)
         self.applyTheme()
         self._tier_name = tier_name
         self._model = model

@@ -82,6 +82,8 @@ class QListWidgetItemHideable(QtWidgets.QListWidgetItem):
 class TierList(CompactList):
     """List of the tiers, whose entries follow the theme"""
 
+    MIN_VISIBLE_ROWS = 4
+
     def applyTheme(self) -> None:
         """Show the entries with the colours of the current theme"""
         for row in range(self.count()):

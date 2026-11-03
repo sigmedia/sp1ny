@@ -14,6 +14,7 @@ def settings(qapp, monkeypatch):
 
     monkeypatch.setattr(theme, "THEMES", copy.deepcopy(theme.THEMES))
     monkeypatch.setattr(shortcuts, "SHORTCUTS", dict(shortcuts.SHORTCUTS))
+    monkeypatch.setattr(shortcuts, "WHEEL_ACTIONS", dict(shortcuts.WHEEL_ACTIONS))
     # NOTE: spiny.config imported the dictionary of the themes by name
     monkeypatch.setattr("spiny.config.THEMES", theme.THEMES)
     return theme, shortcuts
@@ -26,11 +27,11 @@ def write(tmp_path: pathlib.Path, text: str) -> pathlib.Path:
 
 
 def test_example_lists_every_setting_with_its_default_value():
-    from spiny.gui.shortcuts import SHORTCUTS
+    from spiny.gui.shortcuts import SHORTCUTS, WHEEL_ACTIONS
     from spiny.gui.theme import THEMES
 
     example = yaml.safe_load((EXAMPLES / "config.yaml").read_text(encoding="utf-8"))
-    assert example == {"theme": "light", "shortcuts": SHORTCUTS, "themes": THEMES}
+    assert example == {"theme": "light", "shortcuts": SHORTCUTS, "wheel": WHEEL_ACTIONS, "themes": THEMES}
 
 
 def test_valid_settings_are_applied(settings, tmp_path):
@@ -127,3 +128,24 @@ def test_buttons_use_the_configured_shortcut(settings):
     assert ToolBarButton("loop", "Loop", "loop")._shortcut.key().toString() == "Ctrl+L"
     no_shortcut = ToolBarButton("mute", "Mute", "mute")
     assert no_shortcut._shortcut.key().isEmpty() and no_shortcut.toolTip() == "Mute"
+
+
+def test_wheel_can_be_configured(settings, tmp_path, caplog):
+    from spiny.config import load_config
+
+    _, shortcuts = settings
+    path = write(
+        tmp_path,
+        """
+wheel:
+  wheel_up_down: pan
+  wheel_left_right: none
+  shift_wheel_up_down: fly
+  no_such_gesture: zoom
+""",
+    )
+    load_config(path)
+    assert shortcuts.wheel_action(horizontal=False, shift=False) == "pan"
+    assert shortcuts.wheel_action(horizontal=True, shift=False) == "none"
+    assert shortcuts.wheel_action(horizontal=False, shift=True) == "pan"  # the invalid one keeps its value
+    assert '"shift_wheel_up_down"' in caplog.text and '"no_such_gesture"' in caplog.text

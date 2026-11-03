@@ -11,6 +11,7 @@ import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui
 from spiny.core import player
 from spiny.gui import theme
+from spiny.gui.shortcuts import wheel_action
 
 
 ###############################################################################
@@ -250,7 +251,37 @@ class SegmentItem(pg.LinearRegionItem):
         self._segment.end_time = self.lines[1].getXPos()
 
 
-class SelectableViewBox(pg.ViewBox):
+class WheelViewBox(pg.ViewBox):
+    """View whose wheel (or trackpad) zooms or moves along the time axis, as configured (see spiny.gui.shortcuts)"""
+
+    #: How much one notch of the wheel moves the view, as a fraction of its width
+    PAN_PER_NOTCH = 0.1
+
+    def wheelEvent(self, ev: Any, axis: int | None = None) -> None:
+        """Zoom or move, depending on the direction of the wheel and on the Shift key
+
+        Parameters
+        ----------
+        ev : QtWidgets.QGraphicsSceneWheelEvent
+            The wheel event
+        axis : int, optional
+            The axis, when the event comes from an axis item: 0 for x, 1 for y. (default: None)
+        """
+        action = wheel_action(
+            ev.orientation() == QtCore.Qt.Orientation.Horizontal,
+            bool(ev.modifiers() & QtCore.Qt.KeyboardModifier.ShiftModifier),
+        )
+        if axis == 1 or action == "zoom":
+            super().wheelEvent(ev, axis)
+        elif action == "pan" and self.state["mouseEnabled"][0]:
+            x_min, x_max = self.viewRange()[0]
+            self.translateBy(x=-self.PAN_PER_NOTCH * (x_max - x_min) * ev.delta() / 120)
+            ev.accept()
+        else:
+            ev.ignore()
+
+
+class SelectableViewBox(WheelViewBox):
     """Viewbox with region selection support (for playback and zoom)
 
     Attributes

@@ -106,6 +106,8 @@ class TrackOverlay(QtCore.QObject):
     ----------
     TRACKS : tuple(str)
         The names of the tracks: "overlay_<name in lower case>" in the theme gives their colour
+    HIDDEN_TRACKS : tuple(str)
+        The tracks which are not shown by default
     CHUNK_DURATION : float
         The duration analysed at once, in seconds
     MAX_RUNNING : int
@@ -116,9 +118,11 @@ class TrackOverlay(QtCore.QObject):
     """
 
     TRACKS: tuple[str, ...] = ()
+    HIDDEN_TRACKS: tuple[str, ...] = ()
     CHUNK_DURATION = 5.0
     MAX_RUNNING = 2
     MAX_DRAWN_POINTS = 4000
+    DEFAULT_LINE_WIDTH = 2.0
 
     _chunkFinished = QtCore.Signal(object)  # NOTE: emitted by a worker thread, so delivered in the GUI thread
 
@@ -126,14 +130,15 @@ class TrackOverlay(QtCore.QObject):
         super().__init__()
         self._name = name
         self._settings = settings
+        self._default_settings = settings
         self.enabled = False
 
         self._plot: Any = None
         self._wav_plot: Any = None
         self._curves: dict[str, pg.PlotCurveItem] = {}
-        self._shown = {track: True for track in self.TRACKS}
+        self._shown = {track: track not in self.HIDDEN_TRACKS for track in self.TRACKS}
         self._colors: dict[str, QtGui.QColor] = {}  # The colours chosen by the user
-        self._line_width = 2.0
+        self._line_width = self.DEFAULT_LINE_WIDTH
 
         self._signal: np.ndarray | None = None
         self._chunks: dict[int, np.ndarray] = {}
@@ -211,6 +216,15 @@ class TrackOverlay(QtCore.QObject):
             self._settings = settings
             self._forgetChunks()
             self._update()
+
+    def resetConfiguration(self) -> None:
+        """Go back to the default analysis and look (whether the overlay is shown does not change)"""
+        self._shown = {track: track not in self.HIDDEN_TRACKS for track in self.TRACKS}
+        self._colors = {}
+        self._line_width = self.DEFAULT_LINE_WIDTH
+        self.applyTheme()
+        self.setSettings(self._default_settings)
+        self._update()
 
     def color(self, track: str) -> QtGui.QColor:
         """Give the colour of a track
@@ -516,13 +530,19 @@ class OverlayPanel(QtWidgets.QWidget):
         self._none.setWordWrap(True)
         self._panels = {name: overlay.buildPanel() for name, overlay in overlay_entry_dict.items()}
 
+        self._bReset = QtWidgets.QPushButton("Reset to defaults")
+        self._bReset.setToolTip("Go back to the default configuration of the selected overlay")
+        self._bReset.setAutoDefault(False)
+        self._bReset.clicked.connect(self._resetCurrent)
+
         content = QtWidgets.QWidget()
-        layout = QtWidgets.QVBoxLayout(content)
+        layout = self._layout = QtWidgets.QVBoxLayout(content)
         layout.addWidget(self._list)
         layout.addWidget(self._none)
         for panel in self._panels.values():
             layout.addWidget(panel)
             panel.hide()  # NOTE: hidden and not in a stacked widget: the group only takes the height it needs
+        layout.addWidget(self._bReset)
         layout.addStretch(1)
 
         scroll = QtWidgets.QScrollArea()
@@ -560,6 +580,7 @@ class OverlayPanel(QtWidgets.QWidget):
 
         self._list.setVisible(self._list.count() > 0)
         self._none.setVisible(self._list.count() == 0)
+        self._bReset.setVisible(self._list.count() > 0)
         self._showCurrentPanel()
 
     def _onItemChanged(self, item: QtWidgets.QListWidgetItem) -> None:
@@ -583,6 +604,17 @@ class OverlayPanel(QtWidgets.QWidget):
         current = self._list.currentItem().text() if self._list.currentItem() else None
         for name, panel in self._panels.items():
             panel.setVisible(name == current)
+
+    def _resetCurrent(self) -> None:
+        """Go back to the default configuration of the highlighted overlay, and show it in a new panel"""
+        name = self._list.currentItem().text()
+        overlay_entry_dict[name].resetConfiguration()
+        panel = overlay_entry_dict[name].buildPanel()
+        self._layout.replaceWidget(self._panels[name], panel)
+        self._panels[name].hide()
+        self._panels[name].deleteLater()
+        self._panels[name] = panel
+        self._showCurrentPanel()
 
     def applyTheme(self) -> None:
         """Follow the theme: the colours of the tracks which were not chosen by the user come from it"""

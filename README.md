@@ -81,7 +81,7 @@ something, and everything is computed in the background for the part of the sign
 
 ## Configuration
 
-The theme and the shortcuts are set in a YAML file: `spiny/config.yaml` in your configuration directory
+The theme, the shortcuts and the wheel are set in a YAML file: `spiny/config.yaml` in your configuration directory
 (`~/.config/spiny/config.yaml` on Linux), or any file given with `--config`. Only write what you want to change:
 
 ```yaml
@@ -92,6 +92,16 @@ shortcuts:
 themes:
   dark:
     playhead: "#00ff00"
+```
+
+What the wheel does is set in the same file. Two fingers on a trackpad are a wheel with two directions:
+
+```yaml
+wheel:                            # zoom, pan or none
+  wheel_up_down: zoom
+  wheel_left_right: pan
+  shift_wheel_up_down: pan
+  shift_wheel_left_right: pan
 ```
 
 [`examples/config.yaml`](examples/config.yaml) lists every setting with its default value. A mistake in the file is
