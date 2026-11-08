@@ -1106,3 +1106,68 @@ def test_inverted_colormap_is_stable_and_reversed(qapp, index):
     assert colormap_ticks(name) == normal  # and the normal one is not affected
     inverted = colormap_ticks(name, True)
     assert inverted[0][1] == normal[-1][1] and inverted[-1][1] == normal[0][1]
+
+
+def test_smooth_image_filters_both_axes_and_keeps_the_shape(qapp):
+    from spiny.gui.widgets import SMOOTHING_KERNELS, smooth_image
+
+    image = np.zeros((7, 9, 4), dtype=np.uint8)
+    image[3, 4] = 240
+    box = smooth_image(image, SMOOTHING_KERNELS["Box"])
+    assert box.shape == image.shape and box.dtype == np.uint8
+    assert box[3, 4, 0] == 240 // 3 // 3 and box[2, 3, 0] == box[3, 4, 0] and box[1, 4, 0] == 0
+    gaussian = smooth_image(image, SMOOTHING_KERNELS["Gaussian"])
+    assert gaussian[3, 4, 0] > gaussian[2, 4, 0] > gaussian[1, 4, 0] > 0
+
+    flat = np.full((5, 5), 77, dtype=np.uint8)
+    assert np.array_equal(smooth_image(flat, SMOOTHING_KERNELS["Gaussian"]), flat)
+
+
+def test_smoothing_applies_to_every_plugin_and_can_be_reset(window):
+    from spiny.gui.widgets import DataWidget
+
+    previous = window._plugin_list.currentText()
+    choices = [window._smoothing_list.itemText(i) for i in range(window._smoothing_list.count())]
+    assert choices[0] == "None" and {"Bilinear", "Box", "Gaussian"} <= set(choices)
+
+    window._smoothing_list.setCurrentText("Gaussian")
+    for name in [window._plugin_list.itemText(i) for i in range(window._plugin_list.count())]:
+        window._plugin_list.setCurrentText(name)
+        process_events()
+        plot = window._current_controller.widget
+        if isinstance(plot, DataWidget):
+            assert plot._imageItem._smoothing == "Gaussian", name
+
+    window._plugin_list.setCurrentText("Spectrogram")
+    process_events()
+    window.resetPluginConfiguration()
+    process_events()
+    assert window._smoothing_list.currentText() == "None"
+    assert window._current_controller.widget._imageItem._smoothing == "None"
+    window._plugin_list.setCurrentText(previous)
+
+
+@pytest.mark.parametrize("smoothing", ["Bilinear", "Box", "Gaussian"])
+def test_smoothing_changes_what_is_drawn(window, smoothing):
+    previous = window._plugin_list.currentText()
+    window._plugin_list.setCurrentText("Spectrogram")
+    window._visualisation_area._dock_wav.wav_plot.setXRange(0.5, 0.8, padding=0)
+    deadline = time.time() + 5
+    while time.time() < deadline and window._current_controller._running:
+        QtWidgets.QApplication.processEvents()
+    process_events()
+
+    def drawn():
+        image = window._current_controller.widget.grab().toImage().convertToFormat(QtGui.QImage.Format.Format_RGB32)
+        return bytes(image.constBits())
+
+    window._smoothing_list.setCurrentText("None")
+    process_events()
+    sharp = drawn()
+    window._smoothing_list.setCurrentText(smoothing)
+    process_events()
+    smooth = drawn()
+    window._smoothing_list.setCurrentText("None")
+    process_events()
+    assert smooth != sharp and drawn() == sharp
+    window._plugin_list.setCurrentText(previous)

@@ -69,6 +69,14 @@ The *Audio* tab has a parametric equalizer, and every change is heard at once.
 - **Change a band:** drag its handle for the frequency and the gain, and turn the wheel over it for the Q. The controls
   below the curve act on the selected band, and also set its type (bell, low shelf or high shelf).
 
+## Spectrogram and smoothing
+
+The *Method* of the spectrogram can be *Praat*: the plugin then computes what `To Spectrogram...` computes, with its
+defaults (5 ms Gaussian window, 2 ms step, 20 Hz frequency step), still only around the view.
+
+*Smoothing*, in the *General Data Visualization* group, applies to the image of any plugin once it is rendered: *None*,
+*Bilinear*, *Box* or *Gaussian*. Bilinear costs nothing; the two filters are applied each time the image is rendered.
+
 ## Overlays
 
 The *Overlay* tab lists what can be drawn over the current visualisation: tick an overlay to show it, select it to

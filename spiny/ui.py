@@ -22,6 +22,7 @@ import pkgutil
 from .gui.shortcuts import shortcut
 from .gui.colormaps import COLORMAP_NAMES, colormap_ticks
 from .gui.helpers.widgets import ExtendedComboBox
+from .gui.widgets import SMOOTHING_KERNELS
 from .core.wav.visualisation import WavDock
 from .core.wav import get_controller as get_audio_controller
 from .annotations.visualisation import AnnotationDock
@@ -71,6 +72,17 @@ class VisualisationArea(DockArea):
         """
         if self._dock_coef._data_plot is not None:
             self._dock_coef._data_plot.setTicks(colormap_ticks(cmap_name, inverse))
+
+    def updateSmoothing(self, smoothing: str) -> None:
+        """Smooth the data plot once it is rendered
+
+        Parameters
+        ----------
+        smoothing : str
+            The name of the strategy (one of spiny.gui.widgets.SMOOTHING_KERNELS)
+        """
+        if self._dock_coef._data_plot is not None:
+            self._dock_coef._data_plot.setSmoothing(smoothing)
 
     def selectPlugin(self, controller: DataController) -> None:
         """Extract the data of a plugin and show its widget in the data dock
@@ -258,6 +270,12 @@ class GUIVisu(QtWidgets.QMainWindow):
         general_box_layout.addWidget(self._cmap_list, 1, 1)
         general_box_layout.addWidget(QtWidgets.QLabel("Inverse"), 2, 0)
         general_box_layout.addWidget(self._inverse_cmap, 2, 1)
+        self._smoothing_list = QtWidgets.QComboBox()
+        self._smoothing_list.addItems(list(SMOOTHING_KERNELS))
+        self._smoothing_list.setToolTip("Smoothing of the image, once the plugin has rendered it")
+        self._smoothing_list.currentTextChanged.connect(self._visualisation_area.updateSmoothing)
+        general_box_layout.addWidget(QtWidgets.QLabel("Smoothing"), 3, 0)
+        general_box_layout.addWidget(self._smoothing_list, 3, 1)
         general_box = QtWidgets.QGroupBox("General Data Visualization")
         general_box.setLayout(general_box_layout)
 
@@ -367,6 +385,7 @@ class GUIVisu(QtWidgets.QMainWindow):
         panel_layout.addWidget(reset)
         self._control_layout.insertWidget(1, self._plugin_panel)
         self._visualisation_area.selectPlugin(controller)
+        self._visualisation_area.updateSmoothing(self._smoothing_list.currentText())
         self._overlay_panel.setVisualisation(controller, self._visualisation_area._dock_wav.wav_plot)
         self.selectColorMap(self._cmap_list.currentText(), self._inverse_cmap.isChecked())
 
@@ -377,6 +396,7 @@ class GUIVisu(QtWidgets.QMainWindow):
             controller.resetConfiguration()
             self._cmap_list.setCurrentIndex(0)
             self._inverse_cmap.setChecked(False)
+            self._smoothing_list.setCurrentIndex(0)
             self.selectPlugin(controller.name)
 
     def invertColorMap(self, inverse: bool) -> None:

@@ -134,6 +134,91 @@ def blocked_imports(*module_names: str) -> Iterator[None]:
                 del sys.modules[name]
 
 
+#: The smoothing strategies of an image, by name: the weights of the filter applied along each axis (None for no filter)
+SMOOTHING_KERNELS: dict[str, tuple[int, ...] | None] = {
+    "None": None,
+    "Bilinear": None,  # NOTE: done by the painter, when the image is drawn
+    "Box": (1, 1, 1),
+    "Gaussian": (1, 4, 6, 4, 1),
+}
+
+
+def smooth_image(image: np.ndarray, kernel: tuple[int, ...]) -> np.ndarray:
+    """Filter a rendered image along its two axes
+
+    Parameters
+    ----------
+    image : np.ndarray
+        The image, shape (height, width) or (height, width, nb_channels), dtype uint8
+    kernel : tuple(int)
+        The weights of the filter, of odd length
+
+    Returns
+    -------
+    np.ndarray
+        The filtered image, same shape and dtype; the edges are extended
+    """
+    half = len(kernel) // 2
+    total = sum(kernel)
+    result = image.astype(np.uint16)
+    for axis in (0, 1):
+        padding = [(half, half) if dimension == axis else (0, 0) for dimension in range(image.ndim)]
+        padded = np.pad(result, padding, mode="edge")
+        length = image.shape[axis]
+        result = np.zeros_like(result)
+        for i, weight in enumerate(kernel):
+            result += weight * padded.take(range(i, i + length), axis=axis)
+        result //= total
+    return result.astype(np.uint8)
+
+
+class SmoothedImageItem(pg.ImageItem):
+    """Image whose rendering (colours included) can be smoothed, whatever the plugin which provides the data"""
+
+    qimage: Any
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self._smoothing = "None"
+        self._smoothed: np.ndarray | None = None
+
+    def setSmoothing(self, smoothing: str) -> None:
+        """Change the smoothing
+
+        Parameters
+        ----------
+        smoothing : str
+            The name of the strategy, a key of `SMOOTHING_KERNELS`
+        """
+        self._smoothing = smoothing
+        self._renderRequired = True
+        self.update()
+
+    def render(self) -> None:
+        """Render the image, then smooth it"""
+        super().render()
+        kernel = SMOOTHING_KERNELS[self._smoothing]
+        if kernel is not None and self.qimage is not None:
+            # NOTE: in colours, as an image with a lookup table has indices, which cannot be averaged
+            colors = self.qimage.convertToFormat(QtGui.QImage.Format.Format_ARGB32)
+            # NOTE: the QImage only points to the array: it has to be kept alive as long as the image is drawn
+            self._smoothed = smooth_image(pg.functions.ndarray_from_qimage(colors), kernel)
+            self.qimage = pg.functions.ndarray_to_qimage(self._smoothed, QtGui.QImage.Format.Format_ARGB32)
+
+    def paint(self, painter: QtGui.QPainter, *args: Any) -> None:
+        """Draw the image
+
+        Parameters
+        ----------
+        painter : QtGui.QPainter
+            The painter
+        args : list
+            The style option and widget
+        """
+        painter.setRenderHint(QtGui.QPainter.RenderHint.SmoothPixmapTransform, self._smoothing == "Bilinear")
+        super().paint(painter, *args)
+
+
 class DataWidget(pg.GraphicsLayoutWidget):
     """Helper to define a Refined Data area visualisation
 
@@ -187,7 +272,7 @@ class DataWidget(pg.GraphicsLayoutWidget):
         # imageAxisOrder option is when the widget is created
         # NOTE: autoDownsample renders the image at screen resolution (a long recording has far more
         #       frames than pixels), so the rendered QImage stays small whatever the data size
-        self._imageItem = pg.ImageItem(axisOrder="col-major", autoDownsample=True)
+        self._imageItem = SmoothedImageItem(axisOrder="col-major", autoDownsample=True)
         self._plotItem.addItem(self._imageItem)
         self._plotItem.addItem(PlayheadLine(), ignoreBounds=True)
 
@@ -294,6 +379,16 @@ class DataWidget(pg.GraphicsLayoutWidget):
         """
         self._plotItem.setLimits(yMin=y_min, yMax=y_max, minYRange=0, maxYRange=y_max - y_min)
         self._plotItem.setYRange(y_min, y_max, padding=0)
+
+    def setSmoothing(self, smoothing: str) -> None:
+        """Smooth the image once it is rendered
+
+        Parameters
+        ----------
+        smoothing : str
+            The name of the strategy, a key of `SMOOTHING_KERNELS`
+        """
+        self._imageItem.setSmoothing(smoothing)
 
     def setTicks(self, ticks: Ticks) -> None:
         """Apply a colormap (it is kept when the data changes)
