@@ -71,8 +71,9 @@ The *Audio* tab has a parametric equalizer, and every change is heard at once.
 
 ## Spectrogram and smoothing
 
-The *Method* of the spectrogram can be *Praat*: the plugin then computes what `To Spectrogram...` computes, with its
-defaults (5 ms Gaussian window, 2 ms step, 20 Hz frequency step), still only around the view.
+The spectrogram computes what `To Spectrogram...` computes in Praat. The default values are Praat's (5 ms Gaussian window,
+5000 Hz, 2 ms step, 20 Hz frequency step), and the panel has a control for each of these parameters and for the window
+shape. Only the part around the view is computed.
 
 *Smoothing*, in the *General Data Visualization* group, applies to the image of any plugin once it is rendered: *None*,
 *Bilinear*, *Box* or *Gaussian*. Bilinear costs nothing; the two filters are applied each time the image is rendered.
