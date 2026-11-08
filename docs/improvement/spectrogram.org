@@ -153,6 +153,28 @@ visible duration ≤ maximum:   remove the message, compute and show the visible
 The same rule applies when the plugin is selected, when the view changes and when the slider moves. The
 message does not intercept the mouse, so the user can zoom in directly over it.
 
+* Replicating Praat
+
+With the method "Praat", the plugin computes what =Sound: To Spectrogram...= computes:
+
+#+begin_example
+physical width = 2 × effective width       the Gaussian window, zero at the edges: (exp(−48 φ²) − e⁻¹²) / (1 − e⁻¹²)
+time step      = max(time step, effective width / √π / 8)
+frames         = ⌊(duration − physical width) / time step⌋ + 1, centred in the signal
+FFT length     = power of 2, at least the window and 2 × bins × nyquist / maximum frequency
+bin            = ⌊frequency step × FFT length / rate⌋ FFT bins, whose powers are added
+power          = |FFT(frame × window)|² / (Σ window² × FFT bins per bin)
+#+end_example
+
+The frames are not always evenly spaced in samples (a 3.3 ms step, for instance), so each one is read from its own
+start. As for the standard method, only the frames around the view are computed. The levels are relative to the maximum
+of the whole analysis, as in the plugin "Spectrogram (Praat)": this maximum needs the analysis of the whole signal,
+once per file and settings (kept for the following analyses).
+
+Against parselmouth, on the same settings, the shape, the times and the frequency step are the same, and the values are
+the same within one 8-bit code (0.31 dB), the rounding of the two conversions. When the time step is not a whole
+number of samples, a frame falling exactly between two samples can start one sample away from Praat's (23 µs at 44.1 kHz).
+
 * Validation
 
 The tests check that:

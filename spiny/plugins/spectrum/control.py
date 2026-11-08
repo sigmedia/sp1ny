@@ -271,20 +271,30 @@ class SpectrumController(DataController):
         display_box.setLayout(display_layout)
 
         # Analysis: in the background, after a short delay
+        self._method = QtWidgets.QComboBox()
+        self._method.addItem("Standard", "standard")
+        self._method.addItem("Praat", "praat")
+        self._method.setToolTip("Praat: the analysis of Sound: To Spectrogram..., with its Gaussian window")
+        self._method.setCurrentIndex(self._method.findData(settings.method))
+        self._frequency_step = LabelledSlider(1, 200, int(settings.frequency_step), lambda v: f"{v} Hz")
         self._window = QtWidgets.QComboBox()
         self._window.addItems(list(WINDOWS))
         self._window.setCurrentText(settings.window)
         self._window_length = LabelledSlider(2, 100, int(settings.framelength), _describeWindowLength)
         self._time_step = LabelledSlider(1, 20, int(settings.frameshift), lambda v: f"{v} ms")
         self._max_duration = LabelledSlider(1, 600, self.max_duration, lambda v: f"{v} s")
+        self._method.currentIndexChanged.connect(self._onMethodChanged)
+        self._frequency_step.valueChanged.connect(self._scheduleAnalysis)
         self._window.currentTextChanged.connect(self._scheduleAnalysis)
         self._window_length.valueChanged.connect(self._scheduleAnalysis)
         self._time_step.valueChanged.connect(self._scheduleAnalysis)
         self._max_duration.valueChanged.connect(self._onMaxDurationChanged)
 
-        analysis_layout = QtWidgets.QFormLayout()
+        analysis_layout = self._analysis_layout = QtWidgets.QFormLayout()
         analysis_layout.setRowWrapPolicy(QtWidgets.QFormLayout.RowWrapPolicy.WrapAllRows)  # wider sliders
+        analysis_layout.addRow("Method", self._method)
         analysis_layout.addRow("Window", self._window)
+        analysis_layout.addRow("Frequency step", self._frequency_step)
         analysis_layout.addRow("Window length", self._window_length)
         analysis_layout.addRow("Time step", self._time_step)
         analysis_layout.addRow("Max visible duration", self._max_duration)
@@ -301,6 +311,7 @@ class SpectrumController(DataController):
         layout.addWidget(analysis_box)
         layout.addWidget(self._status)
         panel.addWidget(self._panel)
+        self._showMethodControls()
 
     def _panelSettings(self) -> SpectrogramSettings:
         """Read the analysis settings from the panel (the current ones if the panel does not exist)
@@ -312,12 +323,39 @@ class SpectrumController(DataController):
         """
         if not self._panelIsAlive():
             return self._extractor.settings
+        method = self._method.currentData()
+        # NOTE: the standard method keeps what has been analysed when the view gets narrower in frequency; Praat's bins
+        #       and maximum depend on the maximum frequency
+        max_frequency = self._max_frequency.value()
+        if method != "praat":
+            max_frequency = max(max_frequency, self._extractor.settings.max_frequency)
         return SpectrogramSettings(
             frameshift=self._time_step.value(),
             framelength=self._window_length.value(),
             window=self._window.currentText(),
-            max_frequency=max(self._max_frequency.value(), self._extractor.settings.max_frequency),
+            max_frequency=max_frequency,
+            method=method,
+            frequency_step=self._frequency_step.value(),
         )
+
+    def _showMethodControls(self) -> None:
+        """Show the controls which make sense for the method"""
+        praat = self._method.currentData() == "praat"
+        self._analysis_layout.setRowVisible(self._window, not praat)
+        self._analysis_layout.setRowVisible(self._frequency_step, praat)
+
+    def _onMethodChanged(self) -> None:
+        """Use the default values of the method: with the Praat method, the result is then the one of Praat"""
+        praat = self._method.currentData() == "praat"
+        self._showMethodControls()
+        self._window_length.setValue(5 if praat else 30)
+        self._time_step.setValue(2 if praat else 5)
+        self._frequency_step.setValue(20)
+        self._max_frequency.setValue(5000)
+        self._min_frequency.setValue(0)
+        self._max_level.setValue(0)
+        self._dynamic_range.setValue(70)
+        self._scheduleAnalysis()
 
     def _onMaxDurationChanged(self, value: int) -> None:
         """Change the longest visible range for which a spectrogram is computed

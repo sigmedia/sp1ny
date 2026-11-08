@@ -316,3 +316,86 @@ def test_small_pans_are_covered_by_the_margin(spectrogram):
     wav_plot.setXRange(41, 51, padding=0)
     wait_for_analysis(controller)
     assert not refreshes and controller._extractor.spectrogram is result
+
+
+PRAAT_CONFIGURATIONS = [
+    {},
+    {"framelength": 30.0, "frameshift": 5.0, "frequency_step": 10.0},
+    {"framelength": 5.0, "frameshift": 1.0, "max_frequency": 8000.0},
+    {"framelength": 10.0, "frameshift": 3.3, "max_frequency": 3000.0, "frequency_step": 50.0},
+]
+
+
+@pytest.mark.parametrize("configuration", PRAAT_CONFIGURATIONS)
+@pytest.mark.parametrize("rate", [16000, 44100])
+def test_praat_method_replicates_praat(player, configuration, rate):
+    parselmouth = pytest.importorskip("parselmouth")
+    from spiny.plugins.spectrum.extractor import SpectrogramSettings, compute_spectrogram
+
+    if rate == 16000:
+        signal = player.signal[:, 0]
+    else:
+        signal = np.random.default_rng(0).normal(0, 0.1, rate * 2).astype(np.float32)
+    defaults = {"framelength": 5.0, "frameshift": 2.0, "max_frequency": 5000.0, "frequency_step": 20.0}
+    values = {**defaults, **configuration}
+    slice_ = compute_spectrogram(signal, rate, SpectrogramSettings(method="praat", **values))
+
+    reference = parselmouth.Sound(signal.astype(np.float64), rate).to_spectrogram(
+        window_length=values["framelength"] / 1000,
+        maximum_frequency=values["max_frequency"],
+        time_step=values["frameshift"] / 1000,
+        frequency_step=values["frequency_step"],
+    )
+    power = reference.values.T
+    decibels = 10 * np.log10(np.maximum(power, 1e-30) / power.max())
+    expected = np.rint((np.clip(decibels, -80, 0) + 80) * 255 / 80)
+    assert slice_.codes.shape == power.shape
+    differences = np.abs(slice_.codes.astype(int) - expected)
+    if rate == 16000:
+        assert differences.max() <= 1
+    else:
+        # NOTE: when a frame falls exactly between two samples, the last bits of the time decide which one comes first
+        assert (differences <= 1).mean() > 0.97
+    assert slice_.start_time == pytest.approx(reference.x1 - reference.dx / 2)
+    assert slice_.frame_duration == pytest.approx(reference.dx)
+
+
+def test_visible_part_of_the_praat_method_is_the_same_as_the_whole(player):
+    from spiny.plugins.spectrum.extractor import SpectrogramSettings, compute_spectrogram
+
+    signal, rate = player.signal[:, 0], player.sampling_rate
+    settings = SpectrogramSettings(method="praat", framelength=5.0, frameshift=2.0)
+    whole = compute_spectrogram(signal, rate, settings)
+    part = compute_spectrogram(signal, rate, settings, 1.0, 2.0)
+    first = round((part.start_time - whole.start_time) / part.frame_duration)
+    assert np.array_equal(part.codes, whole.codes[first : first + part.codes.shape[0]])
+
+    # With the frames of a part given, the same frames come out
+    wider = compute_spectrogram(signal, rate, settings, 0.5, 2.5, part)
+    first = round((wider.start_time - whole.start_time) / wider.frame_duration)
+    assert np.array_equal(wider.codes, whole.codes[first : first + wider.codes.shape[0]])
+
+
+def test_praat_method_refuses_a_signal_shorter_than_its_window(player):
+    from spiny.plugins.spectrum.extractor import SpectrogramSettings, compute_spectrogram
+
+    with pytest.raises(ValueError, match="shorter"):
+        compute_spectrogram(np.zeros(10, dtype=np.float32), 16000, SpectrogramSettings(method="praat"))
+
+
+def test_panel_goes_to_the_defaults_of_praat(spectrogram):
+    controller, _, _ = spectrogram
+    controller._method.setCurrentIndex(controller._method.findData("praat"))
+    settings = controller._panelSettings()
+    assert (settings.method, settings.framelength, settings.frameshift) == ("praat", 5, 2)
+    assert settings.frequency_step == 20 and settings.max_frequency == 5000
+    assert controller._dynamic_range.value() == 70 and controller._max_level.value() == 0
+    assert not controller._analysis_layout.isRowVisible(controller._window)
+    assert controller._analysis_layout.isRowVisible(controller._frequency_step)
+    wait_for_analysis(controller)
+    assert controller._extractor.settings == settings
+
+    controller._method.setCurrentIndex(controller._method.findData("standard"))
+    assert controller._panelSettings().framelength == 30
+    assert controller._analysis_layout.isRowVisible(controller._window)
+    wait_for_analysis(controller)
