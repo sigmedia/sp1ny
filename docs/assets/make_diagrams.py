@@ -1,10 +1,9 @@
-"""Generate the SVG diagrams explaining the algorithms of the performance work
+"""Generate the SVG diagrams explaining the algorithms
 
 usage: python make_diagrams.py   (run from this directory; writes the *.svg files next to it)
 
-The diagrams are plain SVG written by hand, with the same palette as the result figures (make_figures.py):
-blue for the data that is kept or computed, orange for what is highlighted (the view, a selection), and
-neutral greys for the structure. Text uses neutral inks, never a series colour.
+The diagrams are plain SVG written by hand: blue for the data that is kept or computed, orange for what is highlighted
+(the view, a selection), and neutral greys for the structure. Text uses neutral inks, never a series colour.
 """
 
 from __future__ import annotations
@@ -240,7 +239,7 @@ def waveform_pyramid() -> str:
 
 
 def spectrogram_pipeline() -> str:
-    """Block-wise, multi-threaded STFT of the visible part, with an 8-bit quantization
+    """The analysis of Praat on the frames of the visible part, by blocks, with an 8-bit quantization
 
     Returns
     -------
@@ -248,7 +247,7 @@ def spectrogram_pipeline() -> str:
         The SVG document
     """
     width, height = 900, 450
-    body = [text(24, 30, "Spectrogram: only the visible frames, by blocks", 16, weight="bold")]
+    body = [text(24, 30, "Spectrogram: the analysis of Praat, only for the frames around the view", 16, weight="bold")]
 
     # Signal, visible range and its blocks of frames
     body.append(text(24, 62, "signal", 12, TEXT_SECONDARY))
@@ -260,10 +259,12 @@ def spectrogram_pipeline() -> str:
         x = view_x0 + i * block_w
         body.append(rect(x + 2, 100, block_w - 4, 18, BLUE_LIGHT, BLUE, radius=3))
         body.append(text(x + block_w / 2, 113, "128 frames", 11, TEXT, "middle"))
-    body.append(text(24, 138, "only the frames of the visible range are computed, by blocks", 11, TEXT_SECONDARY))
+    body.append(
+        text(24, 138, "only the frames of the view and of its margins are computed, by blocks", 11, TEXT_SECONDARY)
+    )
 
     # Worker threads
-    stages = ["frames (view, no copy)", "× window", "rFFT (n_fft)", "|X|  (float32)"]
+    stages = ["frame of the signal", "× window", "rFFT", "bins: sum of |X|²"]
     for lane in range(2):
         y = 158 + lane * 62
         body.append(text(24, y + 21, f"thread {lane + 1}", 12, TEXT))
@@ -290,10 +291,10 @@ def spectrogram_pipeline() -> str:
     body.append(line(24, 290, 876, 290, LIGHT, 1))
     body.append(text(24, 314, "quantization of a block", 12, TEXT, weight="bold"))
     body.append(rect(24, 328, 330, 54, ORANGE_LIGHT, ORANGE, radius=4))
-    body.append(text(189, 350, "R = peak(|x|) · sum(window) / 2", 11, TEXT, "middle"))
-    body.append(text(189, 367, "a sine at the peak of the whole signal: stable colours", 11, TEXT_SECONDARY, "middle"))
+    body.append(text(189, 350, "R = maximum power of the whole signal", 11, TEXT, "middle"))
+    body.append(text(189, 367, "computed once: the colours are stable", 11, TEXT_SECONDARY, "middle"))
     body.append(rect(394, 328, 482, 54, BLUE_LIGHT, BLUE, radius=4))
-    body.append(text(635, 350, "d = clip(20 · log10(|X| / R), −80, 0)", 11, TEXT, "middle"))
+    body.append(text(635, 350, "d = clip(10 · log10(power / R), −80, 0)", 11, TEXT, "middle"))
     body.append(text(635, 367, "code = round((d + 80) · 255 / 80)", 11, TEXT, "middle"))
     body.append(arrow(354, 355, 392, 355))
     body.append(
@@ -309,7 +310,7 @@ def spectrogram_pipeline() -> str:
         text(
             24,
             430,
-            "(128 × n_fft values). The display range only selects which codes map to the ends of the colormap.",
+            "(128 frames). The display range only selects which codes map to the ends of the colormap.",
             12,
             TEXT_SECONDARY,
         )
@@ -505,6 +506,112 @@ def playback_resampling() -> str:
     return svg(width, height + 6, body, "Block-wise resampling during playback")
 
 
+def overlay_chunks() -> str:
+    """The chunks of the tracks of an overlay around the view
+
+    Returns
+    -------
+    str
+        The SVG document
+    """
+    width, height = 900, 220
+    body = [text(24, 30, "Overlays: tracks by chunks of 5 s, around the view", 16, weight="bold")]
+    chunk_w, x0, y = 66, 24, 90
+    states = "..KKKRKKR....."  # K: kept, R: being analysed, .: not computed
+    for i, state in enumerate(states[:13]):
+        fill, stroke = {"K": (BLUE, BLUE), "R": (ORANGE_LIGHT, ORANGE), ".": (LIGHT, LINE)}[state]
+        body.append(rect(x0 + i * chunk_w + 2, y, chunk_w - 4, 34, fill, stroke, radius=3))
+    view_x, view_w = x0 + 4 * chunk_w, 3 * chunk_w
+    body.append(rect(view_x - 3, y - 7, view_w + 6, 48, "none", ORANGE, radius=4, dash="5 4"))
+    body.append(text(view_x + view_w / 2, y - 14, "view", 12, TEXT, "middle"))
+    body.append(line(view_x - view_w, y + 52, view_x + 2 * view_w, y + 52, LINE, 1.5))
+    body.append(
+        text(
+            view_x + view_w / 2,
+            y + 68,
+            "wanted: the view and one view width on each side",
+            12,
+            TEXT_SECONDARY,
+            "middle",
+        )
+    )
+    for i, (fill, stroke, label) in enumerate(
+        (
+            (BLUE, BLUE, "kept"),
+            (ORANGE_LIGHT, ORANGE, "being analysed, the closest to the view first"),
+            (LIGHT, LINE, "not computed"),
+        )
+    ):
+        x = 24 + [0, 90, 420][i]
+        body.append(rect(x, 190, 16, 16, fill, stroke, radius=2))
+        body.append(text(x + 24, 203, label, 12, TEXT))
+    return svg(width, height, body, "The chunks of the tracks of an overlay around the view")
+
+
+def equalizer_overlap_save() -> str:
+    """Overlap-save convolution of a block of the equalizer
+
+    Returns
+    -------
+    str
+        The SVG document
+    """
+    width, height = 900, 230
+    body = [text(24, 30, "Equalizer: overlap-save on the last 8192 samples", 16, weight="bold")]
+    body.append(text(24, 64, "buffer (8192 samples)", 12, TEXT_SECONDARY))
+    body.append(rect(24, 72, 760, 28, LIGHT, LINE, radius=3))
+    body.append(rect(784, 72, 92, 28, BLUE, BLUE, radius=3))
+    body.append(text(830, 91, "block", 12, SURFACE, "middle"))
+    for i, label in enumerate(("FFT(buffer)", "× G  (filter)", "inverse FFT")):
+        x = 120 + i * 230
+        body.append(rect(x, 130, 170, 36, BLUE_LIGHT, BLUE, radius=4))
+        body.append(text(x + 85, 153, label, 12, TEXT, "middle"))
+        if i:
+            body.append(arrow(x - 58, 148, x - 2, 148))
+    body.append(arrow(120 + 2 * 230 + 170, 148, 784, 148))
+    body.append(rect(786, 130, 90, 36, BLUE, BLUE, radius=4))
+    body.append(text(831, 153, "output", 12, SURFACE, "middle"))
+    body.append(
+        text(
+            24,
+            200,
+            "Only the last samples are valid: the others wrap around. A change of filter fades over one block.",
+            12,
+            TEXT_SECONDARY,
+        )
+    )
+    return svg(width, height, body, "Overlap-save convolution of a block of the equalizer")
+
+
+def locked_tiers() -> str:
+    """Moving a boundary in locked tiers
+
+    Returns
+    -------
+    str
+        The SVG document
+    """
+    width, height = 900, 250
+    body = [text(24, 30, "Locked tiers: aligned boundaries move together", 16, weight="bold")]
+    old_x, new_x = 430, 540
+    rows = (
+        ("tier a (locked)", 70, BLUE_LIGHT, True),
+        ("tier b (locked)", 120, BLUE_LIGHT, True),
+        ("tier c", 170, LIGHT, False),
+    )
+    for label, y, fill, locked in rows:
+        body.append(text(24, y + 23, label, 12, TEXT))
+        boundary = new_x if locked else old_x
+        body.append(rect(140, y, boundary - 140, 36, fill, BLUE if locked else LINE, radius=3))
+        body.append(rect(boundary, y, 740 - boundary, 36, fill, BLUE if locked else LINE, radius=3))
+        body.append(line(old_x, y - 4, old_x, y + 40, ORANGE, 1.5, dash="4 3"))
+        if locked:
+            body.append(arrow(old_x + 4, y + 18, new_x - 4, y + 18, ORANGE))
+    body.append(text(old_x, 226, "old time", 12, TEXT_SECONDARY, "middle"))
+    body.append(text(new_x, 226, "new time", 12, TEXT_SECONDARY, "middle"))
+    return svg(width, height, body, "Moving a boundary in locked tiers")
+
+
 def main() -> None:
     """Write the diagrams"""
     (HERE / "waveform_pyramid.svg").write_text(waveform_pyramid())
@@ -512,6 +619,9 @@ def main() -> None:
     (HERE / "visible_slice.svg").write_text(visible_slice())
     (HERE / "praat_chunks.svg").write_text(praat_chunks())
     (HERE / "playback_resampling.svg").write_text(playback_resampling())
+    (HERE / "overlay_chunks.svg").write_text(overlay_chunks())
+    (HERE / "equalizer_overlap_save.svg").write_text(equalizer_overlap_save())
+    (HERE / "locked_tiers.svg").write_text(locked_tiers())
 
 
 if __name__ == "__main__":

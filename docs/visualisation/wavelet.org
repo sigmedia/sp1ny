@@ -1,0 +1,21 @@
+#+TITLE: Wavelet plugin
+#+OPTIONS: toc:nil num:t
+
+Implementation: [[file:../../spiny/plugins/wavelet/extractor.py]], which relies on the optional
+=wavelet_prosody_toolkit=.
+
+The plugin shows the continuous wavelet transform of a prosodic contour, on frames of 5 ms:
+
+1. *Energy*: RMS energy in the 200–5000 Hz band, then smoothed by peak smoothing.
+2. *F0*: extracted between the minimum and the maximum F0 with the =inst_freq= tracker, then post-processed. If the
+   post-processing fails (no voiced frame, for instance), the raw F0 is used.
+3. *Combination* of the two contours, on their common frames:
+   #+begin_example
+   sum:      normalize_std(F0) × weight_F0 + normalize_std(energy) × weight_energy
+   product:  (normalize_minmax(F0) + weight_F0) × (normalize_minmax(energy) + weight_energy)
+   #+end_example
+   In a product, a null weight or a flat contour contributes 1.
+4. *Detrending* (=remove_bias=, 800) and normalization.
+5. *Wavelet transform*: Mexican hat, period 3, first frequency 32, 34 scales spaced by 0.25. The real part is displayed.
+
+The analysis covers the whole signal and runs when the plugin is selected or "Extract" is pressed.

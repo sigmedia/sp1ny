@@ -1,0 +1,61 @@
+#+TITLE: Sp1NY: the key algorithms
+#+OPTIONS: toc:nil num:nil
+
+Sp1NY shows a speech recording, what is computed from it, and its annotations, and stays interactive on long
+recordings. These documents explain how, by category and by plugin. The common idea is that *only what can be seen is
+computed or kept at full precision*: the screen has far fewer columns than a recording has samples.
+
+* Audio
+
+| Document                                  | Algorithms                                                                    |
+|-------------------------------------------+-------------------------------------------------------------------------------|
+| [[file:audio/playback.org][Loading and playback]]  | loading, block-wise resampling and speed, transport, real-time constraints    |
+| [[file:audio/equalizer.org][Parametric equalizer]] | biquads applied by FFT convolution, changes without clicks                    |
+
+* Rendering
+
+| Document                                     | Algorithms                                                                     |
+|----------------------------------------------+--------------------------------------------------------------------------------|
+| [[file:rendering/waveform.org][Waveform]]         | min/max pyramid, one segment per pixel column, playhead                        |
+| [[file:rendering/data-image.org][Data images]]   | visible slice with hysteresis, levels, colormaps, smoothing of the rendering   |
+
+* Visualisation plugins
+
+| Document                                                     | Algorithms                                               |
+|--------------------------------------------------------------+----------------------------------------------------------|
+| [[file:visualisation/spectrogram.org][Spectrogram]]                  | the analysis of Praat in numpy, on the visible part, live |
+| [[file:visualisation/spectrogram-praat.org][Spectrogram (Praat)]]    | parselmouth by chunks: the reference for debugging       |
+| [[file:visualisation/raw-data.org][Raw data]]                        | memory-mapped coefficients                               |
+| [[file:visualisation/wavelet.org][Wavelet]]                          | wavelet transform of a prosodic contour                  |
+
+* Overlay plugins
+
+| Document                                       | Algorithms                                                         |
+|------------------------------------------------+--------------------------------------------------------------------|
+| [[file:overlays/framework.org][Overlays]]           | which plugin supports what, tracks by chunks around the view       |
+| [[file:overlays/formants.org][Formants]]            | linear prediction on batches of frames                             |
+| [[file:overlays/f0.org][F0]]                        | normalized autocorrelation and path search                         |
+| [[file:overlays/mask.org][Mask]]                    | transparency mask from a numpy file                                |
+
+* Annotations
+
+| Document                                       | Algorithms                                                             |
+|------------------------------------------------+------------------------------------------------------------------------|
+| [[file:annotations/formats.org][Model and files]]   | the model, the three file formats, safe saving, unsaved changes        |
+| [[file:annotations/editing.org][Editing]]           | drawing the visible items, creation, locked tiers, undo and redo       |
+
+* Interface
+
+| Document                                        | Algorithms                                                            |
+|-------------------------------------------------+-----------------------------------------------------------------------|
+| [[file:interface/interface.org][Interface]]          | time axis, wheel, layout, theme, shortcuts and configuration, fields  |
+
+* Reproducing
+
+=assets/make_diagrams.py= generates the figures. =scripts/gen_data.py= generates long recordings with dense annotations,
+and =scripts/bench.py= measures the duration and the memory of a typical session on them:
+
+#+begin_src sh
+python docs/scripts/gen_data.py /tmp/spiny-data long 600
+BENCH_NO_WAVELET=1 python docs/scripts/bench.py /tmp/spiny-data long
+#+end_src

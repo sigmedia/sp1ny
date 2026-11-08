@@ -1,0 +1,50 @@
+#+TITLE: Interface
+#+OPTIONS: toc:nil num:t
+
+* Time axis
+
+Implementation: =TimeAxisItem= in [[file:../../spiny/core/wav/visualisation.py]].
+
+Ticks are placed on round values of time: the spacing is the first of 1, 2, 5, 10, 15, 30 s, 1, 2, 5, 10, 15, 30 min, 1, 2, 4,
+8 h, 1 day which leaves about 90 pixels per label (decimal spacings below 1 s). Each tick shows its unit: =45 s=, =2:30 min=,
+=1:02:30 h=, with the number of decimals the spacing needs.
+
+* Wheel and trackpad
+
+Implementation: =WheelViewBox= in [[file:../../spiny/gui/items.py]].
+
+Two fingers on a trackpad are a wheel with two directions. The dominant direction and the Shift key select the action in
+the configuration: =zoom=, =pan= (one notch moves the view by 10 % of its width) or =none=.
+
+* Layout
+
+Implementation: [[file:../../spiny/ui.py]].
+
+The plots and the control tabs are in a splitter without stretch factors, which shares a new size in proportion to the
+current ones: the ratio stays. The window has an explicit minimum size, otherwise the toolbars of one row would forbid a window
+narrower than all of them; when it gets narrower, the toolbars which do not fit go to a new row.
+
+* Theme
+
+Implementation: [[file:../../spiny/gui/theme.py]].
+
+Every colour and style sheet is in one place, and widgets ask for a colour by name. Those which cannot follow the palette have
+an =applyTheme= method, called on everything which exists, also the plots of hidden plugins, to switch the theme while running.
+
+* Shortcuts and configuration
+
+Implementation: [[file:../../spiny/gui/shortcuts.py]], [[file:../../spiny/config.py]], [[file:../../spiny/gui/shortcuts_dialog.py]].
+
+The code refers to an action by its name. The YAML file changes the themes, the shortcuts and the wheel, and a mistake is
+reported in the log and keeps the default. Two actions cannot share a shortcut, as Qt would trigger neither. The dialog applies
+the shortcuts at once, and writes those which are not the defaults in the configuration file, keeping its other settings.
+
+Buttons use =QShortcut= rather than =QAbstractButton.setShortcut=, which delays the click by 100 ms.
+
+* Editing the value of a slider
+
+Implementation: =LabelledSlider= in [[file:../../spiny/gui/helpers/widgets.py]].
+
+The text is parsed when the edition ends, not at each key, as a change can start an analysis: the first number is taken, with
+a comma or a dot, and a =k= right after it multiplies it by 1000. A slider with another scale converts this number to its own
+steps. A text which is not a number puts the value back.

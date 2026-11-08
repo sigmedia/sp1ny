@@ -1,0 +1,12 @@
+#+TITLE: Raw data plugin
+#+OPTIONS: toc:nil num:t
+
+Implementation: [[file:../../spiny/raw_data/extractor.py]].
+
+The plugin shows precomputed coefficients from a headerless binary file of float32 values.
+
+- The dimension gives the layout: −d means frames of d values (shape (−1, d)), +d means d tracks one after the other
+  (shape (d, −1)). The file size must be a multiple of the dimension.
+- The file is memory-mapped: its pages are read when displayed, and the system can drop them under memory pressure. With
+  the [[file:../rendering/data-image.org][visible slice]], only what is displayed of a large file is read.
+- A frame i covers [i, i + 1) × frameshift on the time axis.

@@ -1,0 +1,43 @@
+#+TITLE: F0 overlay
+#+OPTIONS: toc:nil num:t
+
+Implementation: [[file:../../spiny/overlays/f0/extractor.py]].
+
+The normalized autocorrelation of P. Boersma (1993), the method of Praat.
+
+* Candidates
+
+#+begin_example
+window = Hanning of 3 periods of the lowest F0
+a(τ)   = autocorrelation(frame × window) / autocorrelation(window)       by FFT, normalized at τ = 0
+#+end_example
+
+Dividing by the autocorrelation of the window removes the decay due to the window: a periodic signal gets close to 1 at
+its period. Only the band up to 4 times the highest F0 is kept before the inverse FFT, which makes it much smaller, and a
+parabola through the three points around each peak gives the period precisely.
+
+Each frame keeps its 6 best peaks, and one candidate "unvoiced":
+
+#+begin_example
+voiced strength   = height − 0.01 × log2(lowest F0 × period)
+unvoiced strength = voicing threshold + max(2 − relative peak × (1 + voicing threshold) / silence threshold, 0)
+#+end_example
+
+* Path search
+
+A Viterbi search finds the best path through the candidates. A jump costs 0.35 per octave and a change between voiced and
+unvoiced 0.14, for a 10 ms step (these costs are scaled by 10 ms / time step, as more frames mean less per frame). Choosing
+the best peak of each frame alone gives many more octave errors.
+
+To join the chunks, each one is computed with 25 more frames on each side.
+
+| Parameter         | Default |
+|-------------------+---------|
+| Time step         | 5 ms    |
+| Minimum F0        | 75 Hz   |
+| Maximum F0        | 500 Hz  |
+| Voicing threshold | 0.45    |
+| Silence threshold | 0.03    |
+
+The median difference with Praat is 0.14 Hz on the voiced frames of the example recordings, with gross errors on at most
+0.2 % of them.

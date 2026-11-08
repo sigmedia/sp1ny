@@ -1,0 +1,37 @@
+#+TITLE: Formants overlay
+#+OPTIONS: toc:nil num:t
+
+Implementation: [[file:../../spiny/overlays/formants/extractor.py]].
+
+numpy has no linear prediction, so everything is computed on a whole batch of frames at once:
+
+#+begin_example
+P(f)  = |FFT(frame × Hamming window)|² × pre-emphasis (+6 dB per octave above 50 Hz), up to the maximum frequency
+r     = inverse FFT of P                    the autocorrelation of the signal limited to this band
+R a   = −r[1..p]                            the normal equations, one small linear system per frame
+z     = eigenvalues of the companion matrix of a     the roots of the prediction polynomial
+F     = angle(z) × Fmax / π                 for the roots with a positive imaginary part
+B     = −log|z| × 2 Fmax / π
+#+end_example
+
+Limiting the power spectrum to the band avoids resampling the signal. =numpy.linalg.solve= and =numpy.linalg.eigvals= work
+on batches of matrices and release the interpreter. The order p is twice the number of formants, as in Praat, and a little
+noise (10⁻⁶ of r[0]) keeps the equations well conditioned.
+
+Resonances are numbered by frequency before the wide ones are hidden: otherwise, a wide F2 would make F3 appear as F2.
+Frames quieter than the silence level (40 dB below the peak of the signal by default) have no formants.
+
+| Parameter          | Default |
+|--------------------+---------|
+| Time step          | 5 ms    |
+| Window length      | 25 ms   |
+| Maximum frequency  | 5500 Hz |
+| Number of formants | 5       |
+| Silence level      | 40 dB   |
+| Maximum bandwidth  | 700 Hz  |
+
+The median difference with Praat is 4 Hz on F1, 5 to 8 Hz on F2 and 9 to 12 Hz on F3, on the example recordings.
+
+Formants are numbered in each frame, without tracking across frames: when a resonance appears or disappears, the following
+ones change number for these frames, as in Praat. On very clean signals with a high F0, linear prediction pulls F1 towards
+a harmonic, as in Praat.

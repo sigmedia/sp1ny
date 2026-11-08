@@ -1,0 +1,30 @@
+#+TITLE: Annotation model and files
+#+OPTIONS: toc:nil num:t
+
+Implementation: [[file:../../spiny/annotations/model.py]] and [[file:../../spiny/annotations/io]].
+
+* The model
+
+An =AnnotationSet= holds tiers in display order (name → annotations sorted by start time), the hidden tiers and the locked
+ones. =Segment= and =Annotation= use =__slots__=, which matters with tens of thousands of annotations.
+
+* The formats
+
+| Format   | Details                                                                                       |
+|----------+-----------------------------------------------------------------------------------------------|
+| HTK      | one tier, times in units of 100 ns; an absent end time is the start of the next line           |
+| TextGrid | through =tgt=, in UTF-8 or UTF-16; empty tiers are ignored                                     |
+| JSON     | tiers, hidden tiers and a format version                                                       |
+
+Full-context HTK labels are kept in the model and in the files; only the display shortens them to their monophone
+(~x^y-a+b=c~ shows ~a~). An HTK file holds one tier: saving several asks first.
+
+* Safe saving
+
+Annotations are written to a temporary file, which then replaces the target: a failure cannot damage the existing file. A
+symbolic link stays a link, and the permissions are kept.
+
+* Unsaved changes
+
+The contents at the last load or save (times, labels, tier order, hidden tiers) are kept and compared with the current
+ones when closing or loading another file, which asks whether to save.

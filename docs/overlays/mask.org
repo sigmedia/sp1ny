@@ -1,0 +1,22 @@
+#+TITLE: Mask overlay
+#+OPTIONS: toc:nil num:t
+
+Implementation: [[file:../../spiny/overlays/mask/extractor.py]] and [[file:../../spiny/overlays/mask/__init__.py]].
+
+The coefficients of a numpy file (.npy), between 0 and 1, are the opacity of the spectrogram. An image above the
+spectrogram hides it with the colour of the background:
+
+#+begin_example
+alpha = (1 − opacity) × strength                    (opacity × strength when inverted)
+#+end_example
+
+which looks the same as making the spectrogram transparent, and leaves it alone.
+
+The file must contain a matrix of numbers between 0 and 1; anything else is refused and the current mask stays. Pickled data
+is never read, so a file cannot run code when it is read.
+
+The file is memory-mapped and only read for what is drawn. The image has the resolution of the plot: the frames and bins
+between two pixels are skipped. It covers the view and half a view on each side, so a small pan does not touch it.
+
+By default, the rows of the file are the frames, the mask spans the whole signal, and its bins go up to half of the sampling
+rate. The time between two frames and the frequency of the last bin can be given instead.
