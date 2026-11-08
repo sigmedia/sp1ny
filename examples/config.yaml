@@ -31,6 +31,8 @@ shortcuts:
   remove_tier: Ctrl+Shift+R
   add_annotation: Ctrl+N
   toggle_tier_lock: Ctrl+L
+  undo: Ctrl+Z
+  redo: Ctrl+Shift+Z
   delete_annotation: Delete
 wheel:
   wheel_up_down: zoom

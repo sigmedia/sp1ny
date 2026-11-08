@@ -66,7 +66,12 @@ class AnnotationDock(Dock):
 
         self._model: AnnotationSet | None = None
 
-    def setModel(self, model: AnnotationSet, handle_edit_segment: Callable[[AnnotationItem | None], None]) -> None:
+    def setModel(
+        self,
+        model: AnnotationSet,
+        handle_edit_segment: Callable[[AnnotationItem | None], None],
+        handle_changed: Callable[[], None] | None = None,
+    ) -> None:
         """Define the annotations to render and render them
 
         Parameters
@@ -75,9 +80,12 @@ class AnnotationDock(Dock):
             The annotation set
         handle_edit_segment : callable
             Function called with the annotation item to select (or None to clear the selection)
+        handle_changed : callable, optional
+            Function called when an operation on the annotations has ended. (default: None)
         """
         self._model = model
         self._handle_segment = handle_edit_segment
+        self._handle_changed = handle_changed
         self.plotAnnotation()
 
     def plotAnnotation(self) -> None:
@@ -94,6 +102,7 @@ class AnnotationDock(Dock):
                 model=self._model,
                 handle_segment=self._handle_segment,
                 handle_moves=partial(self.moveAlignedBoundaries, k),
+                handle_changed=self._handle_changed,
             )
             annotation_plot.getAxis("left").setLabel(k)
 
@@ -188,6 +197,7 @@ class TierPlot(pg.PlotWidget):
         model: AnnotationSet | None = None,
         handle_segment: Callable[[AnnotationItem | None], None],
         handle_moves: Callable[[list[tuple[float, float]]], None] | None = None,
+        handle_changed: Callable[[], None] | None = None,
         **kwargs: Any,
     ) -> None:
         assert model is not None
@@ -196,6 +206,7 @@ class TierPlot(pg.PlotWidget):
         self._model = model
         self._handle_segment = handle_segment
         self._handle_moves = handle_moves
+        self._handle_changed = handle_changed
         self.applyTheme()
         self.scene().sigMouseClicked.connect(self.mouse_clicked)
         self._start_time: float | None = None
@@ -231,10 +242,39 @@ class TierPlot(pg.PlotWidget):
         self._model.annotations.setdefault(self._tier_name, []).append(annotation)
         self._model.annotations[self._tier_name].sort(key=lambda x: x.start_time)
 
-        item = AnnotationItem(annotation, True, self._handle_segment, self._handle_moves)
-        self.addItem(item)
+        item = self._createItem(annotation)
         self._items[id(annotation)] = item
         item.requestSelection()
+        self._notifyChanged()
+
+    def _createItem(self, annotation: Annotation) -> AnnotationItem:
+        """Draw an annotation
+
+        Parameters
+        ----------
+        annotation : Annotation
+            The annotation
+
+        Returns
+        -------
+        AnnotationItem
+            The item, already in the plot
+        """
+        item = AnnotationItem(annotation, True, self._handle_segment, self._handle_moves)
+        item.sigRegionChangeFinished.connect(self._notifyChanged)
+        self.addItem(item)
+        return item
+
+    def _notifyChanged(self, *args: Any) -> None:
+        """Report the end of an operation on the annotations
+
+        Parameters
+        ----------
+        args : list
+            The arguments of the signal (unused)
+        """
+        if self._handle_changed is not None:
+            self._handle_changed()
 
     def moveBoundaries(self, moves: list[tuple[float, float]]) -> None:
         """Move the boundaries of this tier which are aligned with moved ones
@@ -295,11 +335,7 @@ class TierPlot(pg.PlotWidget):
         # Add the newly visible ones
         for key, an in visible.items():
             if key not in self._items:
-                region = AnnotationItem(
-                    an, showLabel=True, handle_edit=self._handle_segment, handle_moves=self._handle_moves
-                )
-                self.addItem(region)
-                self._items[key] = region
+                self._items[key] = self._createItem(an)
 
     def keyPressEvent(self, event: QtGui.QKeyEvent) -> None:
         """Delete the selected annotation on its shortcut, otherwise use the default behaviour
@@ -331,6 +367,7 @@ class TierPlot(pg.PlotWidget):
             if an is item._segment:
                 del tier[i]
                 break
+        self._notifyChanged()
 
     def mouse_clicked(self, ev: MouseClickEvent) -> None:
         """Move the playhead to a left click in an empty area of the tier; two of them create an annotation

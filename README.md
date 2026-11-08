@@ -59,6 +59,7 @@ spiny -w examples/arctic_as.wav -c examples/arctic_as.neur -d -50 -f 6.4
 | Mute | `M` | | Delete the selected annotation | `Delete` |
 | Add a tier | `Ctrl+Shift+T` | | Remove the selected tiers | `Ctrl+Shift+R` |
 | Add an annotation | `Ctrl+N` | | Lock or unlock the selected tiers | `Ctrl+L` |
+| Undo | `Ctrl+Z` | | Redo | `Ctrl+Shift+Z` |
 
 A click on a plot moves the playhead. Changing the speed also changes the pitch, as on a tape.
 
@@ -88,6 +89,8 @@ selected annotation.
 
 Select tiers in the list and press the lock button to lock them: moving a boundary in a locked tier then moves the
 boundaries at the same time (within 1 ms) in the other locked tiers, also while dragging. Locks are not saved.
+
+Undo and redo cover every operation on the tiers and the annotations, up to the last 100.
 
 ## Overlays
 

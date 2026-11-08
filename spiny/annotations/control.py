@@ -17,7 +17,7 @@ from ..gui.icons import ToolBarButton, transport_icon
 from ..gui.helpers.widgets import CompactList
 from ..gui.widgets import CollapsibleBox
 from .io import AnnotationSerialiser
-from .model import AnnotationSet
+from .model import Annotation, AnnotationSet
 from .visualisation import AnnotationDock, AnnotationItem
 from .io.htk_lab import HTKLabelSerialiser
 from .io.textgrid import TextGridSerialiser
@@ -133,11 +133,22 @@ class AnnotationToolBar(QtWidgets.QWidget):
                 controller.removeCurrentAnnotation,
             ),
             ("lock", "Lock or unlock the selected tiers", "toggle_tier_lock", controller.toggleTierLock),
+            ("undo", "Undo", "undo", controller.undo),
+            ("redo", "Redo", "redo", controller.redo),
         ):
             button = ToolBarButton(icon, tooltip, action)
             button.clicked.connect(slot)
             layout.addWidget(button)
             self.buttons[icon] = button
+
+        self._controller = controller
+        controller.historyChanged.connect(self._showHistory)
+        self._showHistory()
+
+    def _showHistory(self) -> None:
+        """Enable the undo and redo buttons when they can do something"""
+        self.buttons["undo"].setEnabled(self._controller.can_undo)
+        self.buttons["redo"].setEnabled(self._controller.can_redo)
 
 
 class QLabelClickable(QtWidgets.QLabel):
@@ -168,12 +179,17 @@ class ControlLayout(QtWidgets.QVBoxLayout):
         The parent widget
     """
 
+    #: Emitted when what can be undone or redone changes
+    historyChanged = QtCore.Signal()
+
     def __init__(self, parent: QtWidgets.QWidget | None) -> None:
         super().__init__(parent)
 
         # View and model
         self._model: AnnotationSet = AnnotationSet({}, set())
         self._saved_contents = self._contents()
+        self._undo_stack = [self._snapshot()]  # NOTE: the last one is the current state
+        self._redo_stack: list[Any] = []
         self._view: AnnotationDock | None = None
         self._list_registered_modules = _registered_modules
 
@@ -232,6 +248,74 @@ class ControlLayout(QtWidgets.QVBoxLayout):
             for name, annotations in self._model.annotations.items()
         ]
         return tiers, set(self._model.ignored)
+
+    def _snapshot(self) -> tuple[list, set[str], set[str]]:
+        """Give everything which can be undone
+
+        Returns
+        -------
+        list
+            The (name, [(start time, end time, label), ...]) of each tier, in display order
+        set(str)
+            The names of the hidden tiers
+        set(str)
+            The names of the locked tiers
+        """
+        return (*self._contents(), set(self._model.locked))
+
+    @property
+    def can_undo(self) -> bool:
+        """bool: True if there is an operation to undo"""
+        return len(self._undo_stack) > 1
+
+    @property
+    def can_redo(self) -> bool:
+        """bool: True if there is an operation to redo"""
+        return bool(self._redo_stack)
+
+    def commit(self) -> None:
+        """Record the current state if an operation has changed it (to be called at the end of each operation)"""
+        snapshot = self._snapshot()
+        previous = self._undo_stack[-1]
+        if snapshot == previous:
+            return
+        # NOTE: the tiers which have not changed share their memory with the previous state
+        unchanged = dict(previous[0])
+        tiers = [(name, unchanged[name] if unchanged.get(name) == values else values) for name, values in snapshot[0]]
+        self._undo_stack.append((tiers, snapshot[1], snapshot[2]))
+        del self._undo_stack[: -MAX_UNDO_STEPS - 1]
+        self._redo_stack.clear()
+        self.historyChanged.emit()
+
+    def undo(self) -> None:
+        """Undo the last operation"""
+        self.commit()  # NOTE: a label being typed is an operation too
+        if self.can_undo:
+            self._redo_stack.append(self._undo_stack.pop())
+            self._restore(self._undo_stack[-1])
+
+    def redo(self) -> None:
+        """Redo the last operation which has been undone"""
+        self.commit()
+        if self.can_redo:
+            self._undo_stack.append(self._redo_stack.pop())
+            self._restore(self._undo_stack[-1])
+
+    def _restore(self, snapshot: tuple[list, set[str], set[str]]) -> None:
+        """Go back to a recorded state
+
+        Parameters
+        ----------
+        snapshot : tuple
+            The state, see `_snapshot`
+        """
+        tiers, ignored, locked = snapshot
+        self._model.annotations = {name: [Annotation(*values) for values in annotations] for name, annotations in tiers}
+        self._model.ignored = set(ignored)
+        self._model.locked = set(locked)
+        self.resetView()
+        self.updateTierList()
+        self.historyChanged.emit()
 
     def confirmDiscardChanges(self) -> bool:
         """If there are unsaved annotations, ask whether to save them, to discard them or to cancel
@@ -353,6 +437,7 @@ class ControlLayout(QtWidgets.QVBoxLayout):
                 self.view.tiers_dict[item.text()].setVisible(not item.isTierHidden())
 
             item.setSelected(False)
+        self.commit()
 
     def _update_order(self) -> None:
         """Reorder the tiers of the model as in the list (after a drag and drop) and redraw them"""
@@ -365,6 +450,7 @@ class ControlLayout(QtWidgets.QVBoxLayout):
         self._model.annotations = new_order
 
         self.resetView()
+        self.commit()
 
     def _remove_tiers(self) -> None:
         """Remove the selected tiers from the model and the list, and redraw the tiers"""
@@ -383,6 +469,7 @@ class ControlLayout(QtWidgets.QVBoxLayout):
             self._list_tiers_widget.takeItem(idx)
 
         self.resetView()
+        self.commit()
 
     def toggleTierLock(self) -> None:
         """Unlock the selected tiers if they are all locked, otherwise lock them"""
@@ -399,6 +486,7 @@ class ControlLayout(QtWidgets.QVBoxLayout):
             item.setSelected(False)
             if self.view is not None:
                 self.view.tiers_dict[item.text()].applyTheme()
+        self.commit()
 
     def removeSelectedTiers(self) -> None:
         """Remove the tiers selected in the list"""
@@ -482,6 +570,7 @@ class ControlLayout(QtWidgets.QVBoxLayout):
         item.setText(tier_name)
         self.resetView()
         self._list_tiers_widget.addItem(item)
+        self.commit()
 
     def _generate_general_box(self) -> QtWidgets.QGroupBox:
         """Create the box editing the boundaries and the label of the selected annotation
@@ -514,6 +603,7 @@ class ControlLayout(QtWidgets.QVBoxLayout):
         l3 = QtWidgets.QLabel("Label")
         self._wLabel = QtWidgets.QLineEdit("<unknown>")
         self._wLabel.textEdited.connect(self.onLabelEdited)
+        self._wLabel.editingFinished.connect(self.commit)
         annotation_info_box_layout.addWidget(l3, 3, 0)
         annotation_info_box_layout.addWidget(self._wLabel, 3, 1)
 
@@ -669,6 +759,8 @@ class ControlLayout(QtWidgets.QVBoxLayout):
         if self._current_annotation is new_annotation:
             return
 
+        self.commit()  # NOTE: a label typed without leaving its field ends here
+
         # If there is already a selected annotation => unselect it
         if self._current_annotation is not None:
             self._current_annotation.setSelectedState(False)
@@ -705,6 +797,7 @@ class ControlLayout(QtWidgets.QVBoxLayout):
             old_start, old_end = segment.start_time, segment.end_time
             self._current_annotation.setBounds(start_time, end_time)
             self._current_annotation.reportMoves(old_start, old_end)
+            self.commit()
         else:
             self._wStartTime.setText(f"{segment.start_time:.4f}")
             self._wEndTime.setText(f"{segment.end_time:.4f}")
@@ -723,6 +816,7 @@ class ControlLayout(QtWidgets.QVBoxLayout):
             The symbol
         """
         self._wLabel.insert(ipa_symbol)
+        self.commit()
 
     def updateTierList(self) -> None:
         """Fill the tier list from the model (hidden tiers are highlighted)"""
@@ -755,6 +849,9 @@ class ControlLayout(QtWidgets.QVBoxLayout):
         """
         self._model = annotation_model
         self._saved_contents = self._contents()
+        self._undo_stack = [self._snapshot()]
+        self._redo_stack = []
+        self.historyChanged.emit()
         self.resetView()
         self.updateTierList()
 
@@ -783,11 +880,14 @@ class ControlLayout(QtWidgets.QVBoxLayout):
         if self._view is not None:
             self.update_current_annotation(None)  # The selected item is destroyed with its tier
             self._view.clear()
-            self._view.setModel(self._model, self.update_current_annotation)
+            self._view.setModel(self._model, self.update_current_annotation, self.commit)
 
 
 #: The duration of an annotation added from the playhead, in seconds
 DEFAULT_ANNOTATION_DURATION = 0.2
+
+#: The number of operations which can be undone
+MAX_UNDO_STEPS = 100
 
 _controller: ControlLayout | None = None
 

@@ -1528,3 +1528,205 @@ def test_toolbar_adds_a_tier(window, two_locked_tiers, monkeypatch):
     monkeypatch.setattr(QtWidgets.QInputDialog, "getText", lambda *a, **k: ("new", True))
     toolbar_of(window).buttons["add_tier"].click()
     assert "new" in controller.model.annotations and "new" in controller.view.tiers_dict
+
+
+@pytest.fixture
+def history(window):
+    """Tiers a and b, with a clean history; the view shows them"""
+    from spiny.annotations import get_controller
+    from spiny.annotations.model import Annotation, AnnotationSet
+
+    def tier():
+        return [Annotation(0.2, 0.5, "x"), Annotation(0.5, 0.9, "y")]
+
+    controller = get_controller()
+    controller.setAnnotationModel(AnnotationSet({"a": tier(), "b": tier()}, set()))
+    window._visualisation_area._dock_wav.wav_plot.setXRange(0, 1, padding=0)
+    process_events()
+    yield controller
+    controller.setAnnotationModel(AnnotationSet({}, set()))
+
+
+def state(controller):
+    return controller._snapshot()
+
+
+def check_undo_redo(controller, operation):
+    """The operation is one step, which undo removes and redo brings back"""
+    before = state(controller)
+    operation()
+    process_events()
+    after = state(controller)
+    assert after != before
+    assert len(controller._undo_stack) == 2
+    controller.undo()
+    process_events()
+    assert state(controller) == before and controller.can_redo
+    controller.redo()
+    process_events()
+    assert state(controller) == after and not controller.can_redo
+
+
+def test_undo_adding_a_tier(window, history, monkeypatch):
+    monkeypatch.setattr(QtWidgets.QInputDialog, "getText", lambda *a, **k: ("new", True))
+    check_undo_redo(history, history._add_tier)
+    assert "new" in history.view.tiers_dict
+    assert [history._list_tiers_widget.item(r).text() for r in range(3)] == ["a", "b", "new"]
+
+
+def test_undo_removing_a_tier(history):
+    def remove():
+        history._list_tiers_widget.item(0).setSelected(True)
+        history.removeSelectedTiers()
+
+    check_undo_redo(history, remove)
+
+
+def test_undo_hiding_and_locking_tiers(history):
+    def hide():
+        history._list_tiers_widget.item(0).setSelected(True)
+        history._toggle_tier()
+
+    check_undo_redo(history, hide)
+    assert not history.view.tiers_dict["a"].isVisibleTo(history.view) and "a" in history.model.ignored
+    history.undo()
+    assert history.view.tiers_dict["a"].isVisibleTo(history.view)
+
+    history.setAnnotationModel(type(history.model)(dict(history.model.annotations), set()))
+
+    def lock():
+        history._list_tiers_widget.item(0).setSelected(True)
+        history.toggleTierLock()
+
+    check_undo_redo(history, lock)
+    assert not history._list_tiers_widget.item(0).icon().isNull()
+
+
+def test_undo_reordering_tiers(history):
+    def reorder():
+        widget = history._list_tiers_widget
+        item = widget.takeItem(0)
+        widget.addItem(item)
+        history._update_order()
+
+    check_undo_redo(history, reorder)
+    assert list(history.model.annotations) == ["b", "a"]
+    history.undo()
+    assert list(history.model.annotations) == ["a", "b"]
+
+
+def test_undo_adding_and_removing_annotations(window, history):
+    from spiny.core import player
+
+    player.seek(0.05)
+    check_undo_redo(history, history.addAnnotation)
+    player.seek(0.0)
+    history.update_current_annotation(rendered(history, "a", 1))
+
+    before = len(history._undo_stack)
+    history.removeCurrentAnnotation()
+    assert len(history._undo_stack) == before + 1
+    history.undo()
+    assert len(history.model.annotations["a"]) == 3
+
+
+def test_a_drag_is_one_step_and_includes_the_locked_tiers(window, history):
+    for row in (0, 1):
+        history._list_tiers_widget.item(row).setSelected(True)
+    history.toggleTierLock()
+    before = len(history._undo_stack)
+
+    item = rendered(history, "a", 0)
+    for position in (0.52, 0.55, 0.6):
+        item.lines[1].setValue(position)  # several mouse events
+    item.lineMoveFinished()
+    assert len(history._undo_stack) == before + 1
+    assert history.model.annotations["b"][0].end_time == pytest.approx(0.6)
+
+    history.undo()
+    assert bounds(history, "a") == [(0.2, 0.5), (0.5, 0.9)] and bounds(history, "b") == [(0.2, 0.5), (0.5, 0.9)]
+    assert rendered(history, "a", 0).lines[1].value() == pytest.approx(0.5)
+
+
+def test_undo_typing_a_time(history):
+    def edit():
+        history.update_current_annotation(rendered(history, "a", 0))
+        history._wEndTime.setText("0.45")
+        history.onTimeEdited()
+
+    check_undo_redo(history, edit)
+
+
+def test_a_typed_label_is_one_step(history):
+    from pyqtgraph.Qt import QtTest
+
+    history.update_current_annotation(rendered(history, "a", 0))
+    before = len(history._undo_stack)
+    QtTest.QTest.keyClicks(history._wLabel, "abc")
+    assert len(history._undo_stack) == before  # nothing yet while typing
+    QtTest.QTest.keyClick(history._wLabel, QtCore.Qt.Key.Key_Return)
+    assert len(history._undo_stack) == before + 1 and history.model.annotations["a"][0].label == "xabc"
+    history.undo()
+    assert history.model.annotations["a"][0].label == "x"
+
+
+def test_label_being_typed_is_undone_too(history):
+    from pyqtgraph.Qt import QtTest
+
+    history.update_current_annotation(rendered(history, "a", 0))
+    QtTest.QTest.keyClicks(history._wLabel, "z")
+    history.undo()  # no Enter before
+    assert history.model.annotations["a"][0].label == "x"
+
+
+def test_a_new_operation_forgets_what_could_be_redone(window, history):
+    history.model.annotations["a"][0].label = "changed"
+    history.commit()
+    history.undo()
+    assert history.can_redo
+    history.model.annotations["a"][0].label = "other"
+    history.commit()
+    assert not history.can_redo
+
+
+def test_history_is_limited_and_forgets_on_load(history):
+    from spiny.annotations.control import MAX_UNDO_STEPS
+    from spiny.annotations.model import Annotation, AnnotationSet
+
+    for index in range(MAX_UNDO_STEPS + 20):
+        history.model.annotations["a"][0].label = str(index)
+        history.commit()
+    assert len(history._undo_stack) == MAX_UNDO_STEPS + 1
+
+    history.setAnnotationModel(AnnotationSet({"t": [Annotation(0, 1, "x")]}, set()))
+    assert not history.can_undo and not history.can_redo
+
+
+def test_unchanged_tiers_share_their_memory(history):
+    history.model.annotations["a"][0].label = "changed"
+    history.commit()
+    previous, current = history._undo_stack[-2], history._undo_stack[-1]
+    assert dict(previous[0])["b"] is dict(current[0])["b"]
+    assert dict(previous[0])["a"] is not dict(current[0])["a"]
+
+
+def test_undo_back_to_the_saved_state_has_nothing_to_save(window, history, monkeypatch):
+    asked = []
+    monkeypatch.setattr(QtWidgets.QMessageBox, "question", lambda *a, **k: asked.append(a))
+    history.model.annotations["a"][0].label = "changed"
+    history.commit()
+    history.undo()
+    assert history.confirmDiscardChanges() and not asked
+
+
+def test_undo_buttons_follow_the_history(window, history):
+    bar = toolbar_of(window)
+    assert not bar.buttons["undo"].isEnabled() and not bar.buttons["redo"].isEnabled()
+    history.model.annotations["a"][0].label = "changed"
+    history.commit()
+    assert bar.buttons["undo"].isEnabled() and not bar.buttons["redo"].isEnabled()
+    bar.buttons["undo"].click()
+    assert history.model.annotations["a"][0].label == "x"
+    assert not bar.buttons["undo"].isEnabled() and bar.buttons["redo"].isEnabled()
+    bar.buttons["redo"].click()
+    assert history.model.annotations["a"][0].label == "changed"

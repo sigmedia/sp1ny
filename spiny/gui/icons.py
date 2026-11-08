@@ -108,6 +108,13 @@ def _shape(name: str) -> QtGui.QPainterPath:
     if name in ("add_annotation", "remove_annotation"):
         shape = _roundedRect(3, 4, 2, 16, 0.5) + _roundedRect(13, 4, 2, 16, 0.5) + _roundedRect(5, 11, 8, 2, 0.5)
         return shape + _symbol(19, 12, name == "add_annotation")
+    if name in ("undo", "redo"):
+        arc = QtGui.QPainterPath(QtCore.QPointF(7, 9))
+        arc.lineTo(14, 9)
+        arc.cubicTo(21, 9, 21, 19, 14, 19)
+        arc.lineTo(9, 19)
+        shape = _stroked(arc) + _polygon((8.5, 4.5), (3, 9), (8.5, 13.5))
+        return shape if name == "undo" else QtGui.QTransform(-1, 0, 0, 1, 24, 0).map(shape)
     if name == "lock":
         shackle = QtGui.QPainterPath(QtCore.QPointF(8, 11))
         shackle.lineTo(8, 8)

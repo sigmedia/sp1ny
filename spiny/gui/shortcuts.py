@@ -38,6 +38,8 @@ SHORTCUTS: dict[str, str] = {
     "remove_tier": "Ctrl+Shift+R",
     "add_annotation": "Ctrl+N",
     "toggle_tier_lock": "Ctrl+L",
+    "undo": "Ctrl+Z",
+    "redo": "Ctrl+Shift+Z",
     "delete_annotation": "Delete",
 }
 
