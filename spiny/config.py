@@ -12,12 +12,14 @@ import pathlib
 from typing import Any
 
 import yaml
-from pyqtgraph.Qt import QtCore
+from pyqtgraph.Qt import QtCore, QtGui
 
-from spiny.gui.shortcuts import configure_shortcuts, configure_wheel
+from spiny.gui.shortcuts import DEFAULT_SHORTCUTS, SHORTCUTS, configure_shortcuts, configure_wheel
 from spiny.gui.theme import THEMES, configure_themes
 
 logger = logging.getLogger(__name__)
+
+_config_path: pathlib.Path | None = None  # The file of `load_config`
 
 
 def default_config_path() -> pathlib.Path:
@@ -32,6 +34,39 @@ def default_config_path() -> pathlib.Path:
         QtCore.QStandardPaths.StandardLocation.GenericConfigLocation
     )
     return pathlib.Path(config_directory) / "spiny" / "config.yaml"
+
+
+def save_shortcuts() -> None:
+    """Write the shortcuts which are not the default ones in the configuration file
+
+    The other settings of the file are kept, not its comments.
+
+    Raises
+    ------
+    OSError
+        if the file cannot be written
+    yaml.YAMLError
+        if the file exists and is not valid: it is left as it is
+    """
+    path = (default_config_path() if _config_path is None else _config_path).resolve()
+    config = yaml.safe_load(path.read_text(encoding="utf-8")) if path.is_file() else None
+    config = config if isinstance(config, dict) else {}
+    # NOTE: compared as keys and not as texts: "Delete" and "Del" are the same key
+    config["shortcuts"] = {
+        action: key
+        for action, key in SHORTCUTS.items()
+        if QtGui.QKeySequence(key) != QtGui.QKeySequence(DEFAULT_SHORTCUTS[action])
+    }
+    if not config["shortcuts"]:
+        del config["shortcuts"]
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(path.name + ".tmp")
+    try:
+        temporary.write_text(yaml.safe_dump(config, sort_keys=False, allow_unicode=True), encoding="utf-8")
+        os.replace(temporary, path)
+    finally:
+        temporary.unlink(missing_ok=True)
 
 
 def _section(config: dict[str, Any], name: str) -> dict[str, Any]:
@@ -69,7 +104,9 @@ def load_config(path: str | os.PathLike | None = None) -> str:
     str
         The name of the theme to start with
     """
+    global _config_path
     path = default_config_path() if path is None else pathlib.Path(path)
+    _config_path = path
     if not path.is_file():
         return "light"
 

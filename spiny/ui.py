@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import types
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
+from typing import Any
 
 import itertools
 import os
@@ -16,10 +17,13 @@ from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 
 # GUI
 import importlib
+import importlib.metadata
+import platform
 import pkgutil
 
 # spiny internal packages
 from .gui.shortcuts import shortcut
+from .gui.shortcuts_dialog import ShortcutsDialog
 from .gui.colormaps import COLORMAP_NAMES, colormap_ticks
 from .gui.helpers.widgets import ExtendedComboBox
 from .gui.widgets import SMOOTHING_KERNELS
@@ -144,7 +148,6 @@ class GUIVisu(QtWidgets.QMainWindow):
 
     def __init__(self) -> None:
         super().__init__()
-        self._createMenuBar()
         self._addToolBar("Transport", TransportWidget())
         self._addToolBar("Output", OutputWidget())
         self._filename_label = QtWidgets.QLabel(str(player.filename or ""))
@@ -159,6 +162,7 @@ class GUIVisu(QtWidgets.QMainWindow):
         self._overlay_panel = OverlayPanel()
         tabs.addTab(self._overlay_panel, "Overlay")
         self._addToolBar("Annotations", AnnotationToolBar(self._annotation_layout))
+        self._createMenuBar()
 
         # NOTE: without stretch factors, a splitter shares a new size in proportion to the current ones: the ratio stays
         self._main_splitter = QtWidgets.QSplitter(QtCore.Qt.Orientation.Horizontal)
@@ -229,19 +233,80 @@ class GUIVisu(QtWidgets.QMainWindow):
         toolbar.setFloatable(False)
         toolbar.addWidget(widget)
 
+    def _addMenuAction(
+        self, menu: QtWidgets.QMenu, text: str, slot: Callable[[], Any], name: str = ""
+    ) -> QtGui.QAction:
+        """Add an entry to a menu
+
+        Parameters
+        ----------
+        menu : QtWidgets.QMenu
+            The menu
+        text : str
+            The text of the entry
+        slot : callable
+            What the entry does
+        name : str, optional
+            The name of its keyboard shortcut (see spiny.gui.shortcuts). (default: "", i.e. no shortcut)
+
+        Returns
+        -------
+        QtGui.QAction
+            The entry
+        """
+        action = QtGui.QAction(text, self)
+        action.triggered.connect(slot)
+        menu.addAction(action)
+        if name:
+            self._shortcut_actions[name] = action
+            action.setShortcut(shortcut(name))
+        return action
+
+    def applyShortcuts(self) -> None:
+        """Use the current shortcuts in the menus"""
+        for name, action in self._shortcut_actions.items():
+            action.setShortcut(shortcut(name))
+
     def _createMenuBar(self) -> None:
-        """Create the File menu (open an audio file, quit)"""
+        """Create the menus: File (open an audio file, quit), Edit (undo, redo), Help (about, shortcuts)"""
+        self._shortcut_actions: dict[str, QtGui.QAction] = {}
+
         file_menu = self.menuBar().addMenu("&File")
+        self._addMenuAction(file_menu, "&Open wav...", self.openFile, "open_file")
+        self._addMenuAction(file_menu, "E&xit", self.close, "quit")
 
-        open_action = QtGui.QAction("&Open wav...", self)
-        open_action.setShortcut(shortcut("open_file"))
-        open_action.triggered.connect(self.openFile)
-        file_menu.addAction(open_action)
+        edit_menu = self.menuBar().addMenu("&Edit")
+        self._undo_action = self._addMenuAction(edit_menu, "&Undo", self._annotation_layout.undo, "undo")
+        self._redo_action = self._addMenuAction(edit_menu, "&Redo", self._annotation_layout.redo, "redo")
+        self._annotation_layout.historyChanged.connect(self._showHistory)
+        self._showHistory()
 
-        exit_action = QtGui.QAction("E&xit", self)
-        exit_action.setShortcut(shortcut("quit"))
-        exit_action.triggered.connect(self.close)
-        file_menu.addAction(exit_action)
+        help_menu = self.menuBar().addMenu("&Help")
+        self._addMenuAction(help_menu, "&Keyboard shortcuts...", self.showShortcuts)
+        self._addMenuAction(help_menu, "&About Sp1NY...", self.showAbout)
+
+    def _showHistory(self) -> None:
+        """Enable undo and redo when they can do something"""
+        self._undo_action.setEnabled(self._annotation_layout.can_undo)
+        self._redo_action.setEnabled(self._annotation_layout.can_redo)
+
+    def showShortcuts(self) -> None:
+        """Show the keyboard shortcuts, which can be changed"""
+        ShortcutsDialog(self).exec()
+
+    def showAbout(self) -> None:
+        """Show what the application is"""
+        try:
+            version = importlib.metadata.version("SpINY")
+        except importlib.metadata.PackageNotFoundError:  # The standalone application has no package metadata
+            version = "unknown"
+        QtWidgets.QMessageBox.about(
+            self,
+            "About Sp1NY",
+            f"<b>Sp1NY</b> {version}<br>Speech vIsualisation and aNnotation in pYthon<br><br>"
+            f"Python {platform.python_version()}, Qt {QtCore.qVersion()}<br>MIT License<br>"
+            '<a href="https://github.com/sigmedia/sp1ny">github.com/sigmedia/sp1ny</a>',
+        )
 
     def _createDataTab(self) -> QtWidgets.QWidget:
         """Create the tab choosing the data plugin and the colormap; the plugin panel is added below them

@@ -61,6 +61,9 @@ spiny -w examples/arctic_as.wav -c examples/arctic_as.neur -d -50 -f 6.4
 | Add an annotation | `Ctrl+N` | | Lock or unlock the selected tiers | `Ctrl+L` |
 | Undo | `Ctrl+Z` | | Redo | `Ctrl+Shift+Z` |
 
+*Help > Keyboard shortcuts...* shows every shortcut and lets you change them: they apply at once and are kept in the
+configuration file (its comments are not).
+
 A click on a plot moves the playhead. Changing the speed also changes the pitch, as on a tape.
 
 ## Equalizer
@@ -90,7 +93,7 @@ selected annotation.
 Select tiers in the list and press the lock button to lock them: moving a boundary in a locked tier then moves the
 boundaries at the same time (within 1 ms) in the other locked tiers, also while dragging. Locks are not saved.
 
-Undo and redo cover every operation on the tiers and the annotations, up to the last 100.
+Undo and redo, in the *Edit* menu, cover every operation on the tiers and the annotations, up to the last 100.
 
 ## Overlays
 

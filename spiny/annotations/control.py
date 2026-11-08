@@ -133,22 +133,11 @@ class AnnotationToolBar(QtWidgets.QWidget):
                 controller.removeCurrentAnnotation,
             ),
             ("lock", "Lock or unlock the selected tiers", "toggle_tier_lock", controller.toggleTierLock),
-            ("undo", "Undo", "undo", controller.undo),
-            ("redo", "Redo", "redo", controller.redo),
         ):
             button = ToolBarButton(icon, tooltip, action)
             button.clicked.connect(slot)
             layout.addWidget(button)
             self.buttons[icon] = button
-
-        self._controller = controller
-        controller.historyChanged.connect(self._showHistory)
-        self._showHistory()
-
-    def _showHistory(self) -> None:
-        """Enable the undo and redo buttons when they can do something"""
-        self.buttons["undo"].setEnabled(self._controller.can_undo)
-        self.buttons["redo"].setEnabled(self._controller.can_redo)
 
 
 class QLabelClickable(QtWidgets.QLabel):

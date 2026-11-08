@@ -8,7 +8,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from pyqtgraph.Qt import QtGui
+from pyqtgraph.Qt import QtGui, QtWidgets
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +43,9 @@ SHORTCUTS: dict[str, str] = {
     "delete_annotation": "Delete",
 }
 
+
+#: The shortcuts of the application, whatever the configuration file changes in `SHORTCUTS`
+DEFAULT_SHORTCUTS = dict(SHORTCUTS)
 
 #: What the wheel does: two fingers on a trackpad are a wheel with two directions
 WHEEL_ACTIONS: dict[str, str] = {
@@ -113,14 +116,42 @@ def configure_shortcuts(overrides: dict[str, Any]) -> None:
         else:
             SHORTCUTS[action] = value
 
-    # Qt triggers neither of two actions sharing a shortcut
+    for key, actions in duplicated_keys(SHORTCUTS).items():
+        logger.warning('Configuration: the shortcut "%s" is used by several actions: %s', key, ", ".join(actions))
+
+
+def duplicated_keys(shortcuts: dict[str, str]) -> dict[str, list[str]]:
+    """Find the shortcuts given to several actions: Qt triggers neither of them
+
+    Parameters
+    ----------
+    shortcuts : dict
+        The shortcut of each action
+
+    Returns
+    -------
+    dict
+        The actions of each shortcut used more than once
+    """
     actions_by_key: dict[str, list[str]] = {}
-    for action, value in SHORTCUTS.items():
+    for action, value in shortcuts.items():
         if value:
             actions_by_key.setdefault(QtGui.QKeySequence(value).toString(), []).append(action)
-    for key, actions in actions_by_key.items():
-        if len(actions) > 1:
-            logger.warning('Configuration: the shortcut "%s" is used by several actions: %s', key, ", ".join(actions))
+    return {key: actions for key, actions in actions_by_key.items() if len(actions) > 1}
+
+
+def set_shortcuts(shortcuts: dict[str, str]) -> None:
+    """Change the shortcuts of an application which is already running
+
+    Parameters
+    ----------
+    shortcuts : dict
+        The shortcut of each action
+    """
+    SHORTCUTS.update(shortcuts)
+    for widget in QtWidgets.QApplication.allWidgets():
+        if hasattr(widget, "applyShortcuts"):
+            widget.applyShortcuts()
 
 
 def shortcut(action: str) -> QtGui.QKeySequence:

@@ -1719,14 +1719,163 @@ def test_undo_back_to_the_saved_state_has_nothing_to_save(window, history, monke
     assert history.confirmDiscardChanges() and not asked
 
 
-def test_undo_buttons_follow_the_history(window, history):
-    bar = toolbar_of(window)
-    assert not bar.buttons["undo"].isEnabled() and not bar.buttons["redo"].isEnabled()
+def test_undo_entries_of_the_edit_menu_follow_the_history(window, history):
+    assert "undo" not in toolbar_of(window).buttons
+    undo, redo = window._undo_action, window._redo_action
+    assert not undo.isEnabled() and not redo.isEnabled()
     history.model.annotations["a"][0].label = "changed"
     history.commit()
-    assert bar.buttons["undo"].isEnabled() and not bar.buttons["redo"].isEnabled()
-    bar.buttons["undo"].click()
+    assert undo.isEnabled() and not redo.isEnabled()
+    undo.trigger()
     assert history.model.annotations["a"][0].label == "x"
-    assert not bar.buttons["undo"].isEnabled() and bar.buttons["redo"].isEnabled()
-    bar.buttons["redo"].click()
+    assert not undo.isEnabled() and redo.isEnabled()
+    redo.trigger()
     assert history.model.annotations["a"][0].label == "changed"
+
+
+def menu_entries(window, title):
+    menu = next(a.menu() for a in window.menuBar().actions() if a.text().replace("&", "") == title)
+    return {a.text().replace("&", ""): a for a in menu.actions()}
+
+
+def test_menus(window):
+    assert list(menu_entries(window, "Edit")) == ["Undo", "Redo"]
+    assert set(menu_entries(window, "Help")) == {"Keyboard shortcuts...", "About Sp1NY..."}
+
+
+def test_about(window, monkeypatch):
+    shown = []
+    monkeypatch.setattr(QtWidgets.QMessageBox, "about", lambda *a: shown.append(a[2]))
+    menu_entries(window, "Help")["About Sp1NY..."].trigger()
+    assert "Sp1NY" in shown[0] and "MIT" in shown[0]
+
+
+@pytest.fixture
+def shortcut_config(window, tmp_path, monkeypatch):
+    """The configuration file is a temporary one, and the shortcuts come back at the end"""
+    import spiny.config
+    from spiny.gui.shortcuts import SHORTCUTS, set_shortcuts
+
+    before = dict(SHORTCUTS)
+    path = tmp_path / "spiny" / "config.yaml"
+    monkeypatch.setattr(spiny.config, "_config_path", path)
+    yield path
+    set_shortcuts(before)
+
+
+def open_shortcuts(window):
+    from spiny.gui.shortcuts_dialog import ShortcutsDialog
+
+    return ShortcutsDialog(window)
+
+
+def set_key(dialog, action, key):
+    dialog._editors[action].setKeySequence(key)
+
+
+def test_dialog_shows_every_shortcut(window, shortcut_config):
+    from spiny.gui.shortcuts import SHORTCUTS
+
+    dialog = open_shortcuts(window)
+    assert dialog._table.rowCount() == len(SHORTCUTS)
+    assert {a: e.keySequence() for a, e in dialog._editors.items()} == {
+        a: QtGui.QKeySequence(k) for a, k in SHORTCUTS.items()
+    }
+
+
+def test_editing_a_shortcut_applies_it_everywhere_and_saves_it(window, shortcut_config):
+    import yaml
+    from pyqtgraph.Qt import QtTest
+    from spiny.core import player
+    from spiny.core.wav import TransportWidget
+    from spiny.gui.shortcuts import shortcut
+
+    dialog = open_shortcuts(window)
+    set_key(dialog, "loop", "Ctrl+Shift+Y")
+    set_key(dialog, "undo", "Ctrl+Alt+U")
+    dialog.accept()
+
+    assert shortcut("loop").toString() == "Ctrl+Shift+Y"
+    button = window.findChild(TransportWidget)._bLoop
+    assert button._shortcut.key().toString() == "Ctrl+Shift+Y" and "Ctrl+Shift+Y" in button.toolTip()
+    assert window._undo_action.shortcut().toString() == "Ctrl+Alt+U"
+    assert yaml.safe_load(shortcut_config.read_text()) == {"shortcuts": {"loop": "Ctrl+Shift+Y", "undo": "Ctrl+Alt+U"}}
+
+    # The new key works, and the old one does nothing anymore
+    window.activateWindow()
+    QtTest.QTest.qWaitForWindowActive(window, 2000)
+    before = player.loop_activated
+    QtTest.QTest.keyClick(window, QtCore.Qt.Key.Key_L)
+    assert player.loop_activated == before
+    QtTest.QTest.keyClick(
+        window,
+        QtCore.Qt.Key.Key_Y,
+        QtCore.Qt.KeyboardModifier.ControlModifier | QtCore.Qt.KeyboardModifier.ShiftModifier,
+    )
+    assert player.loop_activated != before
+    player.toggleLoop()
+
+
+def test_saving_shortcuts_keeps_the_other_settings(window, shortcut_config):
+    import yaml
+
+    shortcut_config.parent.mkdir(parents=True)
+    shortcut_config.write_text("theme: dark\nwheel:\n  wheel_up_down: pan\nshortcuts:\n  mute: X\n")
+    dialog = open_shortcuts(window)
+    set_key(dialog, "loop", "Ctrl+Y")
+    dialog.accept()
+    assert yaml.safe_load(shortcut_config.read_text()) == {
+        "theme": "dark",
+        "wheel": {"wheel_up_down": "pan"},
+        "shortcuts": {"loop": "Ctrl+Y"},
+    }
+    assert not list(shortcut_config.parent.glob("*.tmp"))
+
+
+def test_two_actions_cannot_get_the_same_shortcut(window, shortcut_config):
+    from spiny.gui.shortcuts import shortcut
+
+    window.dialogs.clear()
+    dialog = open_shortcuts(window)
+    set_key(dialog, "loop", "M")
+    dialog.accept()
+    assert window.dialogs and "mute" in window.dialogs[0][2]
+    assert shortcut("loop").toString() == "L" and not shortcut_config.exists()
+    window.dialogs.clear()
+
+
+def test_restore_defaults_and_removing_a_shortcut(window, shortcut_config):
+    import yaml
+    from spiny.gui.shortcuts import DEFAULT_SHORTCUTS, set_shortcuts, shortcut
+
+    set_shortcuts({"loop": "Ctrl+Y"})
+    dialog = open_shortcuts(window)
+    dialog._restoreDefaults()
+    assert dialog._editors["loop"].keySequence().toString() == DEFAULT_SHORTCUTS["loop"]
+    dialog._editors["mute"].clear()
+    dialog.accept()
+    assert shortcut("loop").toString() == "L" and shortcut("mute").isEmpty()
+    assert yaml.safe_load(shortcut_config.read_text()) == {"shortcuts": {"mute": ""}}
+
+
+def test_cancel_changes_nothing(window, shortcut_config):
+    from spiny.gui.shortcuts import shortcut
+
+    dialog = open_shortcuts(window)
+    set_key(dialog, "loop", "Ctrl+Y")
+    dialog.reject()
+    assert shortcut("loop").toString() == "L" and not shortcut_config.exists()
+
+
+def test_a_broken_configuration_file_is_not_overwritten(window, shortcut_config):
+    from spiny.gui.shortcuts import shortcut
+
+    shortcut_config.parent.mkdir(parents=True)
+    shortcut_config.write_text("{not yaml")
+    window.dialogs.clear()
+    dialog = open_shortcuts(window)
+    set_key(dialog, "loop", "Ctrl+Y")
+    dialog.accept()
+    assert shortcut("loop").toString() == "Ctrl+Y"  # applied for this session
+    assert shortcut_config.read_text() == "{not yaml" and window.dialogs
+    window.dialogs.clear()
