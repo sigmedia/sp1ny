@@ -41,6 +41,7 @@ THEMES: dict[str, dict[str, str]] = {
         "selection_hover": "#32ff0000",
         # Annotations
         "tier_background": "#19000000",
+        "tier_locked": "#402a78d6",
         "annotation": "#f7f7f7",
         "annotation_text": "#000000",
         "annotation_border": "#a8a84c",
@@ -103,6 +104,7 @@ THEMES: dict[str, dict[str, str]] = {
         "selection": "#320000ff",
         "selection_hover": "#32ff0000",
         "tier_background": "#19000000",
+        "tier_locked": "#5a2a78d6",
         "annotation": "#353535",
         "annotation_text": "#ffffff",
         "annotation_border": "#c8c864",

@@ -224,7 +224,7 @@ def test_click_on_a_plot_moves_the_cursor(window):
 
 def test_transport_and_output_are_separate_movable_toolbars(window):
     toolbars = {toolbar.windowTitle(): toolbar for toolbar in window.findChildren(QtWidgets.QToolBar)}
-    assert set(toolbars) == {"Transport", "Output", "View"}
+    assert set(toolbars) == {"Transport", "Output", "View", "Annotations"}
     assert all(toolbar.isMovable() for toolbar in toolbars.values())
     window.addToolBar(QtCore.Qt.ToolBarArea.BottomToolBarArea, toolbars["Output"])
     assert window.toolBarArea(toolbars["Output"]) == QtCore.Qt.ToolBarArea.BottomToolBarArea
@@ -1297,3 +1297,234 @@ def test_voicing_threshold_field_is_on_the_scale_it_shows(window, overlays):
     assert overlay.settings == dataclasses.replace(default, voicing_threshold=0.6)
     overlay.setSettings(default)
     voicing.setValue(45)
+
+
+@pytest.fixture
+def two_locked_tiers(window):
+    """Tiers a and b, with boundaries aligned at 0.2 and 0.5, and c which is not locked; a view showing them"""
+    from spiny.annotations import get_controller
+    from spiny.annotations.model import Annotation, AnnotationSet
+
+    def tier():
+        return [Annotation(0.2, 0.5, "x"), Annotation(0.5, 0.9, "y")]
+
+    controller = get_controller()
+    controller.setAnnotationModel(AnnotationSet({"a": tier(), "b": tier(), "c": tier()}, set()))
+    window._visualisation_area._dock_wav.wav_plot.setXRange(0, 1, padding=0)
+    process_events()
+    for row in (0, 1):
+        controller._list_tiers_widget.item(row).setSelected(True)
+    controller.toggleTierLock()
+    yield controller
+    controller.setAnnotationModel(AnnotationSet({}, set()))
+
+
+def rendered(controller, tier, index):
+    annotation = controller.model.annotations[tier][index]
+    return next(i for i in controller.view.tiers_dict[tier].annotation_items if i._segment is annotation)
+
+
+def bounds(controller, tier):
+    return [(round(a.start_time, 4), round(a.end_time, 4)) for a in controller.model.annotations[tier]]
+
+
+def test_lock_marks_the_tiers_and_toggles(two_locked_tiers):
+    from spiny.gui import theme
+
+    controller = two_locked_tiers
+    assert controller.model.locked == {"a", "b"}
+    assert controller.view.tiers_dict["a"].getViewBox().state["background"] == theme.color("tier_locked")
+    assert controller.view.tiers_dict["c"].getViewBox().state["background"] == theme.color("tier_background")
+    assert not controller._list_tiers_widget.item(0).icon().isNull()
+    assert controller._list_tiers_widget.item(2).icon().isNull()
+
+    for row in (0, 1):
+        controller._list_tiers_widget.item(row).setSelected(True)
+    controller.toggleTierLock()
+    assert controller.model.locked == set()
+    assert controller._list_tiers_widget.item(0).icon().isNull()
+
+
+def test_moving_a_boundary_moves_the_aligned_ones_of_the_locked_tiers(two_locked_tiers):
+    controller = two_locked_tiers
+    rendered(controller, "a", 0).lines[1].setValue(0.6)  # the same as dragging it with the mouse
+    # In the other locked tier, both annotations which share the boundary follow
+    assert bounds(controller, "b") == [(0.2, 0.6), (0.6, 0.9)]
+    assert rendered(controller, "b", 0).lines[1].value() == pytest.approx(0.6)
+    assert rendered(controller, "b", 1).lines[0].value() == pytest.approx(0.6)
+    # A tier which is not locked does not change
+    assert bounds(controller, "c") == [(0.2, 0.5), (0.5, 0.9)]
+    # In the tier itself, only the item which has been moved changes
+    assert bounds(controller, "a") == [(0.2, 0.6), (0.5, 0.9)]
+
+
+def test_dragging_a_whole_annotation_with_the_mouse_moves_both_boundaries(window, two_locked_tiers):
+    from pyqtgraph.Qt import QtTest
+
+    controller = two_locked_tiers
+    tiers = window._visualisation_area._dock_annotation
+    plot = tiers.tiers_dict["a"]
+    tiers.scroll.ensureWidgetVisible(plot)
+    process_events()
+
+    def position(time_position):
+        return plot.mapFromScene(plot.getViewBox().mapViewToScene(QtCore.QPointF(time_position, 0.5)))
+
+    viewport = plot.viewport()
+    left = QtCore.Qt.MouseButton.LeftButton
+    start, end = position(0.35), position(0.4)
+    QtTest.QTest.mousePress(viewport, left, pos=start)
+    for fraction in (0.25, 0.5, 0.75, 1.0):
+        point = QtCore.QPointF(start + (end - start) * fraction)
+        event = QtGui.QMouseEvent(
+            QtCore.QEvent.Type.MouseMove,
+            point,
+            QtCore.QPointF(viewport.mapToGlobal(point)),
+            QtCore.Qt.MouseButton.NoButton,
+            left,
+            QtCore.Qt.KeyboardModifier.NoModifier,
+        )
+        QtWidgets.QApplication.sendEvent(viewport, event)
+    QtTest.QTest.mouseRelease(viewport, left, pos=end)
+    QtWidgets.QApplication.processEvents()
+
+    moved_start, moved_end = (
+        controller.model.annotations["a"][0].start_time,
+        controller.model.annotations["a"][0].end_time,
+    )
+    assert moved_start == pytest.approx(0.25, abs=0.01) and moved_end == pytest.approx(0.55, abs=0.01)
+    assert bounds(controller, "b")[0] == pytest.approx((round(moved_start, 4), round(moved_end, 4)))
+
+
+def test_several_steps_of_a_drag_stay_aligned(two_locked_tiers):
+    controller = two_locked_tiers
+    line = rendered(controller, "a", 0).lines[0]
+    for position in (0.22, 0.25, 0.3, 0.28):
+        line.setValue(position)
+        assert bounds(controller, "b")[0][0] == pytest.approx(position)
+
+
+def test_editing_the_times_moves_the_aligned_boundaries(two_locked_tiers):
+    controller = two_locked_tiers
+    controller.update_current_annotation(rendered(controller, "a", 0))
+    controller._wEndTime.setText("0.7")
+    controller.onTimeEdited()
+    assert bounds(controller, "b")[0] == (0.2, 0.7)
+
+
+def test_a_boundary_which_is_not_aligned_does_not_move(two_locked_tiers):
+    controller = two_locked_tiers
+    controller.model.annotations["b"][0].end_time = 0.55
+    rendered(controller, "b", 0).setBounds(0.2, 0.55)
+    rendered(controller, "a", 0).lines[1].setValue(0.6)
+    assert bounds(controller, "b")[0] == (0.2, 0.55)
+
+
+def test_a_move_which_would_collapse_an_annotation_is_not_applied_to_it(two_locked_tiers):
+    controller = two_locked_tiers
+    controller.model.annotations["b"][0].end_time = 0.3
+    rendered(controller, "b", 0).setBounds(0.2, 0.3)
+    rendered(controller, "a", 0).lines[0].setValue(0.35)
+    assert bounds(controller, "b")[0] == (0.2, 0.3)
+
+
+def test_moving_boundaries_reaches_annotations_which_are_not_drawn(two_locked_tiers, window):
+    from spiny.annotations.model import Annotation
+
+    controller = two_locked_tiers
+    hidden = Annotation(0.6, 0.7, "far")
+    controller.model.annotations["b"].append(hidden)
+    controller.view.tiers_dict["b"].moveBoundaries([(0.6, 0.65)])
+    assert hidden.start_time == 0.65
+
+
+def test_locked_moves_count_as_unsaved_changes(two_locked_tiers, window, monkeypatch):
+    controller = two_locked_tiers
+    asked = []
+    monkeypatch.setattr(
+        QtWidgets.QMessageBox,
+        "question",
+        lambda *a, **k: asked.append(a) or QtWidgets.QMessageBox.StandardButton.Cancel,
+    )
+    controller._saved_contents = controller._contents()
+    rendered(controller, "a", 0).lines[1].setValue(0.6)
+    assert not controller.confirmDiscardChanges() and asked
+
+
+def toolbar_of(window):
+    from spiny.annotations import AnnotationToolBar
+
+    return window.findChild(AnnotationToolBar)
+
+
+def test_toolbar_adds_an_annotation_from_the_playhead_and_removes_it(window, two_locked_tiers):
+    from spiny.core import player
+
+    controller = two_locked_tiers
+    bar = toolbar_of(window)
+    player.seek(0.05)
+    controller._list_tiers_widget.item(2).setSelected(True)
+    bar.buttons["add_annotation"].click()
+    annotation = controller.model.annotations["c"][0]
+    # From the playhead, until the next annotation: the selected tier is c
+    assert annotation.start_time == pytest.approx(0.05) and annotation.end_time == pytest.approx(0.2)
+    assert controller._current_annotation._segment is annotation
+
+    bar.buttons["remove_annotation"].click()
+    assert annotation not in controller.model.annotations["c"]
+    assert controller._current_annotation is None
+    controller._list_tiers_widget.item(2).setSelected(False)
+    player.seek(0.0)
+
+
+def test_toolbar_adds_an_annotation_on_the_waveform_selection(window, two_locked_tiers):
+    from spiny.core import player
+    from spiny.core.segment import Segment
+    from spiny.gui.items import SegmentItem
+
+    controller = two_locked_tiers
+    view = window._visualisation_area._dock_wav.wav_plot.getViewBox()
+    item = SegmentItem(Segment(1.0, 1.5))
+    view._dragPoint = item
+    try:
+        toolbar_of(window).buttons["add_annotation"].click()
+        tier = controller.model.annotations["a"]
+        assert (tier[-1].start_time, tier[-1].end_time) == (1.0, min(1.5, player.duration))
+    finally:
+        view._dragPoint = None
+
+
+def test_toolbar_refuses_an_annotation_where_there_is_no_room(window, two_locked_tiers):
+    from spiny.core import player
+
+    controller = two_locked_tiers
+    window.dialogs.clear()
+    player.seek(0.3)  # inside an annotation
+    before = list(controller.model.annotations["a"])
+    toolbar_of(window).buttons["add_annotation"].click()
+    assert controller.model.annotations["a"] == before and window.dialogs
+    window.dialogs.clear()
+    player.seek(0.0)
+
+
+def test_toolbar_explains_when_nothing_is_selected(window, two_locked_tiers):
+    window.dialogs.clear()
+    bar = toolbar_of(window)
+    for name in ("remove_tier", "remove_annotation", "lock"):
+        bar.buttons[name].click()
+    assert len(window.dialogs) == 3
+    window.dialogs.clear()
+
+
+def test_toolbar_removes_the_selected_tiers_and_their_lock(window, two_locked_tiers):
+    controller = two_locked_tiers
+    controller._list_tiers_widget.item(0).setSelected(True)
+    toolbar_of(window).buttons["remove_tier"].click()
+    assert "a" not in controller.model.annotations and "a" not in controller.model.locked
+
+
+def test_toolbar_adds_a_tier(window, two_locked_tiers, monkeypatch):
+    controller = two_locked_tiers
+    monkeypatch.setattr(QtWidgets.QInputDialog, "getText", lambda *a, **k: ("new", True))
+    toolbar_of(window).buttons["add_tier"].click()
+    assert "new" in controller.model.annotations and "new" in controller.view.tiers_dict

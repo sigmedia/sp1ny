@@ -68,6 +68,27 @@ def _stroked(path: QtGui.QPainterPath, width: float = 2.0) -> QtGui.QPainterPath
     return stroker.createStroke(path)
 
 
+def _symbol(x: float, y: float, plus: bool) -> QtGui.QPainterPath:
+    """Build a small plus or minus sign
+
+    Parameters
+    ----------
+    x : float
+        The centre of the sign
+    y : float
+        The centre of the sign
+    plus : bool
+        True for a plus sign, False for a minus sign
+
+    Returns
+    -------
+    QtGui.QPainterPath
+        The shape
+    """
+    bar = _roundedRect(x - 3.5, y - 1, 7, 2, 0.5)
+    return bar + _roundedRect(x - 1, y - 3.5, 2, 7, 0.5) if plus else bar
+
+
 def _shape(name: str) -> QtGui.QPainterPath:
     """Build the shape of an icon
 
@@ -81,6 +102,18 @@ def _shape(name: str) -> QtGui.QPainterPath:
     QtGui.QPainterPath
         The shape, on a 24 × 24 grid
     """
+    if name in ("add_tier", "remove_tier"):
+        shape = _roundedRect(3, 5, 18, 4) + _roundedRect(3, 15, 10, 4)
+        return shape + _symbol(18, 17, name == "add_tier")
+    if name in ("add_annotation", "remove_annotation"):
+        shape = _roundedRect(3, 4, 2, 16, 0.5) + _roundedRect(13, 4, 2, 16, 0.5) + _roundedRect(5, 11, 8, 2, 0.5)
+        return shape + _symbol(19, 12, name == "add_annotation")
+    if name == "lock":
+        shackle = QtGui.QPainterPath(QtCore.QPointF(8, 11))
+        shackle.lineTo(8, 8)
+        shackle.arcTo(8, 4, 8, 8, 180, -180)
+        shackle.lineTo(16, 11)
+        return _roundedRect(5, 11, 14, 9, 1.5) + _stroked(shackle)
     if name == "rewind":
         return _polygon((11.5, 5), (3, 12), (11.5, 19)) + _polygon((21, 5), (12.5, 12), (21, 19))
     if name == "forward":

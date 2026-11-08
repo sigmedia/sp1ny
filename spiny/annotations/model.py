@@ -1,5 +1,5 @@
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from ..core import Segment
 
@@ -44,7 +44,10 @@ class AnnotationSet:
         The tiers (name => annotations sorted by start time), in display order
     ignored : set[str]
         The names of the hidden tiers
+    locked : set[str]
+        The names of the locked tiers: moving a boundary in one moves the aligned boundaries of the others (not saved)
     """
 
     annotations: dict[str, list[Annotation]]
     ignored: set[str]
+    locked: set[str] = field(default_factory=set)

@@ -31,6 +31,7 @@ from .core import player
 from .core.overlay import OverlayPanel
 from .core.wav import OutputWidget, TransportWidget, ViewWidget
 from .core import plugin_entry_dict
+from .annotations import AnnotationToolBar
 from .annotations import get_controller as get_annotation_controller
 
 import spiny.overlays
@@ -157,6 +158,7 @@ class GUIVisu(QtWidgets.QMainWindow):
         tabs.addTab(self._createAudioTab(), "Audio")
         self._overlay_panel = OverlayPanel()
         tabs.addTab(self._overlay_panel, "Overlay")
+        self._addToolBar("Annotations", AnnotationToolBar(self._annotation_layout))
 
         # NOTE: without stretch factors, a splitter shares a new size in proportion to the current ones: the ratio stays
         self._main_splitter = QtWidgets.QSplitter(QtCore.Qt.Orientation.Horizontal)

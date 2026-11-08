@@ -8,7 +8,7 @@ from .io.htk_lab import HTKLabelSerialiser
 from .io.textgrid import TextGridSerialiser
 from .io.json import JSONSerialiser
 
-from .control import get_controller
+from .control import AnnotationToolBar, get_controller
 from . import model
 
 __all__ = [
@@ -16,6 +16,7 @@ __all__ = [
     "HTKLabelSerialiser",
     "TextGridSerialiser",
     "JSONSerialiser",
+    "AnnotationToolBar",
     "get_controller",
     "load_annotations",
     "model",

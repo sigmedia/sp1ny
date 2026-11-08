@@ -34,6 +34,10 @@ SHORTCUTS: dict[str, str] = {
     "follow": "F",
     "switch_theme": "Ctrl+T",
     # Annotations
+    "add_tier": "Ctrl+Shift+T",
+    "remove_tier": "Ctrl+Shift+R",
+    "add_annotation": "Ctrl+N",
+    "toggle_tier_lock": "Ctrl+L",
     "delete_annotation": "Delete",
 }
 

@@ -11,7 +11,9 @@ from ipapy.ipachar import IPAConsonant, IPASuprasegmental, IPADiacritic, IPAVowe
 from pyqtgraph import QtCore, QtGui, QtWidgets
 from pyqtgraph.Qt import isQObjectAlive
 
+from ..core import player
 from ..gui import theme
+from ..gui.icons import ToolBarButton, transport_icon
 from ..gui.helpers.widgets import CompactList
 from ..gui.widgets import CollapsibleBox
 from .io import AnnotationSerialiser
@@ -56,6 +58,18 @@ class QListWidgetItemHideable(QtWidgets.QListWidgetItem):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self._hidden = False
+        self._locked = False
+
+    def setLocked(self, locked: bool) -> None:
+        """Show whether the tier is locked
+
+        Parameters
+        ----------
+        locked : bool
+            True if it is locked
+        """
+        self._locked = locked
+        self.applyTheme()
 
     def toggleTierHidden(self) -> None:
         """Hide the tier if it is shown, show it if it is hidden; a hidden tier is highlighted in the list"""
@@ -67,6 +81,7 @@ class QListWidgetItemHideable(QtWidgets.QListWidgetItem):
         # NOTE: an empty brush means the colours of the palette
         self.setBackground(QtGui.QBrush(theme.color("hidden_tier")) if self._hidden else QtGui.QBrush())
         self.setForeground(QtGui.QBrush(theme.color("hidden_tier_text")) if self._hidden else QtGui.QBrush())
+        self.setIcon(transport_icon("lock", theme.color("window_text")) if self._locked else QtGui.QIcon())
 
     def isTierHidden(self) -> bool:
         """Tell if the tier is hidden
@@ -88,6 +103,41 @@ class TierList(CompactList):
         """Show the entries with the colours of the current theme"""
         for row in range(self.count()):
             self.item(row).applyTheme()
+
+
+class AnnotationToolBar(QtWidgets.QWidget):
+    """Toolbar of the basic operations on the annotations
+
+    Parameters
+    ----------
+    controller : ControlLayout
+        The annotation controller
+    parent : QtWidgets.QWidget, optional
+        The parent widget. (default: None)
+    """
+
+    def __init__(self, controller: ControlLayout, parent: QtWidgets.QWidget | None = None) -> None:
+        super().__init__(parent)
+        layout = QtWidgets.QHBoxLayout(self)
+        layout.setContentsMargins(6, 2, 6, 2)
+        layout.setSpacing(4)
+        self.buttons = {}
+        for icon, tooltip, action, slot in (
+            ("add_tier", "Add a tier", "add_tier", controller._add_tier),
+            ("remove_tier", "Remove the selected tiers", "remove_tier", controller.removeSelectedTiers),
+            ("add_annotation", "Add an annotation", "add_annotation", controller.addAnnotation),
+            (
+                "remove_annotation",
+                "Remove the selected annotation",
+                "delete_annotation",
+                controller.removeCurrentAnnotation,
+            ),
+            ("lock", "Lock or unlock the selected tiers", "toggle_tier_lock", controller.toggleTierLock),
+        ):
+            button = ToolBarButton(icon, tooltip, action)
+            button.clicked.connect(slot)
+            layout.addWidget(button)
+            self.buttons[icon] = button
 
 
 class QLabelClickable(QtWidgets.QLabel):
@@ -324,6 +374,7 @@ class ControlLayout(QtWidgets.QVBoxLayout):
         for item in self._list_tiers_widget.selectedItems():
             del self._model.annotations[item.text()]
             self._model.ignored.discard(item.text())
+            self._model.locked.discard(item.text())
             list_index.append(self._list_tiers_widget.row(item))
         list_index.sort()
 
@@ -332,6 +383,85 @@ class ControlLayout(QtWidgets.QVBoxLayout):
             self._list_tiers_widget.takeItem(idx)
 
         self.resetView()
+
+    def toggleTierLock(self) -> None:
+        """Unlock the selected tiers if they are all locked, otherwise lock them"""
+        items = self._list_tiers_widget.selectedItems()
+        if not items:
+            self._inform("Select the tiers to lock or unlock in the list of tiers.")
+            return
+
+        names = {item.text() for item in items}
+        unlock = names <= self._model.locked
+        self._model.locked = self._model.locked - names if unlock else self._model.locked | names
+        for item in items:
+            item.setLocked(not unlock)
+            item.setSelected(False)
+            if self.view is not None:
+                self.view.tiers_dict[item.text()].applyTheme()
+
+    def removeSelectedTiers(self) -> None:
+        """Remove the tiers selected in the list"""
+        if self._list_tiers_widget.selectedItems():
+            self._remove_tiers()
+        else:
+            self._inform("Select the tiers to remove in the list of tiers.")
+
+    def addAnnotation(self) -> None:
+        """Add an annotation on the waveform selection, or from the playhead (in the selected or the first tier)"""
+        if self.view is None or not self.view.tiers_dict:
+            self._inform("Add a tier first.")
+            return
+
+        selected = self._list_tiers_widget.selectedItems()
+        tier_name = selected[0].text() if selected else self._currentTierName()
+        tier = self._model.annotations[tier_name]
+        selection = self.view.waveform_selection
+        if selection is not None:
+            start_time, end_time = max(selection[0], 0.0), min(selection[1], player.duration)
+        else:
+            start_time = player.position
+            following = [annotation.start_time for annotation in tier if annotation.start_time > start_time]
+            end_time = min(start_time + DEFAULT_ANNOTATION_DURATION, player.duration, *following)
+
+        if end_time <= start_time or any(a.start_time < end_time and start_time < a.end_time for a in tier):
+            self._inform(f'There is no room for a new annotation here in the tier "{tier_name}".')
+            return
+        self.view.tiers_dict[tier_name].addAnnotation(start_time, end_time)
+
+    def removeCurrentAnnotation(self) -> None:
+        """Remove the selected annotation"""
+        if self.view is None or self._current_annotation is None:
+            self._inform("Select the annotation to remove.")
+            return
+        for tier_plot in self.view.tiers_dict.values():
+            tier_plot.deleteSelectedAnnotation()
+
+    def _currentTierName(self) -> str:
+        """Give the tier of the selected annotation, otherwise the first visible tier
+
+        Returns
+        -------
+        str
+            The name of the tier
+        """
+        assert self.view is not None
+        tiers = self.view.tiers_dict
+        for name, tier_plot in tiers.items():
+            if self._current_annotation in tier_plot.annotation_items:
+                return name
+        visible = [name for name in tiers if name not in self._model.ignored]
+        return visible[0] if visible else next(iter(tiers))
+
+    def _inform(self, message: str) -> None:
+        """Tell why an operation of the toolbar cannot be done
+
+        Parameters
+        ----------
+        message : str
+            The message
+        """
+        QtWidgets.QMessageBox.information(self._tier_box, "Annotations", message)
 
     def _add_tier(self) -> None:
         """Ask for the name of a new (empty) tier and add it; empty and existing names are refused"""
@@ -572,7 +702,9 @@ class ControlLayout(QtWidgets.QVBoxLayout):
             start_time, end_time = -1.0, -1.0
 
         if 0 <= start_time < end_time:
+            old_start, old_end = segment.start_time, segment.end_time
             self._current_annotation.setBounds(start_time, end_time)
+            self._current_annotation.reportMoves(old_start, old_end)
         else:
             self._wStartTime.setText(f"{segment.start_time:.4f}")
             self._wEndTime.setText(f"{segment.end_time:.4f}")
@@ -600,6 +732,7 @@ class ControlLayout(QtWidgets.QVBoxLayout):
             item.setText(tier_name)
             if tier_name in self._model.ignored:
                 item.toggleTierHidden()
+            item.setLocked(tier_name in self._model.locked)
             self._list_tiers_widget.addItem(item)
 
     @property
@@ -652,6 +785,9 @@ class ControlLayout(QtWidgets.QVBoxLayout):
             self._view.clear()
             self._view.setModel(self._model, self.update_current_annotation)
 
+
+#: The duration of an annotation added from the playhead, in seconds
+DEFAULT_ANNOTATION_DURATION = 0.2
 
 _controller: ControlLayout | None = None
 

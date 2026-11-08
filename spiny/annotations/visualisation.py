@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from functools import partial
 from typing import Any
 
 from pyqtgraph.GraphicsScene.mouseEvents import HoverEvent, MouseClickEvent
@@ -14,6 +15,9 @@ from spiny.gui.items import PlayheadLine, SegmentItem, WheelViewBox
 from spiny.gui.shortcuts import shortcut
 from .model import Annotation, AnnotationSet, display_label
 from spiny.core import player
+
+#: Two boundaries closer than this, in seconds, are aligned
+ALIGNMENT_TOLERANCE = 0.001
 
 
 class AnnotationDock(Dock):
@@ -85,7 +89,11 @@ class AnnotationDock(Dock):
         for k in self._model.annotations:
             # NOTE: hidden (ignored) tiers are built too, only hidden, so that they can be shown again
             annotation_plot = TierPlot(
-                name="%s_%s" % (self.name(), k), tier_name=k, model=self._model, handle_segment=self._handle_segment
+                name="%s_%s" % (self.name(), k),
+                tier_name=k,
+                model=self._model,
+                handle_segment=self._handle_segment,
+                handle_moves=partial(self.moveAlignedBoundaries, k),
             )
             annotation_plot.getAxis("left").setLabel(k)
 
@@ -114,9 +122,29 @@ class AnnotationDock(Dock):
             w.getAxis("left").setWidth(50)  # the same width in every dock, so that the time axes line up
 
     @property
+    def waveform_selection(self) -> tuple[float, float] | None:
+        """tuple(float, float) or None: The (start, end) times of the region selected on the waveform, if any"""
+        region = self._wav_plot.getViewBox()._dragPoint
+        return None if region is None else (region._segment.start_time, region._segment.end_time)
+
+    @property
     def tiers_dict(self) -> dict[str, TierPlot]:
         """dict: The tier plots, by tier name"""
         return self._tiers_dict
+
+    def moveAlignedBoundaries(self, tier_name: str, moves: list[tuple[float, float]]) -> None:
+        """Follow in the other locked tiers what has been moved in a locked tier
+
+        Parameters
+        ----------
+        tier_name : str
+            The tier where the boundaries have been moved
+        moves : list(tuple(float, float))
+            The (old, new) times of the boundaries which have been moved
+        """
+        if self._model is not None and tier_name in self._model.locked:
+            for other in self._model.locked - {tier_name}:
+                self._tiers_dict[other].moveBoundaries(moves)
 
     def clear(self) -> None:
         """Remove every tier plot from the dock and destroy it"""
@@ -159,14 +187,16 @@ class TierPlot(pg.PlotWidget):
         tier_name: str = "",
         model: AnnotationSet | None = None,
         handle_segment: Callable[[AnnotationItem | None], None],
+        handle_moves: Callable[[list[tuple[float, float]]], None] | None = None,
         **kwargs: Any,
     ) -> None:
         assert model is not None
         super().__init__(*args, viewBox=WheelViewBox(), **kwargs)
-        self.applyTheme()
         self._tier_name = tier_name
         self._model = model
         self._handle_segment = handle_segment
+        self._handle_moves = handle_moves
+        self.applyTheme()
         self.scene().sigMouseClicked.connect(self.mouse_clicked)
         self._start_time: float | None = None
 
@@ -183,8 +213,52 @@ class TierPlot(pg.PlotWidget):
         self.getPlotItem().getViewBox().sigXRangeChanged.connect(self.updateVisibleRegions)
 
     def applyTheme(self) -> None:
-        """Shade the background with the colour of the current theme, to tell the tiers apart"""
-        self.getViewBox().setBackgroundColor(theme.color("tier_background"))
+        """Shade the background with the colour of the current theme, to tell the tiers and the locked ones apart"""
+        locked = self._tier_name in self._model.locked
+        self.getViewBox().setBackgroundColor(theme.color("tier_locked" if locked else "tier_background"))
+
+    def addAnnotation(self, start_time: float, end_time: float) -> None:
+        """Add an empty annotation to the tier and select it
+
+        Parameters
+        ----------
+        start_time : float
+            The start of the annotation, in seconds
+        end_time : float
+            The end of the annotation, in seconds
+        """
+        annotation = Annotation(start_time=start_time, end_time=end_time, label="")
+        self._model.annotations.setdefault(self._tier_name, []).append(annotation)
+        self._model.annotations[self._tier_name].sort(key=lambda x: x.start_time)
+
+        item = AnnotationItem(annotation, True, self._handle_segment, self._handle_moves)
+        self.addItem(item)
+        self._items[id(annotation)] = item
+        item.requestSelection()
+
+    def moveBoundaries(self, moves: list[tuple[float, float]]) -> None:
+        """Move the boundaries of this tier which are aligned with moved ones
+
+        A change which would leave an annotation with no duration is not applied to it.
+
+        Parameters
+        ----------
+        moves : list(tuple(float, float))
+            The (old, new) times of the boundaries which have been moved
+        """
+
+        def moved(time: float) -> float:
+            return next((new for old, new in moves if abs(time - old) <= ALIGNMENT_TOLERANCE), time)
+
+        for annotation in self._model.annotations[self._tier_name]:
+            start_time, end_time = moved(annotation.start_time), moved(annotation.end_time)
+            changed = (start_time, end_time) != (annotation.start_time, annotation.end_time)
+            if changed and start_time < end_time:
+                item = self._items.get(id(annotation))
+                if item is not None:
+                    item.setBounds(start_time, end_time)
+                else:
+                    annotation.start_time, annotation.end_time = start_time, end_time
 
     @property
     def annotation_items(self) -> list[AnnotationItem]:
@@ -221,7 +295,9 @@ class TierPlot(pg.PlotWidget):
         # Add the newly visible ones
         for key, an in visible.items():
             if key not in self._items:
-                region = AnnotationItem(an, showLabel=True, handle_edit=self._handle_segment)
+                region = AnnotationItem(
+                    an, showLabel=True, handle_edit=self._handle_segment, handle_moves=self._handle_moves
+                )
                 self.addItem(region)
                 self._items[key] = region
 
@@ -287,17 +363,7 @@ class TierPlot(pg.PlotWidget):
         self._start_time = None
         if start_time == end_time:
             return
-        annotation = Annotation(start_time=start_time, end_time=end_time, label="")
-
-        # Update the model
-        self._model.annotations.setdefault(self._tier_name, []).append(annotation)
-        self._model.annotations[self._tier_name].sort(key=lambda x: x.start_time)
-
-        # Now add the item
-        an_item = AnnotationItem(annotation, True, self._handle_segment)
-        self.addItem(an_item)
-        self._items[id(annotation)] = an_item
-        an_item.requestSelection()
+        self.addAnnotation(start_time, end_time)
 
 
 class AnnotationItem(SegmentItem):
@@ -319,6 +385,7 @@ class AnnotationItem(SegmentItem):
         annotation: Annotation,
         showLabel: bool = True,
         handle_edit: Callable[[AnnotationItem | None], None] | None = None,
+        handle_moves: Callable[[list[tuple[float, float]]], None] | None = None,
     ) -> None:
         """
         Parameters
@@ -332,6 +399,9 @@ class AnnotationItem(SegmentItem):
         handle_edit : callable, optional
             Function called with the item to select (or None to clear the selection); without it the
             item cannot be selected. (default: None)
+
+        handle_moves : callable, optional
+            Function called with the (old, new) times of the boundaries which have been moved. (default: None)
         """
         super().__init__(annotation, movable=True)
 
@@ -339,6 +409,8 @@ class AnnotationItem(SegmentItem):
         self._previous_annotation_item = None
         self._next_annotation_item = None
         self._handle_edit = handle_edit
+        self._handle_moves = handle_moves
+        self.sigRegionChanged.connect(self._onRegionChanged)
 
         # Add label
         self._text: Any = None
@@ -372,6 +444,33 @@ class AnnotationItem(SegmentItem):
         else:
             self.setMouseHover(False)
 
+    def _onRegionChanged(self, *args: Any) -> None:
+        """Report the boundaries moved with the mouse, while they are moving
+
+        Parameters
+        ----------
+        args : list
+            The arguments of the signal (unused)
+        """
+        old_start, old_end = self._segment.start_time, self._segment.end_time
+        self._segment.start_time, self._segment.end_time = self.lines[0].getXPos(), self.lines[1].getXPos()
+        self.reportMoves(old_start, old_end)
+
+    def reportMoves(self, old_start: float, old_end: float) -> None:
+        """Tell which boundaries have moved
+
+        Parameters
+        ----------
+        old_start : float
+            The previous start time, in seconds
+        old_end : float
+            The previous end time, in seconds
+        """
+        pairs = ((old_start, self._segment.start_time), (old_end, self._segment.end_time))
+        moves = [(old, new) for old, new in pairs if old != new]
+        if moves and self._handle_moves is not None:
+            self._handle_moves(moves)
+
     def _update_bounds(self, ev: pg.LinearRegionItem) -> None:
         """Update the segment from the lines and move the label to the middle of the segment
 
@@ -380,6 +479,7 @@ class AnnotationItem(SegmentItem):
         ev : AnnotationItem
             The item whose region changed (sent by sigRegionChangeFinished)
         """
+        self._onRegionChanged()  # NOTE: the last step of a drag only comes with the signal of the end of the drag
         super()._update_bounds(ev)
         self._text.setPos((self._segment.start_time + self._segment.end_time) / 2, 0.5)
 
@@ -453,10 +553,14 @@ class AnnotationItem(SegmentItem):
         end_time : float
             The new end time in seconds
         """
-        self._segment.start_time = start_time
-        self.lines[0].setPos(self._segment.start_time)
-        self._segment.end_time = end_time
-        self.lines[1].setPos(self._segment.end_time)
+        self._segment.start_time, self._segment.end_time = start_time, end_time
+        # NOTE: blocked: this is not a move of the user, and the lines must not be sorted when they cross on the way
+        self.blockLineSignal = True
+        self.lines[0].setPos(start_time)
+        self.lines[1].setPos(end_time)
+        self.blockLineSignal = False
+        self.prepareGeometryChange()
+        self.update()
         self._text.setPos((self._segment.start_time + self._segment.end_time) / 2, 0.5)
 
     def isSelected(self) -> bool:
