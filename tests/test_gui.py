@@ -1094,3 +1094,15 @@ def test_panel_loads_a_mask_and_reports_errors(window, overlays, tmp_path, monke
     process_events()
     assert overlay.mask is not None  # a reset keeps the mask, only the configuration changes
     overlay._file_mask = None
+
+
+@pytest.mark.parametrize("index", [0, -1])  # a colormap of pyqtgraph and one defined here
+def test_inverted_colormap_is_stable_and_reversed(qapp, index):
+    from spiny.gui.colormaps import COLORMAP_NAMES, colormap_ticks
+
+    name = COLORMAP_NAMES[index]
+    normal = colormap_ticks(name)
+    assert colormap_ticks(name, True) == colormap_ticks(name, True)  # asking twice does not flip it back
+    assert colormap_ticks(name) == normal  # and the normal one is not affected
+    inverted = colormap_ticks(name, True)
+    assert inverted[0][1] == normal[-1][1] and inverted[-1][1] == normal[0][1]

@@ -13,6 +13,8 @@ revised one: the darkest blues differ by up to about 20/255.
 from __future__ import annotations
 
 
+import copy
+
 import numpy as np
 import pyqtgraph as pg
 
@@ -56,13 +58,15 @@ SEGMENTED_COLORMAPS = {
 COLORMAP_NAMES = BUNDLED_COLORMAPS + tuple(SEGMENTED_COLORMAPS)
 
 
-def get_colormap(name: str, inverse: bool) -> pg.ColorMap:
+def get_colormap(name: str, inverse: bool = False) -> pg.ColorMap:
     """Build the colormap of the given name
 
     Parameters
     ----------
     name : str
         The colormap name (one of `COLORMAP_NAMES`)
+    inverse : bool, optional
+        True to reverse the colormap. (default: False)
 
     Returns
     -------
@@ -76,39 +80,36 @@ def get_colormap(name: str, inverse: bool) -> pg.ColorMap:
     """
     if name in BUNDLED_COLORMAPS:
         cmap = pg.colormap.get(name)
-        if inverse:
-            cmap.reverse()
-
-        return cmap
-
-    if name not in SEGMENTED_COLORMAPS:
+    elif name in SEGMENTED_COLORMAPS:
+        # Evaluate every channel at all the breakpoints, so that pyqtgraph's linear interpolation is exact
+        channels = SEGMENTED_COLORMAPS[name]
+        positions = np.unique([pos for segments in channels.values() for pos, _ in segments])
+        colors = np.stack(
+            [
+                np.interp(positions, [pos for pos, _ in channels[channel]], [value for _, value in channels[channel]])
+                for channel in ("red", "green", "blue")
+            ],
+            axis=1,
+        )
+        cmap = pg.ColorMap(positions, np.rint(colors * 255).astype(np.uint8))
+    else:
         raise ValueError(f'Unknown colormap "{name}", available colormaps are: {", ".join(COLORMAP_NAMES)}')
 
-    # Evaluate every channel at all the breakpoints, so that pyqtgraph's linear interpolation is exact
-    channels = SEGMENTED_COLORMAPS[name]
-    positions = np.unique([pos for segments in channels.values() for pos, _ in segments])
-    colors = np.stack(
-        [
-            np.interp(positions, [pos for pos, _ in channels[channel]], [value for _, value in channels[channel]])
-            for channel in ("red", "green", "blue")
-        ],
-        axis=1,
-    )
-
-    print(inverse)
     if inverse:
-        return pg.ColorMap(positions, np.rint(colors[::-1] * 255).astype(np.uint8))
-    else:
-        return pg.ColorMap(positions, np.rint(colors * 255).astype(np.uint8))
+        cmap = copy.copy(cmap)  # NOTE: pyqtgraph caches its colormaps: reversing one in place would change the cache
+        cmap.reverse()
+    return cmap
 
 
-def colormap_ticks(name: str, inverse:bool, nb_ticks: int = 10) -> Ticks:
+def colormap_ticks(name: str, inverse: bool = False, nb_ticks: int = 10) -> Ticks:
     """Sample a colormap as gradient ticks (the format used by pyqtgraph's GradientEditorItem.restoreState)
 
     Parameters
     ----------
     name : str
         The colormap name (one of `COLORMAP_NAMES`)
+    inverse : bool, optional
+        True to reverse the colormap. (default: False)
     nb_ticks : int, optional
         The number of ticks. (default: 10)
 

@@ -66,6 +66,8 @@ class VisualisationArea(DockArea):
         ----------
         cmap_name : str
             The colormap name (one of spiny.gui.colormaps.COLORMAP_NAMES)
+        inverse : bool
+            True to reverse the colormap
         """
         if self._dock_coef._data_plot is not None:
             self._dock_coef._data_plot.setTicks(colormap_ticks(cmap_name, inverse))
@@ -374,18 +376,28 @@ class GUIVisu(QtWidgets.QMainWindow):
         if controller is not None:
             controller.resetConfiguration()
             self._cmap_list.setCurrentIndex(0)
+            self._inverse_cmap.setChecked(False)
             self.selectPlugin(controller.name)
 
     def invertColorMap(self, inverse: bool) -> None:
+        """Reverse the colormap or not
+
+        Parameters
+        ----------
+        inverse : bool
+            True to reverse it
+        """
         self.selectColorMap(None, inverse)
 
-    def selectColorMap(self, cmap_name: str|None=None, inverse: bool|None = None) -> None:
+    def selectColorMap(self, cmap_name: str | None = None, inverse: bool | None = None) -> None:
         """Apply a colormap to the data plot
 
         Parameters
         ----------
-        cmap_name : str
-            The colormap name (one of spiny.gui.colormaps.COLORMAP_NAMES)
+        cmap_name : str, optional
+            The colormap name (one of spiny.gui.colormaps.COLORMAP_NAMES). (default: None, i.e. the selected one)
+        inverse : bool, optional
+            True to reverse the colormap. (default: None, i.e. the state of the check box)
         """
         if cmap_name is None:
             cmap_name = self._cmap_list.currentText()
