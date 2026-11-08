@@ -1171,3 +1171,129 @@ def test_smoothing_changes_what_is_drawn(window, smoothing):
     process_events()
     assert smooth != sharp and drawn() == sharp
     window._plugin_list.setCurrentText(previous)
+
+
+def type_in(slider, text, finish=QtCore.Qt.Key.Key_Return):
+    """Type a text in the field of a slider, as a user would"""
+    from pyqtgraph.Qt import QtTest
+
+    slider._field.selectAll()
+    slider._field.del_()
+    QtTest.QTest.keyClicks(slider._field, text)
+    QtTest.QTest.keyClick(slider._field, finish)
+    QtWidgets.QApplication.processEvents()
+
+
+@pytest.mark.parametrize(
+    "text, value, shown",
+    [
+        ("42", 42, "42 ms"),
+        ("42 ms", 42, "42 ms"),
+        ("42,4 ms", 42, "42 ms"),
+        ("1000", 100, "100 ms"),  # clipped to the range of the slider
+        ("-3", 1, "1 ms"),
+        ("a lot", 7, "7 ms"),  # not a number: the value does not change
+        ("", 7, "7 ms"),
+    ],
+)
+def test_typing_in_the_field_moves_the_slider(qapp, text, value, shown):
+    from spiny.gui.helpers.widgets import LabelledSlider
+
+    slider = LabelledSlider(1, 100, 7, lambda v: f"{v} ms")
+    received = []
+    slider.valueChanged.connect(received.append)
+    type_in(slider, text)
+    assert slider.value() == value and slider._field.text() == shown
+    assert received == ([] if value == 7 else [value])
+
+
+def test_value_is_only_applied_at_the_end_of_the_edition(qapp):
+    from pyqtgraph.Qt import QtTest
+    from spiny.gui.helpers.widgets import LabelledSlider
+
+    slider = LabelledSlider(1, 100, 7)
+    received = []
+    slider.valueChanged.connect(received.append)
+    slider._field.selectAll()
+    slider._field.del_()
+    QtTest.QTest.keyClicks(slider._field, "42")
+    assert received == [] and slider.value() == 7
+
+    slider.show()
+    slider._field.setFocus()
+    QtWidgets.QApplication.processEvents()
+    QtWidgets.QApplication.sendEvent(slider._field, QtGui.QFocusEvent(QtCore.QEvent.Type.FocusOut))
+    assert received == [42]
+
+
+def test_moving_the_slider_updates_the_field(qapp):
+    from spiny.gui.helpers.widgets import LabelledSlider
+
+    slider = LabelledSlider(1, 100, 7, lambda v: f"{v} ms")
+    slider.setValue(30)
+    assert slider._field.text() == "30 ms"
+
+
+def test_field_of_the_equalizer_frequency_understands_kilohertz(player):
+    from spiny.core.wav.equalizer_widget import ParametricEqWidget
+
+    bands = list(player.equalizer.bands)
+    widget = ParametricEqWidget()
+    try:
+        widget._select(1)
+        type_in(widget._sFrequency, "2 kHz")
+        assert player.equalizer.bands[1].frequency == pytest.approx(2000, rel=0.02)
+        type_in(widget._sGain, "-6.5")
+        assert player.equalizer.bands[1].gain_db == -6.5
+        type_in(widget._sQ, "2.5")
+        assert player.equalizer.bands[1].q == 2.5
+        assert widget._sGain._field.text() == "-6.5 dB"
+        type_in(widget._sFrequency, "0")  # below the range: not a crash
+        assert player.equalizer.bands[1].frequency == pytest.approx(widget._frequencyOfStep(0))
+    finally:
+        player.equalizer.setBands(bands)
+
+
+def test_field_of_a_spectrogram_setting_starts_the_analysis(window):
+    previous = window._plugin_list.currentText()
+    window._plugin_list.setCurrentText("Spectrogram")
+    process_events()
+    controller = window._current_controller
+    try:
+        type_in(controller._time_step, "7")
+        deadline = time.time() + 5
+        while controller._extractor.settings.frameshift != 7 and time.time() < deadline:
+            QtWidgets.QApplication.processEvents()
+        assert controller._extractor.settings.frameshift == 7
+        assert controller._time_step._field.text() == "7 ms"
+    finally:
+        controller._time_step.setValue(2)
+        window._plugin_list.setCurrentText(previous)
+
+
+def test_volume_can_be_typed(window):
+    from spiny.core import player
+    from spiny.core.wav import OutputWidget
+
+    output = window.findChild(OutputWidget)
+    before = player.volume
+    try:
+        type_in(output._sVolume, "35")
+        assert player.volume == 0.35 and output._sVolume._field.text() == "35%"
+    finally:
+        output._sVolume.setValue(round(before * 100))
+
+
+def test_voicing_threshold_field_is_on_the_scale_it_shows(window, overlays):
+    import dataclasses
+
+    overlay = overlays["F0"]
+    default = overlay.settings
+    from spiny.gui.helpers.widgets import LabelledSlider
+
+    sliders = window._overlay_panel._panels["F0"].findChildren(LabelledSlider)
+    voicing = next(slider for slider in sliders if slider._field.text() == "0.45")
+    type_in(voicing, "0.6")
+    assert overlay.settings == dataclasses.replace(default, voicing_threshold=0.6)
+    overlay.setSettings(default)
+    voicing.setValue(45)

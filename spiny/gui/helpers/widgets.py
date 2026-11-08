@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import re
 from collections.abc import Callable
 
 from pyqtgraph.Qt.QtCore import QAbstractItemModel, QSortFilterProxyModel, Qt, Signal
-from pyqtgraph.Qt.QtWidgets import QComboBox, QCompleter, QHBoxLayout, QLabel, QListWidget, QSlider, QWidget
+from pyqtgraph.Qt.QtWidgets import QComboBox, QCompleter, QHBoxLayout, QLineEdit, QListWidget, QSlider, QWidget
 
 
 class CompactList(QListWidget):
@@ -96,8 +97,15 @@ class ExtendedComboBox(QComboBox):
         super(ExtendedComboBox, self).setModelColumn(column)
 
 
+#: A number in the text of a value: its unit can be anything, only a "k" (as in "2 kHz" or "2k") changes the value
+_NUMBER = re.compile(r"([-+]?(?:\d+[.,]?\d*|[.,]\d+))\s*(k?)", re.IGNORECASE)
+
+
 class LabelledSlider(QWidget):
-    """Horizontal slider showing its current value next to it
+    """Horizontal slider with its current value next to it, in a field which can be edited
+
+    The value typed in the field is applied when the edition ends (Enter, or leaving the field), not at each key: a
+    change can start an analysis. A text which is not a number puts the current value back.
 
     Parameters
     ----------
@@ -108,11 +116,16 @@ class LabelledSlider(QWidget):
     value : int
         The initial value
     formatter : callable, optional
-        Converts a value into the text of the label. (default: str)
+        Converts a value into the text of the field. (default: str)
     step : int, optional
         The change made by the arrow keys (ten times more with Page Up/Down). (default: 1)
     parent : QWidget, optional
         The parent widget. (default: None)
+    to_value : callable, optional
+        Converts the number typed in the field into a value of the slider, when the text is not the value itself
+        (default: None, i.e. the number rounded)
+    compact : bool, optional
+        For a toolbar: a narrow field, and a slider which does not take the focus of the keyboard. (default: False)
     """
 
     #: Emitted with the new value every time it changes (also while dragging)
@@ -126,23 +139,32 @@ class LabelledSlider(QWidget):
         formatter: Callable[[int], str] = str,
         step: int = 1,
         parent: QWidget | None = None,
+        to_value: Callable[[float], int] = round,
+        compact: bool = False,
     ) -> None:
         super().__init__(parent)
         self._formatter = formatter
+        self._to_value = to_value
 
         self._slider = QSlider(Qt.Orientation.Horizontal)
         self._slider.setRange(minimum, maximum)
         self._slider.setSingleStep(step)
         self._slider.setPageStep(10 * step)
         self._slider.setValue(value)
-        self._label = QLabel(formatter(value))
-        self._label.setMinimumWidth(110)  # room for the longest text, so that the slider does not move
+        self._field = QLineEdit(formatter(value))
+        widest = max(self._field.fontMetrics().horizontalAdvance(formatter(v)) for v in (minimum, value, maximum))
+        self._field.setFixedWidth(widest + 16 if compact else max(widest + 16, 110))  # So that the slider does not move
+        if compact:
+            self._slider.setFocusPolicy(Qt.FocusPolicy.NoFocus)
 
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(self._slider, 1)
-        layout.addWidget(self._label)
+        layout.addWidget(self._field)
         self._slider.valueChanged.connect(self._onValueChanged)
+        self._field.editingFinished.connect(self._onFieldEdited)
+        # NOTE: Enter gives the keyboard back to the application: Space plays again, and does not edit the field
+        self._field.returnPressed.connect(self._field.clearFocus)
 
     def value(self) -> int:
         """Return the current value
@@ -172,5 +194,13 @@ class LabelledSlider(QWidget):
         value : int
             The new value
         """
-        self._label.setText(self._formatter(value))
+        self._field.setText(self._formatter(value))
         self.valueChanged.emit(value)
+
+    def _onFieldEdited(self) -> None:
+        """Apply the number typed in the field (the text is then rewritten in the format of the slider)"""
+        match = _NUMBER.search(self._field.text())
+        if match is not None:
+            number = float(match.group(1).replace(",", "."))
+            self._slider.setValue(self._to_value(number * 1000 if match.group(2) else number))
+        self._field.setText(self._formatter(self._slider.value()))

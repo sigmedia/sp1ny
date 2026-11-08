@@ -39,7 +39,13 @@ class F0Overlay(TrackOverlay):
         self._max_f0 = LabelledSlider(100, 1000, round(settings.max_f0), lambda v: f"{v} Hz", step=10)
         self._min_f0.valueChanged.connect(self._onMinF0)
         self._max_f0.valueChanged.connect(self._onMaxF0)
-        voicing = LabelledSlider(0, 100, round(settings.voicing_threshold * 100), lambda v: f"{v / 100:.2f}")
+        voicing = LabelledSlider(
+            0,
+            100,
+            round(settings.voicing_threshold * 100),
+            lambda v: f"{v / 100:.2f}",
+            to_value=lambda t: round(t * 100),
+        )
         voicing.valueChanged.connect(lambda value: self._changeSettings(voicing_threshold=value / 100))
         silence = LabelledSlider(0, 30, round(settings.silence_threshold * 100), lambda v: f"{v} %")
         silence.valueChanged.connect(lambda value: self._changeSettings(silence_threshold=value / 100))

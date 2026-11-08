@@ -309,12 +309,22 @@ class ParametricEqWidget(QtWidgets.QGroupBox):
         band_row.addWidget(self._cBand)
 
         self._sFrequency = LabelledSlider(
-            0, self.FREQUENCY_STEPS, 0, lambda step: self._describeFrequency(self._frequencyOfStep(step)), step=4
+            0,
+            self.FREQUENCY_STEPS,
+            0,
+            lambda step: self._describeFrequency(self._frequencyOfStep(step)),
+            step=4,
+            to_value=lambda frequency: self._stepOfFrequency(min(max(frequency, MIN_FREQUENCY), MAX_FREQUENCY)),
         )
         self._sGain = LabelledSlider(
-            round(-10 * MAX_GAIN_DB), round(10 * MAX_GAIN_DB), 0, lambda v: f"{v / 10:+.1f} dB", step=5
+            round(-10 * MAX_GAIN_DB),
+            round(10 * MAX_GAIN_DB),
+            0,
+            lambda v: f"{v / 10:+.1f} dB",
+            step=5,
+            to_value=lambda gain: round(gain * 10),
         )
-        self._sQ = LabelledSlider(1, 100, 7, lambda v: f"{v / 10:.1f}")
+        self._sQ = LabelledSlider(1, 100, 7, lambda v: f"{v / 10:.1f}", to_value=lambda q: round(q * 10))
         self._sFrequency.valueChanged.connect(lambda step: self._changeBand(frequency=self._frequencyOfStep(step)))
         self._sGain.valueChanged.connect(lambda value: self._changeBand(gain_db=value / 10))
         self._sQ.valueChanged.connect(lambda value: self._changeBand(q=value / 10))

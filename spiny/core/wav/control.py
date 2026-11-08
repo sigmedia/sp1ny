@@ -11,6 +11,7 @@ import sounddevice as sd
 from pyqtgraph.Qt import QtCore, QtGui, QtWidgets, isQObjectAlive
 
 from spiny.gui import theme
+from spiny.gui.helpers.widgets import LabelledSlider
 from spiny.gui.icons import ToolBarButton
 
 from .equalizer_widget import ParametricEqWidget
@@ -213,16 +214,10 @@ class OutputWidget(QtWidgets.QWidget):
         self._bMute.setCheckable(True)
         self._bMute.setChecked(player.muted)
         self._bMute.toggled.connect(self.mute_changed)
-        self._sVolume = QtWidgets.QSlider(QtCore.Qt.Horizontal)
-        self._sVolume.setRange(0, 100)
-        self._sVolume.setValue(round(player.volume * 100))
-        self._sVolume.setFixedWidth(120)
-        self._sVolume.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
+        self._sVolume = LabelledSlider(0, 100, round(player.volume * 100), lambda v: f"{v}%", compact=True)
+        self._sVolume.setFixedWidth(180)
         self._sVolume.setToolTip("Volume")
         self._sVolume.valueChanged.connect(self.volume_changed)
-        self._lVolume = QtWidgets.QLabel()
-        self._lVolume.setAlignment(QtCore.Qt.AlignmentFlag.AlignRight | QtCore.Qt.AlignmentFlag.AlignVCenter)
-        self._lVolume.setFixedWidth(40)
         self.volume_changed()
 
         layout = QtWidgets.QHBoxLayout(self)
@@ -232,7 +227,6 @@ class OutputWidget(QtWidgets.QWidget):
         layout.addSpacing(12)
         layout.addWidget(self._bMute)
         layout.addWidget(self._sVolume)
-        layout.addWidget(self._lVolume)
 
     def mute_changed(self, muted: bool) -> None:
         """Mute or unmute the player
@@ -285,7 +279,6 @@ class OutputWidget(QtWidgets.QWidget):
     def volume_changed(self) -> None:
         """Apply the volume of the slider to the player"""
         player.volume = self._sVolume.value() / 100
-        self._lVolume.setText(f"{self._sVolume.value()}%")
 
 
 class ViewWidget(QtWidgets.QWidget):
