@@ -919,7 +919,7 @@ def test_reset_button_of_the_plugin(window, plots):
     process_events()
     assert controller._extractor.settings == SpectrogramSettings()
     assert controller.max_duration == 30
-    assert controller._max_level.value() == 0 and controller._time_step.value() == 5
+    assert controller._max_level.value() == 0 and controller._time_step.value() == 2
     assert controller._max_frequency.value() == 5000 and controller._max_duration.value() == 30
     assert controller.widget.db_range == (-70.0, 0.0)
     assert window._cmap_list.currentIndex() == 0

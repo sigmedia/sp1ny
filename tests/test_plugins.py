@@ -1,3 +1,4 @@
+import dataclasses
 import time
 
 import numpy as np
@@ -33,7 +34,7 @@ def spectrogram(player, monkeypatch):
     wav_plot = WavPlotWidget()
     wav_plot.setXRange(20, 30, padding=0)
     holder = QtWidgets.QWidget()  # keeps the panel alive
-    controller.max_duration = 30
+    controller.resetConfiguration()
     controller.setControlPanel(QtWidgets.QVBoxLayout(holder))
     controller.setWavPlot(wav_plot)
     refreshes = []
@@ -52,7 +53,7 @@ def wait_for_analysis(controller):
 def test_only_the_visible_part_is_computed(spectrogram):
     controller, _, _ = spectrogram
     result = controller._extractor.spectrogram
-    assert result.start_time == pytest.approx(20) and result.codes.shape[0] == pytest.approx(2000, abs=2)
+    assert result.start_time == pytest.approx(20, abs=0.01) and result.codes.shape[0] == pytest.approx(5000, abs=2)
     assert result.covers(20, 30) and not result.covers(19, 30) and not result.covers(20, 31)
 
 
@@ -109,15 +110,14 @@ def test_display_settings_are_applied_without_analysis(spectrogram, monkeypatch)
 
     controller._max_level.setValue(-10)
     controller._dynamic_range.setValue(30)
-    controller._max_frequency.setValue(3000)
     controller._min_frequency.setValue(500)
 
-    assert widget.db_range == (-40, -10) and widget.frequency_range == (500, 3000)
-    assert widget._plotItem.getViewBox().viewRange()[1] == pytest.approx([500, 3000])
+    assert widget.db_range == (-40, -10) and widget.frequency_range == (500, 5000)
+    assert widget._plotItem.getViewBox().viewRange()[1] == pytest.approx([500, 5000])
     assert analyses == [] and refreshes == []
 
-    controller._min_frequency.setValue(3000)  # crossing the other bound pushes it
-    assert widget.frequency_range == (3000, 3050)
+    controller._min_frequency.setValue(5000)  # crossing the other bound pushes it
+    assert widget.frequency_range == (5000, 5050)
 
 
 def test_analysis_settings_update_the_spectrogram_in_the_background(spectrogram):
@@ -160,39 +160,11 @@ def test_full_scale_sine_is_at_0_db_whatever_the_analysed_part(player):
     assert quiet.max() == pytest.approx(128, abs=1)  # 40 dB lower: (80 - 40) / 80 × 255
 
 
-def test_spectrum_matches_librosa(player):
-    """The numpy STFT reproduces librosa's stft + amplitude_to_db (up to one 8-bit code)"""
-    librosa = pytest.importorskip("librosa")
-    from spiny.plugins.spectrum.extractor import SpectrogramSettings, SpectrumExtractor, fft_length, get_window
-
-    settings = SpectrogramSettings(frameshift=5, framelength=25, window="hann", max_frequency=4000)
-    codes = SpectrumExtractor(settings).extract().codes.astype(int)
-
-    n_fft = fft_length(400)
-    signal = player.signal[:, 0]
-    reference = np.abs(signal).max() * get_window("hann", 400, n_fft).sum() / 2
-    sp = np.abs(librosa.stft(signal, n_fft=n_fft, hop_length=80, win_length=400, window="hann", center=True))
-    sp = librosa.amplitude_to_db(sp, ref=reference, top_db=None).T[:, : int(4000 * n_fft / player.sampling_rate) + 1]
-    expected = np.rint((np.clip(sp, -80, 0) + 80) * 255 / 80).astype(int)
-    assert codes.shape == expected.shape
-    assert np.abs(codes - expected).max() <= 1
-
-
-def test_visible_part_matches_the_whole_analysis(player):
-    from spiny.plugins.spectrum.extractor import SpectrumExtractor
-
-    extractor = SpectrumExtractor()
-    whole = extractor.extract().codes
-    part = extractor.extract(1.0, 2.0)
-    first = round(part.start_time / part.frame_duration)
-    assert (part.codes == whole[first : first + part.codes.shape[0]]).all()
-
-
 @pytest.mark.parametrize(
     "settings, error",
     [
-        ({"window": "nope"}, "supported windows"),
-        ({"frameshift": 0.01}, "time step"),
+        ({"window": "nope"}, "supported shapes"),
+        ({"framelength": 0.01}, "shorter than one sample"),
         ({"max_frequency": 0}, "positive"),
     ],
 )
@@ -278,12 +250,16 @@ def test_reusing_a_previous_part_gives_the_same_frames(player, monkeypatch):
     previous = extractor.compute_spectrogram(signal, 16000, settings, 7.0, 10.0)
 
     computed = []
-    stft = extractor.stft_magnitude
-    monkeypatch.setattr(
-        extractor,
-        "stft_magnitude",
-        lambda s, first, last, *args: computed.append(last - first) or stft(s, first, last, *args),
-    )
+    prepare = extractor._prepare_analysis
+
+    def counting_analysis(*args):
+        analysis = prepare(*args)
+        block = analysis.compute_block
+        return dataclasses.replace(
+            analysis, compute_block=lambda first, last: computed.append(last - first) or block(first, last)
+        )
+
+    monkeypatch.setattr(extractor, "_prepare_analysis", counting_analysis)
     result = extractor.compute_spectrogram(signal, 16000, settings, 5.0, 12.0, previous)
     assert result.start_time == expected.start_time
     assert np.array_equal(result.codes, expected.codes)
@@ -318,17 +294,18 @@ def test_small_pans_are_covered_by_the_margin(spectrogram):
     assert not refreshes and controller._extractor.spectrogram is result
 
 
-PRAAT_CONFIGURATIONS = [
+ANALYSIS_CONFIGURATIONS = [
     {},
     {"framelength": 30.0, "frameshift": 5.0, "frequency_step": 10.0},
     {"framelength": 5.0, "frameshift": 1.0, "max_frequency": 8000.0},
     {"framelength": 10.0, "frameshift": 3.3, "max_frequency": 3000.0, "frequency_step": 50.0},
+    *({"window": shape, "framelength": 12.0} for shape in ("hanning", "hamming", "bartlett", "welch", "square")),
 ]
 
 
-@pytest.mark.parametrize("configuration", PRAAT_CONFIGURATIONS)
+@pytest.mark.parametrize("configuration", ANALYSIS_CONFIGURATIONS)
 @pytest.mark.parametrize("rate", [16000, 44100])
-def test_praat_method_replicates_praat(player, configuration, rate):
+def test_spectrogram_replicates_praat(player, configuration, rate):
     parselmouth = pytest.importorskip("parselmouth")
     from spiny.plugins.spectrum.extractor import SpectrogramSettings, compute_spectrogram
 
@@ -336,15 +313,15 @@ def test_praat_method_replicates_praat(player, configuration, rate):
         signal = player.signal[:, 0]
     else:
         signal = np.random.default_rng(0).normal(0, 0.1, rate * 2).astype(np.float32)
-    defaults = {"framelength": 5.0, "frameshift": 2.0, "max_frequency": 5000.0, "frequency_step": 20.0}
-    values = {**defaults, **configuration}
-    slice_ = compute_spectrogram(signal, rate, SpectrogramSettings(method="praat", **values))
+    values = {**dataclasses.asdict(SpectrogramSettings()), **configuration}
+    slice_ = compute_spectrogram(signal, rate, SpectrogramSettings(**values))
 
     reference = parselmouth.Sound(signal.astype(np.float64), rate).to_spectrogram(
         window_length=values["framelength"] / 1000,
         maximum_frequency=values["max_frequency"],
         time_step=values["frameshift"] / 1000,
         frequency_step=values["frequency_step"],
+        window_shape=getattr(parselmouth.SpectralAnalysisWindowShape, values["window"].upper()),
     )
     power = reference.values.T
     decibels = 10 * np.log10(np.maximum(power, 1e-30) / power.max())
@@ -360,11 +337,11 @@ def test_praat_method_replicates_praat(player, configuration, rate):
     assert slice_.frame_duration == pytest.approx(reference.dx)
 
 
-def test_visible_part_of_the_praat_method_is_the_same_as_the_whole(player):
+def test_visible_part_is_the_same_as_in_the_whole_analysis(player):
     from spiny.plugins.spectrum.extractor import SpectrogramSettings, compute_spectrogram
 
     signal, rate = player.signal[:, 0], player.sampling_rate
-    settings = SpectrogramSettings(method="praat", framelength=5.0, frameshift=2.0)
+    settings = SpectrogramSettings()
     whole = compute_spectrogram(signal, rate, settings)
     part = compute_spectrogram(signal, rate, settings, 1.0, 2.0)
     first = round((part.start_time - whole.start_time) / part.frame_duration)
@@ -376,26 +353,46 @@ def test_visible_part_of_the_praat_method_is_the_same_as_the_whole(player):
     assert np.array_equal(wider.codes, whole.codes[first : first + wider.codes.shape[0]])
 
 
-def test_praat_method_refuses_a_signal_shorter_than_its_window(player):
+def test_a_signal_shorter_than_the_window_is_refused(player):
     from spiny.plugins.spectrum.extractor import SpectrogramSettings, compute_spectrogram
 
     with pytest.raises(ValueError, match="shorter"):
-        compute_spectrogram(np.zeros(10, dtype=np.float32), 16000, SpectrogramSettings(method="praat"))
+        compute_spectrogram(np.zeros(10, dtype=np.float32), 16000, SpectrogramSettings())
 
 
-def test_panel_goes_to_the_defaults_of_praat(spectrogram):
+def test_defaults_and_panel_are_those_of_praat(spectrogram):
+    from spiny.plugins.spectrum.extractor import SpectrogramSettings
+
     controller, _, _ = spectrogram
-    controller._method.setCurrentIndex(controller._method.findData("praat"))
-    settings = controller._panelSettings()
-    assert (settings.method, settings.framelength, settings.frameshift) == ("praat", 5, 2)
-    assert settings.frequency_step == 20 and settings.max_frequency == 5000
+    assert controller._panelSettings() == SpectrogramSettings(
+        framelength=5, max_frequency=5000, frameshift=2, frequency_step=20, window="gaussian"
+    )
     assert controller._dynamic_range.value() == 70 and controller._max_level.value() == 0
-    assert not controller._analysis_layout.isRowVisible(controller._window)
-    assert controller._analysis_layout.isRowVisible(controller._frequency_step)
-    wait_for_analysis(controller)
-    assert controller._extractor.settings == settings
 
-    controller._method.setCurrentIndex(controller._method.findData("standard"))
-    assert controller._panelSettings().framelength == 30
-    assert controller._analysis_layout.isRowVisible(controller._window)
+
+@pytest.mark.parametrize(
+    "control, value, field, expected",
+    [
+        ("_window_length", 12, "framelength", 12),
+        ("_max_frequency", 4000, "max_frequency", 4000),
+        ("_time_step", 7, "frameshift", 7),
+        ("_frequency_step", 50, "frequency_step", 50),
+    ],
+)
+def test_every_parameter_has_a_control_which_starts_the_analysis(spectrogram, control, value, field, expected):
+    controller, refreshes, _ = spectrogram
+    refreshes.clear()
+    getattr(controller, control).setValue(value)
     wait_for_analysis(controller)
+    assert getattr(controller._extractor.settings, field) == expected and refreshes
+
+
+def test_window_shape_has_a_control(spectrogram):
+    from spiny.plugins.spectrum.extractor import WINDOW_SHAPES
+
+    controller, refreshes, _ = spectrogram
+    assert [controller._window.itemText(i) for i in range(controller._window.count())] == list(WINDOW_SHAPES)
+    refreshes.clear()
+    controller._window.setCurrentText("hanning")
+    wait_for_analysis(controller)
+    assert controller._extractor.settings.window == "hanning" and refreshes
