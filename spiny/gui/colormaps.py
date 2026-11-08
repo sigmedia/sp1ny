@@ -56,7 +56,7 @@ SEGMENTED_COLORMAPS = {
 COLORMAP_NAMES = BUNDLED_COLORMAPS + tuple(SEGMENTED_COLORMAPS)
 
 
-def get_colormap(name: str) -> pg.ColorMap:
+def get_colormap(name: str, inverse: bool) -> pg.ColorMap:
     """Build the colormap of the given name
 
     Parameters
@@ -75,7 +75,11 @@ def get_colormap(name: str) -> pg.ColorMap:
         if the name is unknown
     """
     if name in BUNDLED_COLORMAPS:
-        return pg.colormap.get(name)
+        cmap = pg.colormap.get(name)
+        if inverse:
+            cmap.reverse()
+
+        return cmap
 
     if name not in SEGMENTED_COLORMAPS:
         raise ValueError(f'Unknown colormap "{name}", available colormaps are: {", ".join(COLORMAP_NAMES)}')
@@ -90,10 +94,15 @@ def get_colormap(name: str) -> pg.ColorMap:
         ],
         axis=1,
     )
-    return pg.ColorMap(positions, np.rint(colors * 255).astype(np.uint8))
+
+    print(inverse)
+    if inverse:
+        return pg.ColorMap(positions, np.rint(colors[::-1] * 255).astype(np.uint8))
+    else:
+        return pg.ColorMap(positions, np.rint(colors * 255).astype(np.uint8))
 
 
-def colormap_ticks(name: str, nb_ticks: int = 10) -> Ticks:
+def colormap_ticks(name: str, inverse:bool, nb_ticks: int = 10) -> Ticks:
     """Sample a colormap as gradient ticks (the format used by pyqtgraph's GradientEditorItem.restoreState)
 
     Parameters
@@ -108,6 +117,6 @@ def colormap_ticks(name: str, nb_ticks: int = 10) -> Ticks:
     list(tuple(float, tuple(int, int, int, int)))
         The (position, RGBA color) ticks, positions going from 0 to 1
     """
-    lut = get_colormap(name).getLookupTable(0.0, 1.0, nb_ticks, alpha=True)
+    lut = get_colormap(name, inverse).getLookupTable(0.0, 1.0, nb_ticks, alpha=True)
     positions = np.linspace(0.0, 1.0, nb_ticks)
     return [(float(pos), (int(r), int(g), int(b), int(a))) for pos, (r, g, b, a) in zip(positions, lut)]

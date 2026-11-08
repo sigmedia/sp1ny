@@ -59,7 +59,7 @@ class VisualisationArea(DockArea):
         self.addDock(self._dock_annotation, "top", self._dock_wav)
         self.addDock(self._dock_coef, "top", self._dock_annotation)
 
-    def updateColorMap(self, cmap_name: str) -> None:
+    def updateColorMap(self, cmap_name: str, inverse: bool) -> None:
         """Apply a colormap to the data plot
 
         Parameters
@@ -68,7 +68,7 @@ class VisualisationArea(DockArea):
             The colormap name (one of spiny.gui.colormaps.COLORMAP_NAMES)
         """
         if self._dock_coef._data_plot is not None:
-            self._dock_coef._data_plot.setTicks(colormap_ticks(cmap_name))
+            self._dock_coef._data_plot.setTicks(colormap_ticks(cmap_name, inverse))
 
     def selectPlugin(self, controller: DataController) -> None:
         """Extract the data of a plugin and show its widget in the data dock
@@ -158,7 +158,7 @@ class GUIVisu(QtWidgets.QMainWindow):
 
         # Show the default plugin with the default colormap
         self.selectPlugin(self._plugin_list.currentText())
-        self.selectColorMap(self._cmap_list.currentText())
+        self.selectColorMap(self._cmap_list.currentText(), self._inverse_cmap.isChecked())
 
     def resizeEvent(self, event: QtGui.QResizeEvent) -> None:
         """Put the toolbars on as many rows as the new width needs
@@ -245,6 +245,8 @@ class GUIVisu(QtWidgets.QMainWindow):
         self._cmap_list = ExtendedComboBox(self)
         self._cmap_list.addItems(list(COLORMAP_NAMES))
         self._cmap_list.currentTextChanged.connect(self.selectColorMap)
+        self._inverse_cmap = QtWidgets.QCheckBox("")
+        self._inverse_cmap.toggled.connect(self.invertColorMap)
 
         general_box_layout = QtWidgets.QGridLayout()
         general_box_layout.setAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
@@ -252,6 +254,8 @@ class GUIVisu(QtWidgets.QMainWindow):
         general_box_layout.addWidget(self._plugin_list, 0, 1)
         general_box_layout.addWidget(QtWidgets.QLabel("Colormap"), 1, 0)
         general_box_layout.addWidget(self._cmap_list, 1, 1)
+        general_box_layout.addWidget(QtWidgets.QLabel("Inverse"), 2, 0)
+        general_box_layout.addWidget(self._inverse_cmap, 2, 1)
         general_box = QtWidgets.QGroupBox("General Data Visualization")
         general_box.setLayout(general_box_layout)
 
@@ -362,7 +366,7 @@ class GUIVisu(QtWidgets.QMainWindow):
         self._control_layout.insertWidget(1, self._plugin_panel)
         self._visualisation_area.selectPlugin(controller)
         self._overlay_panel.setVisualisation(controller, self._visualisation_area._dock_wav.wav_plot)
-        self.selectColorMap(self._cmap_list.currentText())
+        self.selectColorMap(self._cmap_list.currentText(), self._inverse_cmap.isChecked())
 
     def resetPluginConfiguration(self) -> None:
         """Go back to the default configuration of the current plugin, and to the default colormap"""
@@ -372,7 +376,10 @@ class GUIVisu(QtWidgets.QMainWindow):
             self._cmap_list.setCurrentIndex(0)
             self.selectPlugin(controller.name)
 
-    def selectColorMap(self, cmap_name: str) -> None:
+    def invertColorMap(self, inverse: bool) -> None:
+        self.selectColorMap(None, inverse)
+
+    def selectColorMap(self, cmap_name: str|None=None, inverse: bool|None = None) -> None:
         """Apply a colormap to the data plot
 
         Parameters
@@ -380,7 +387,11 @@ class GUIVisu(QtWidgets.QMainWindow):
         cmap_name : str
             The colormap name (one of spiny.gui.colormaps.COLORMAP_NAMES)
         """
-        self._visualisation_area.updateColorMap(cmap_name)
+        if cmap_name is None:
+            cmap_name = self._cmap_list.currentText()
+        if inverse is None:
+            inverse = self._inverse_cmap.isChecked()
+        self._visualisation_area.updateColorMap(cmap_name, inverse)
 
 
 def install_exception_hook(parent: QtWidgets.QWidget | None = None) -> None:
