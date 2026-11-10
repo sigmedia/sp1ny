@@ -71,6 +71,7 @@ class AnnotationDock(Dock):
         model: AnnotationSet,
         handle_edit_segment: Callable[[AnnotationItem | None], None],
         handle_changed: Callable[[], None] | None = None,
+        handle_label: Callable[[str, int], None] | None = None,
     ) -> None:
         """Define the annotations to render and render them
 
@@ -82,10 +83,14 @@ class AnnotationDock(Dock):
             Function called with the annotation item to select (or None to clear the selection)
         handle_changed : callable, optional
             Function called when an operation on the annotations has ended. (default: None)
+        handle_label : callable, optional
+            Function called with the label typed on the selected annotation and the position of the cursor in it.
+            (default: None)
         """
         self._model = model
         self._handle_segment = handle_edit_segment
         self._handle_changed = handle_changed
+        self._handle_label = handle_label
         self.plotAnnotation()
 
     def plotAnnotation(self) -> None:
@@ -103,6 +108,7 @@ class AnnotationDock(Dock):
                 handle_segment=self._handle_segment,
                 handle_moves=partial(self.moveAlignedBoundaries, k),
                 handle_changed=self._handle_changed,
+                handle_label=self._handle_label,
             )
             annotation_plot.getAxis("left").setLabel(k)
 
@@ -169,7 +175,8 @@ class TierPlot(pg.PlotWidget):
 
     Only the annotations which are visible and wide enough (see `threshold`) are rendered, see
     `updateVisibleRegions`. Clicking in an empty area moves the playhead, clicking twice creates a new annotation
-    between the two clicks, and the Delete key removes the selected annotation.
+    between the two clicks, and the Delete key removes the selected annotation. The label of the selected annotation
+    can be typed on it, in a text field placed over it (see `editLabel`).
 
     Parameters
     ----------
@@ -181,6 +188,12 @@ class TierPlot(pg.PlotWidget):
         The annotation set containing the tier
     handle_segment : callable
         Function called with the annotation item to select (or None to clear the selection)
+    handle_moves : callable, optional
+        Function called with the (old, new) times of the boundaries which have been moved
+    handle_changed : callable, optional
+        Function called when an operation on the annotations has ended
+    handle_label : callable, optional
+        Function called with the label typed on the selected annotation and the position of the cursor in it
     kwargs : keyword arguments
         Keyword arguments passed to pg.PlotWidget
 
@@ -190,6 +203,9 @@ class TierPlot(pg.PlotWidget):
         The minimum width, in pixels, of a rendered annotation
     """
 
+    #: The minimum width, in pixels, of the text field of the label: it is hidden on a narrower annotation
+    MIN_EDITOR_WIDTH = 36
+
     def __init__(
         self,
         *args: Any,
@@ -198,6 +214,7 @@ class TierPlot(pg.PlotWidget):
         handle_segment: Callable[[AnnotationItem | None], None],
         handle_moves: Callable[[list[tuple[float, float]]], None] | None = None,
         handle_changed: Callable[[], None] | None = None,
+        handle_label: Callable[[str, int], None] | None = None,
         **kwargs: Any,
     ) -> None:
         assert model is not None
@@ -207,6 +224,18 @@ class TierPlot(pg.PlotWidget):
         self._handle_segment = handle_segment
         self._handle_moves = handle_moves
         self._handle_changed = handle_changed
+        self._handle_label = handle_label
+
+        # While its label is edited, the selected annotation shows it in this field, placed over the annotation
+        self._editing = False
+        self._editor = QtWidgets.QLineEdit(self.viewport())
+        self._editor.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+        self._editor.hide()
+        self._editor.textEdited.connect(self._onLabelTyped)
+        self._editor.cursorPositionChanged.connect(self._onLabelTyped)
+        self._editor.textChanged.connect(self.placeEditor)
+        self._editor.editingFinished.connect(self._endEdition)  # Enter, or the keyboard going elsewhere
+        self.getViewBox().sigResized.connect(self.placeEditor)
         self.applyTheme()
         self.scene().sigMouseClicked.connect(self.mouse_clicked)
         self._start_time: float | None = None
@@ -227,6 +256,11 @@ class TierPlot(pg.PlotWidget):
         """Shade the background with the colour of the current theme, to tell the tiers and the locked ones apart"""
         locked = self._tier_name in self._model.locked
         self.getViewBox().setBackgroundColor(theme.color("tier_locked" if locked else "tier_background"))
+        text_color = theme.color("annotation_text").name()
+        self._editor.setStyleSheet(
+            f"QLineEdit {{ background: transparent; border: none; border-bottom: 1px solid {text_color};"
+            f" color: {text_color}; }}"
+        )
 
     def addAnnotation(self, start_time: float, end_time: float) -> None:
         """Add an empty annotation to the tier and select it
@@ -300,6 +334,78 @@ class TierPlot(pg.PlotWidget):
                 else:
                     annotation.start_time, annotation.end_time = start_time, end_time
 
+    def _onLabelTyped(self, *args: Any) -> None:
+        """Report the label typed on the selected annotation, and where its cursor is
+
+        Parameters
+        ----------
+        args : list
+            The arguments of the signal (unused)
+        """
+        # NOTE: only what is typed here: the field also follows the label typed in the control panel
+        if self._handle_label is not None and self._editor.hasFocus():
+            self._handle_label(self._editor.text(), self._editor.cursorPosition())
+
+    def editLabel(self) -> None:
+        """Type the label of the selected annotation of this tier on the annotation itself
+
+        The text field has the keyboard until Enter: the one-key shortcuts (of the player, for instance) are typed.
+        """
+        self._editing = True
+        self.placeEditor()
+        self._editor.setFocus()  # NOTE: nothing happens if the field could not be shown
+
+    def _endEdition(self) -> None:
+        """Leave the edition of the label: the keyboard is back to the shortcuts"""
+        self._editing = False
+        self.placeEditor()
+        self._notifyChanged()
+
+    def placeEditor(self, *args: Any) -> None:
+        """Put the text field over the selected annotation while its label is edited, otherwise hide it
+
+        The field is as wide as its text, in the middle of the visible part of the annotation: the rest of the
+        annotation still gets the clicks (selection, zoom, move). The edition ends if the annotation is not selected
+        anymore, or if it leaves the view.
+
+        Parameters
+        ----------
+        args : list
+            The arguments of the signal (unused)
+        """
+        editor = self._editor
+        item = next((item for item in self._items.values() if item.isSelected()), None)
+        view = self.mapFromScene(self.getViewBox().sceneBoundingRect()).boundingRect()
+        left, right = view.left(), view.left() - 1
+        if item is not None:
+            start, end = (self.getViewBox().mapViewToScene(QtCore.QPointF(time, 0)) for time in item.getRegion())
+            left = max(self.mapFromScene(start).x(), view.left())
+            right = min(self.mapFromScene(end).x(), view.right())
+
+        self._editing = self._editing and item is not None and right - left >= self.MIN_EDITOR_WIDTH
+        if item is not None:
+            item.setLabelVisible(not self._editing)
+        if not self._editing:
+            if editor.hasFocus():
+                self.setFocus()  # NOTE: otherwise Qt gives the keyboard to another text field
+            editor.hide()
+            return
+
+        assert item is not None
+        label = item._segment.label
+        if editor.isHidden():
+            editor.setText(label)
+        elif editor.text() != label:
+            # The label was changed from the control panel: the cursor stays after what has been inserted
+            position = editor.cursorPosition() + len(label) - len(editor.text())
+            editor.setText(label)
+            editor.setCursorPosition(max(position, 0))
+        text_width = editor.fontMetrics().horizontalAdvance(label) + 2 * self.MIN_EDITOR_WIDTH // 3
+        width = min(max(text_width, self.MIN_EDITOR_WIDTH), right - left - 8)
+        height = editor.sizeHint().height()
+        editor.setGeometry((left + right - width) // 2, view.center().y() - height // 2, width, height)
+        editor.show()
+
     @property
     def annotation_items(self) -> list[AnnotationItem]:
         """The annotation items currently rendered"""
@@ -336,6 +442,7 @@ class TierPlot(pg.PlotWidget):
         for key, an in visible.items():
             if key not in self._items:
                 self._items[key] = self._createItem(an)
+        self.placeEditor()
 
     def keyPressEvent(self, event: QtGui.QKeyEvent) -> None:
         """Delete the selected annotation on its shortcut, otherwise use the default behaviour
@@ -372,7 +479,8 @@ class TierPlot(pg.PlotWidget):
     def mouse_clicked(self, ev: MouseClickEvent) -> None:
         """Move the playhead to a left click in an empty area of the tier; two of them create an annotation
 
-        A double-click or a click on an annotation cancels the first click.
+        With the Shift key, the playhead (and so a playback) is left alone. A double-click or a click on an
+        annotation cancels the first click.
 
         Parameters
         ----------
@@ -391,7 +499,8 @@ class TierPlot(pg.PlotWidget):
         ev.accept()
         # NOTE: a time and not a position: the view can change before the second click
         time = vb.mapSceneToView(ev.scenePos()).x()
-        player.seek(time)
+        if not ev.modifiers() & QtCore.Qt.KeyboardModifier.ShiftModifier:  # with Shift, the click only creates
+            player.seek(time)
         if self._start_time is None:
             self._start_time = time
             return
@@ -492,6 +601,7 @@ class AnnotationItem(SegmentItem):
         old_start, old_end = self._segment.start_time, self._segment.end_time
         self._segment.start_time, self._segment.end_time = self.lines[0].getXPos(), self.lines[1].getXPos()
         self.reportMoves(old_start, old_end)
+        self._placeEditor()
 
     def reportMoves(self, old_start: float, old_end: float) -> None:
         """Tell which boundaries have moved
@@ -539,14 +649,9 @@ class AnnotationItem(SegmentItem):
             if modifier_pressed == QtCore.Qt.KeyboardModifier.ControlModifier:
                 ev.accept()
                 player.play(start=self._segment.start_time, end=self._segment.end_time)
-            elif (modifier_pressed == QtCore.Qt.KeyboardModifier.NoModifier) and self._is_zoomed_in:
-                ev.accept()
-                self.parentWidget().setXRange(0, self.parentWidget().state["limits"]["xLimits"][1])
-                self._is_zoomed_in = not self._is_zoomed_in
             elif modifier_pressed == QtCore.Qt.KeyboardModifier.NoModifier:
                 ev.accept()
-                self.parentWidget().setXRange(self._segment.start_time, self._segment.end_time)
-                self._is_zoomed_in = not self._is_zoomed_in
+                self.toggleZoom()
 
         elif (ev.buttons() == QtCore.Qt.LeftButton) and (not ev.double()):
             ev.accept()
@@ -567,6 +672,25 @@ class AnnotationItem(SegmentItem):
         self._selected = selected
         self.applyTheme()
         self.update()
+        self.setLabelVisible(True)
+        self._placeEditor()
+
+    def setLabelVisible(self, visible: bool) -> None:
+        """Show or hide the label: it is hidden while it is edited in the text field of the tier
+
+        Parameters
+        ----------
+        visible : bool
+            True to show the label
+        """
+        if self._text is not None:
+            self._text.setVisible(visible)
+
+    def _placeEditor(self) -> None:
+        """Tell the tier that the text field of the label must follow this annotation"""
+        tier = self.getViewWidget()
+        if isinstance(tier, TierPlot):
+            tier.placeEditor()
 
     def updateLabel(self, label: str) -> None:
         """Change the label of the annotation
@@ -579,6 +703,7 @@ class AnnotationItem(SegmentItem):
         self._segment.label = label
         self._text.setText(display_label(label))
         self._text.setPos((self._segment.start_time + self._segment.end_time) / 2, 0.5)
+        self._placeEditor()
 
     def setBounds(self, start_time: float, end_time: float) -> None:
         """Move the boundaries of the annotation
@@ -599,6 +724,7 @@ class AnnotationItem(SegmentItem):
         self.prepareGeometryChange()
         self.update()
         self._text.setPos((self._segment.start_time + self._segment.end_time) / 2, 0.5)
+        self._placeEditor()
 
     def isSelected(self) -> bool:
         """Indicate if the annotation is the current (selected) one

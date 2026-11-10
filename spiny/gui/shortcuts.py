@@ -41,6 +41,7 @@ SHORTCUTS: dict[str, str] = {
     "undo": "Ctrl+Z",
     "redo": "Ctrl+Shift+Z",
     "delete_annotation": "Delete",
+    "edit_label": "Insert",
 }
 
 

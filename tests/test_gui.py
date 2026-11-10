@@ -1744,7 +1744,7 @@ def menu_entries(window, title):
 
 
 def test_menus(window):
-    assert list(menu_entries(window, "Edit")) == ["Undo", "Redo"]
+    assert list(menu_entries(window, "Edit")) == ["Undo", "Redo", "", "Edit the label on the annotation"]
     assert set(menu_entries(window, "Help")) == {"Keyboard shortcuts...", "About Sp1NY..."}
 
 
@@ -1913,3 +1913,79 @@ def test_ipa_symbol_goes_in_the_label_of_the_annotation_as_one_step(history):
     assert len(history._undo_stack) == before + 2
     history.undo()
     assert history.model.annotations["a"][0].label == "xʃ"
+
+
+def test_second_zoom_on_an_annotation_goes_back_to_the_previous_view(window, history):
+    plot = window._visualisation_area._dock_wav.wav_plot
+    plot.setXRange(0.1, 1.2, padding=0)
+    process_events()
+    item = rendered(history, "a", 0)
+    item.toggleZoom()
+    process_events()
+    x_min, x_max = plot.getViewBox().viewRange()[0]
+    assert 0.1 < x_min <= 0.2 and 0.5 <= x_max < 0.6
+    assert rendered(history, "a", 0) is item  # the item remembers the view: it must survive the zoom
+    item.toggleZoom()
+    process_events()
+    assert plot.getViewBox().viewRange()[0] == pytest.approx([0.1, 1.2], abs=1e-6)
+
+
+@pytest.fixture
+def edited(window, history):
+    """The first annotation of the tier a is selected, and the keyboard is in the window"""
+    from pyqtgraph.Qt import QtTest
+
+    window.activateWindow()
+    assert QtTest.QTest.qWaitForWindowActive(window, 2000)
+    history.update_current_annotation(rendered(history, "a", 0))
+    tier = history.view.tiers_dict["a"]
+    tier.setFocus()
+    process_events()
+    return history, tier
+
+
+def test_label_is_only_edited_on_the_annotation_between_insert_and_return(edited):
+    from pyqtgraph.Qt import QtTest
+    from spiny.core import player
+
+    history, tier = edited
+    item = rendered(history, "a", 0)
+    assert tier._editor.isHidden() and item._text.isVisible()
+
+    press(tier, QtCore.Qt.Key.Key_Insert)
+    assert tier._editor.isVisible() and tier._editor.hasFocus() and tier._editor.text() == "x"
+    assert not item._text.isVisible()
+    assert item.sceneBoundingRect().contains(tier.mapToScene(tier._editor.geometry().center()))
+
+    before = len(history._undo_stack)
+    QtTest.QTest.keyClicks(tier._editor, "a l")  # the shortcuts of the player (space, l) are typed
+    assert history.model.annotations["a"][0].label == "xa l" and history._wLabel.text() == "xa l"
+    assert not player.is_playing and len(history._undo_stack) == before
+
+    press(tier._editor, QtCore.Qt.Key.Key_Return)
+    assert tier._editor.isHidden() and tier.hasFocus() and item._text.isVisible()
+    assert item._text.toPlainText() == "xa l" and len(history._undo_stack) == before + 1
+    history.undo()
+    assert history.model.annotations["a"][0].label == "x"
+
+
+def test_cursor_of_the_edited_label_is_where_the_ipa_symbols_go(edited):
+    history, tier = edited
+    history.editLabel()
+    process_events()
+    press(tier._editor, QtCore.Qt.Key.Key_Home)
+    ipa_button(history, "ʃ").click()
+    press(tier._editor, QtCore.Qt.Key.Key_A)
+    assert history.model.annotations["a"][0].label == "ʃax" and tier._editor.hasFocus()
+
+
+def test_edition_of_the_label_ends_with_the_selection(edited):
+    history, tier = edited
+    history.editLabel()
+    process_events()
+    history.update_current_annotation(rendered(history, "a", 1))
+    process_events()
+    assert tier._editor.isHidden() and rendered(history, "a", 0)._text.isVisible()
+    history.update_current_annotation(None)
+    history.editLabel()  # nothing is selected: nothing to edit
+    assert tier._editor.isHidden()

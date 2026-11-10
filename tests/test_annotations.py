@@ -277,6 +277,19 @@ def test_two_clicks_create_an_annotation_at_the_clicked_times(empty_tier, player
     assert times(empty_tier) == [(0.3, 0.7)]
 
 
+def test_shift_clicks_create_an_annotation_without_moving_the_player(empty_tier, player):
+    player.seek(0.1)
+    shift = QtCore.Qt.KeyboardModifier.ShiftModifier
+    for time in (0.3, 0.7):
+        QtTest.QTest.mouseClick(
+            empty_tier.viewport(), QtCore.Qt.MouseButton.LeftButton, shift, widget_position(empty_tier, time)
+        )
+        QtWidgets.QApplication.processEvents()
+        separate_clicks()
+    assert times(empty_tier) == [(0.3, 0.7)]
+    assert player.position == pytest.approx(0.1)
+
+
 def test_view_change_between_two_clicks_keeps_the_first_time(empty_tier):
     click(empty_tier, 0.3)
     empty_tier.setXRange(0.5, 1.5, padding=0)

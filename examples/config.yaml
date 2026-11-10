@@ -34,6 +34,7 @@ shortcuts:
   undo: Ctrl+Z
   redo: Ctrl+Shift+Z
   delete_annotation: Delete
+  edit_label: Insert
 wheel:
   wheel_up_down: zoom
   wheel_left_right: pan

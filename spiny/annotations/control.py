@@ -803,6 +803,26 @@ class ControlLayout(QtWidgets.QVBoxLayout):
         if self._current_annotation is not None:
             self._current_annotation.updateLabel(self._wLabel.text())
 
+    def editLabel(self) -> None:
+        """Type the label of the selected annotation on the annotation itself (see TierPlot.editLabel)"""
+        if self._current_annotation is not None:
+            self._current_annotation.getViewWidget().editLabel()
+
+    def onLabelTyped(self, label: str, cursor: int) -> None:
+        """Follow the label typed on the selected annotation itself
+
+        Parameters
+        ----------
+        label : str
+            The label
+        cursor : int
+            The position of the cursor in the label: what the IPA palettes insert goes there
+        """
+        if label != self._wLabel.text():
+            self._wLabel.setText(label)
+            self.onLabelEdited()
+        self._wLabel.setCursorPosition(cursor)
+
     def onIPAInsert(self, ipa_symbol: str) -> None:
         """Insert an IPA symbol at the cursor position of the label field
 
@@ -876,7 +896,7 @@ class ControlLayout(QtWidgets.QVBoxLayout):
         if self._view is not None:
             self.update_current_annotation(None)  # The selected item is destroyed with its tier
             self._view.clear()
-            self._view.setModel(self._model, self.update_current_annotation, self.commit)
+            self._view.setModel(self._model, self.update_current_annotation, self.commit, self.onLabelTyped)
 
 
 #: The duration of an annotation added from the playhead, in seconds

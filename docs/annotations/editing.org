@@ -19,9 +19,22 @@ those which are no longer visible are removed; the selected one is kept alive.
 
 Two left clicks in an empty area create an annotation between the two times. The first one is kept as a time, not as a
 position, as the view can change before the second one. A double click, or a click on an annotation, cancels it.
+Each click also moves the cursor of the player, unless the Shift key is pressed: a playback is then left alone.
 
 The toolbar adds an annotation on the region selected on the waveform, otherwise from the playhead for 0.2 s or until the next
 annotation, and refuses if it would overlap another one.
+
+* Zooming on an annotation
+
+A double click on an annotation zooms on it and remembers the view it came from; the next one restores that view, not the
+whole signal.
+
+* Typing the label on the annotation
+
+The Insert key (the =edit_label= shortcut) puts a text field over the selected annotation, as wide as its text so that the
+rest of the annotation still gets the clicks. Until Enter, it has the keyboard: the one-key shortcuts of the player are
+typed as text. The field and the one of the control panel follow each other, cursor included, so that an IPA symbol goes
+where the cursor is. The edition is one step of the history, and ends if the annotation is unselected or leaves the view.
 
 * Locked tiers
 

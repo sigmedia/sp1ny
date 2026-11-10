@@ -278,6 +278,10 @@ class GUIVisu(QtWidgets.QMainWindow):
         edit_menu = self.menuBar().addMenu("&Edit")
         self._undo_action = self._addMenuAction(edit_menu, "&Undo", self._annotation_layout.undo, "undo")
         self._redo_action = self._addMenuAction(edit_menu, "&Redo", self._annotation_layout.redo, "redo")
+        edit_menu.addSeparator()
+        self._addMenuAction(
+            edit_menu, "Edit the &label on the annotation", self._annotation_layout.editLabel, "edit_label"
+        )
         self._annotation_layout.historyChanged.connect(self._showHistory)
         self._showHistory()
 

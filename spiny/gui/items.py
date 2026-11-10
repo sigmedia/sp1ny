@@ -143,7 +143,7 @@ class SegmentItem(pg.LinearRegionItem):
 
         self._segment = segment
         self._related = list(related) if related is not None else []
-        self._is_zoomed_in = False
+        self._view_before_zoom: tuple[float, float] | None = None
 
         self.orientation = "vertical"
         self.blockLineSignal = False
@@ -232,12 +232,18 @@ class SegmentItem(pg.LinearRegionItem):
                 player.play(start=self._segment.start_time, end=self._segment.end_time)
             elif modifier_pressed == QtCore.Qt.KeyboardModifier.ShiftModifier:
                 self.parentWidget().removeSegment()
-            elif (modifier_pressed == QtCore.Qt.KeyboardModifier.NoModifier) and self._is_zoomed_in:
-                self.parentWidget().setXRange(0, self.parentWidget().state["limits"]["xLimits"][1])
-                self._is_zoomed_in = not self._is_zoomed_in
             elif modifier_pressed == QtCore.Qt.KeyboardModifier.NoModifier:
-                self.parentWidget().setXRange(self._segment.start_time, self._segment.end_time)
-                self._is_zoomed_in = not self._is_zoomed_in
+                self.toggleZoom()
+
+    def toggleZoom(self) -> None:
+        """Zoom on the segment, or go back to the view from which it has been zoomed on"""
+        view = self.getViewBox()
+        if self._view_before_zoom is None:
+            self._view_before_zoom = tuple(view.viewRange()[0])
+            view.setXRange(self._segment.start_time, self._segment.end_time)
+        else:
+            view.setXRange(*self._view_before_zoom, padding=0)
+            self._view_before_zoom = None
 
     def _update_bounds(self, ev: pg.LinearRegionItem) -> None:
         """Update the segment from the positions of the lines
