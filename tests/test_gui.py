@@ -1879,3 +1879,32 @@ def test_a_broken_configuration_file_is_not_overwritten(window, shortcut_config)
     assert shortcut("loop").toString() == "Ctrl+Y"  # applied for this session
     assert shortcut_config.read_text() == "{not yaml" and window.dialogs
     window.dialogs.clear()
+
+
+def ipa_button(controller, text):
+    buttons = controller._ipa_box.findChildren(QtWidgets.QToolButton, "ipa_symbol")
+    return next(button for button in buttons if button.text() == text)
+
+
+def test_ipa_palette_opens_on_a_click_and_closes_on_the_next(window, history):
+    from spiny.gui.widgets import CollapsibleBox
+
+    window.findChild(QtWidgets.QTabWidget).setCurrentIndex(1)
+    box = history._ipa_box.findChildren(CollapsibleBox)[0]
+    history.update_current_annotation(rendered(history, "a", 0))
+    for expected in (True, False):
+        box.toggle_button.click()
+        assert box.content_area.isVisible() is expected
+    window.findChild(QtWidgets.QTabWidget).setCurrentIndex(0)
+
+
+def test_ipa_symbol_goes_in_the_label_of_the_annotation_as_one_step(history):
+    assert not history._ipa_box.isEnabled()  # nothing is selected: no label to insert in
+    history.update_current_annotation(rendered(history, "a", 0))
+    before = len(history._undo_stack)
+    ipa_button(history, "ʃ").click()
+    ipa_button(history, "◌\u0303").click()  # shown on a dotted circle, inserted alone
+    assert history.model.annotations["a"][0].label == "xʃ\u0303"
+    assert len(history._undo_stack) == before + 2
+    history.undo()
+    assert history.model.annotations["a"][0].label == "xʃ"

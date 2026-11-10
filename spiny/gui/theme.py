@@ -163,7 +163,9 @@ _PALETTE_ROLES = {
 
 _STYLE_SHEET = Template("""
     QToolTip { color: $tooltip_text; background-color: $tooltip_background; border: 1px solid $tooltip_text; }
-    QLabelClickable:hover { background-color: $ipa_hover; color: $ipa_hover_text; }
+    QToolButton#ipa_symbol { border: none; border-radius: 4px; padding: 3px 0px; }
+    QToolButton#ipa_symbol:hover { background-color: $ipa_hover; color: $ipa_hover_text; }
+    QToolButton#ipa_symbol:pressed { background-color: $accent; }
 
     ToolBarButton { border: none; border-radius: 6px; padding: 5px; }
     ToolBarButton:hover { background: $button_hover; }

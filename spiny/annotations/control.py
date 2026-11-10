@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import pathlib
 import shutil
+import unicodedata
 from collections.abc import Callable
 from typing import Any
 
@@ -138,22 +139,6 @@ class AnnotationToolBar(QtWidgets.QWidget):
             button.clicked.connect(slot)
             layout.addWidget(button)
             self.buttons[icon] = button
-
-
-class QLabelClickable(QtWidgets.QLabel):
-    """Label emitting its text when it is clicked (used by the IPA palettes)"""
-
-    clicked = QtCore.Signal(str)
-
-    def mouseReleaseEvent(self, event: QtGui.QMouseEvent) -> None:
-        """Emit `clicked` with the text of the label
-
-        Parameters
-        ----------
-        event : QtGui.QMouseEvent
-            The mouse event
-        """
-        self.clicked.emit(self.text())
 
 
 class ControlLayout(QtWidgets.QVBoxLayout):
@@ -613,37 +598,57 @@ class ControlLayout(QtWidgets.QVBoxLayout):
         ipa_box_layout = QtWidgets.QVBoxLayout()
         ipa_box_layout.setAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
 
-        # One collapsible palette per IPA category: (title, IPA class, font (None = default))
-        categories = [
-            ("Consonnants", IPAConsonant, None),
-            ("Vowels", IPAVowel, None),
-            ("Diacritics", IPADiacritic, QtGui.QFont("Arial", 16)),
-            ("Suprasegmental", IPASuprasegmental, QtGui.QFont("Arial", 16)),
-        ]
-        for title, ipa_cls, font in categories:
-            ipa_box_layout.addWidget(self._generate_IPA_palette(title, ipa_cls, font))
+        for title, ipa_cls in (
+            ("Consonants", IPAConsonant),
+            ("Vowels", IPAVowel),
+            ("Diacritics", IPADiacritic),
+            ("Suprasegmental", IPASuprasegmental),
+        ):
+            ipa_box_layout.addWidget(self._generate_IPA_palette(title, ipa_cls))
 
         ipa_box = QtWidgets.QGroupBox("IPA Helpers")
         ipa_box.setLayout(ipa_box_layout)
+        ipa_box.setEnabled(False)  # NOTE: until an annotation is selected, there is no label to insert in
 
         return ipa_box
 
-    def _generate_IPA_palette(
-        self, title: str, ipa_cls: type, font: QtGui.QFont | None = None, nb_columns: int = 8
-    ) -> CollapsibleBox:
-        """Generate a collapsible grid of clickable labels for the IPA characters of a given class"""
+    def _generate_IPA_palette(self, title: str, ipa_cls: type, nb_columns: int = 8) -> CollapsibleBox:
+        """Generate a collapsible grid of buttons for the IPA characters of a given class
+
+        Parameters
+        ----------
+        title : str
+            The title of the palette
+        ipa_cls : type
+            The class of ipapy of the characters
+        nb_columns : int, optional
+            The number of symbols per row. (default: 8)
+
+        Returns
+        -------
+        CollapsibleBox
+            The palette
+        """
         box = CollapsibleBox(title)
         lay = QtWidgets.QGridLayout()
+        lay.setSpacing(2)
+        font = box.font()
+        font.setPointSize(font.pointSize() + 4)
 
-        ipa_chars: list[Any] = [cur_unicode for cur_unicode in IPA_CHARS if type(cur_unicode) is ipa_cls]
-        for j, cur_unicode in enumerate(ipa_chars):
-            label = QLabelClickable(str(cur_unicode))
-            label.clicked.connect(self.onIPAInsert)
-            if font is not None:
-                label.setFont(font)
-            label.setAlignment(QtCore.Qt.AlignCenter)
-            label.setToolTip(" ".join(cur_unicode.descriptors))
-            lay.addWidget(label, j // nb_columns, j % nb_columns)
+        symbols = [str(char) for char in IPA_CHARS if type(char) is ipa_cls]
+        names = {str(char): char.name for char in IPA_CHARS}
+        # NOTE: only the single consonants: the others (236 otherwise) are these ones with diacritics
+        symbols = [s for s in symbols if s.strip() and (len(s) == 1 or ipa_cls is not IPAConsonant)]
+        for j, symbol in enumerate(symbols):
+            # A combining mark alone is drawn on whatever precedes it: it is shown on the dotted circle
+            button = QtWidgets.QToolButton(text=("◌" + symbol) if unicodedata.combining(symbol[0]) else symbol)
+            button.setObjectName("ipa_symbol")
+            button.setFont(font)
+            button.setToolTip(names[symbol])
+            button.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)  # the cursor stays in the label
+            button.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Fixed)
+            button.clicked.connect(lambda _checked=False, symbol=symbol: self.onIPAInsert(symbol))
+            lay.addWidget(button, j // nb_columns, j % nb_columns)
 
         box.setContentLayout(lay)
         return box
@@ -763,12 +768,14 @@ class ControlLayout(QtWidgets.QVBoxLayout):
             self._wEndTime.setText(f"{self._current_annotation._segment.end_time:.4f}")
             self._wLabel.setText(self._current_annotation._segment.label)
             self._info_box.setVisible(True)
+            self._ipa_box.setEnabled(True)
         else:
             self._wStartTime.setText("")
             self._wEndTime.setText("")
             self._wLabel.setText("")
             self._current_annotation = None
             self._info_box.setVisible(False)
+            self._ipa_box.setEnabled(False)
 
     def onTimeEdited(self) -> None:
         """Apply the edited boundaries (once editing is finished), or restore the previous ones if they are invalid"""
