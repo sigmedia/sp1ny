@@ -34,6 +34,7 @@ def test_htk_rejects_lines_without_timing(tmp_path):
         load_htk(tmp_path, "sil\n")
 
 
+@pytest.mark.core
 def test_htk_round_trip(tmp_path, example_annotations):
     HTKLabelSerialiser().save(tmp_path / "o.lab", example_annotations)
     assert HTKLabelSerialiser().load(tmp_path / "o.lab") == example_annotations
@@ -44,6 +45,7 @@ def test_htk_save_requires_a_visible_tier(tmp_path):
         HTKLabelSerialiser().save(tmp_path / "o.lab", AnnotationSet({"t": []}, {"t"}))
 
 
+@pytest.mark.core
 def test_json_round_trip(tmp_path):
     annotation_set = AnnotationSet({"t": [Annotation(0.0, 1.0, "ə")], "u": []}, {"u"})
     JSONSerialiser().save(tmp_path / "o.json", annotation_set)
@@ -71,6 +73,7 @@ def test_json_ignored_is_optional(tmp_path):
     assert JSONSerialiser().load(tmp_path / "a.json").ignored == set()
 
 
+@pytest.mark.core
 def test_textgrid_round_trip(tmp_path, example_annotations):
     TextGridSerialiser().save(str(tmp_path / "o.TextGrid"), example_annotations)
     loaded = TextGridSerialiser().load(str(tmp_path / "o.TextGrid"))

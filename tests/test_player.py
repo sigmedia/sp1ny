@@ -61,6 +61,7 @@ def test_stop_while_paused(fake_audio):
     assert player.position == 0
 
 
+@pytest.mark.core
 def test_stop_returns_to_the_cursor(fake_audio):
     player = fake_audio
     player.seek(2.0)
@@ -246,6 +247,7 @@ def test_playback_is_resampled_only_when_needed(fake_audio, monkeypatch):
     assert wait_until(lambda: player.position > 0)
 
 
+@pytest.mark.core
 def test_fill_block_interpolates_linearly():
     from spiny.core.wav.player import Player
 

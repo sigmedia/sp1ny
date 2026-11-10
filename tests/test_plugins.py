@@ -50,6 +50,7 @@ def wait_for_analysis(controller):
     assert wait_until(lambda: not controller._analysis_timer.isActive() and not controller._running)
 
 
+@pytest.mark.core
 def test_only_the_visible_part_is_computed(spectrogram):
     controller, _, _ = spectrogram
     result = controller._extractor.spectrogram
@@ -147,6 +148,7 @@ def test_spectrum_of_silence_is_the_lowest_level(player):
     assert codes.dtype == np.uint8 and (codes == 0).all()
 
 
+@pytest.mark.core
 def test_full_scale_sine_is_at_0_db_whatever_the_analysed_part(player):
     from spiny.plugins.spectrum.extractor import SpectrumExtractor
 
@@ -303,6 +305,7 @@ ANALYSIS_CONFIGURATIONS = [
 ]
 
 
+@pytest.mark.core
 @pytest.mark.parametrize("configuration", ANALYSIS_CONFIGURATIONS)
 @pytest.mark.parametrize("rate", [16000, 44100])
 def test_spectrogram_replicates_praat(player, configuration, rate):

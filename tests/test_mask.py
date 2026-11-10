@@ -51,6 +51,7 @@ def test_every_kind_of_number_can_be_used(tmp_path, array):
     assert load_mask(save(tmp_path, array)).shape == (1, 2)
 
 
+@pytest.mark.core
 def test_image_hides_according_to_the_opacity():
     mask = np.array([[1.0, 0.0], [0.5, 0.25]], dtype=np.float32)
     image = mask_image(mask, 0, 2, 1, 1, (10, 20, 30), 1.0)

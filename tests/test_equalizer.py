@@ -45,6 +45,7 @@ def test_flat_equalizer_leaves_the_signal_untouched():
     assert np.array_equal(run(equalizer, signal), signal.astype(np.float32))
 
 
+@pytest.mark.core
 @pytest.mark.parametrize(
     "band",
     [

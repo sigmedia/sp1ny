@@ -36,6 +36,7 @@ def test_frames_are_centred_and_padded_with_zeros():
     assert last.tolist() == [99, 100, 0, 0]
 
 
+@pytest.mark.core
 @pytest.mark.parametrize("formants", [(500, 1500, 2500), (450, 1900, 2800), (700, 1200, 2600)])
 def test_formants_of_a_synthetic_vowel(formants):
     signal = resonant_vowel(formants)
@@ -74,6 +75,7 @@ def test_formants_at_every_rate_and_above_nyquist(rate):
     assert np.nanmedian(tracks[50:-50, 0]) == pytest.approx(500, rel=0.08)
 
 
+@pytest.mark.core
 @pytest.mark.parametrize("f0", [90.0, 120.0, 220.0, 400.0])
 def test_f0_of_a_pulse_train(f0):
     signal = resonant_vowel((500, 1500), f0=f0)

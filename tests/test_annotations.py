@@ -30,6 +30,7 @@ def tier(controller, example_annotations):
     plot.close()
 
 
+@pytest.mark.core
 def test_loaded_annotations_are_selectable(tier):
     assert tier.annotation_items
     assert all(item._handle_edit is not None for item in tier.annotation_items)
@@ -267,6 +268,7 @@ def separate_clicks():
     QtTest.QTest.qWait(QtWidgets.QApplication.doubleClickInterval() + 50)
 
 
+@pytest.mark.core
 def test_two_clicks_create_an_annotation_at_the_clicked_times(empty_tier, player):
     click(empty_tier, 0.7)
     assert player.position == pytest.approx(0.7, abs=0.01)

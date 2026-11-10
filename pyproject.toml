@@ -61,6 +61,7 @@ dev = ["pre-commit", "pytest", "mypy"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = ["core: the bare minimum, the only tests the CI runs (pytest -m core)"]
 filterwarnings = ["ignore::DeprecationWarning"]
 
 [tool.mypy]

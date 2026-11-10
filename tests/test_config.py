@@ -34,6 +34,7 @@ def test_example_lists_every_setting_with_its_default_value():
     assert example == {"theme": "light", "shortcuts": SHORTCUTS, "wheel": WHEEL_ACTIONS, "themes": THEMES}
 
 
+@pytest.mark.core
 def test_valid_settings_are_applied(settings, tmp_path):
     from spiny.config import load_config
 

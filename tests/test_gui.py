@@ -85,6 +85,7 @@ def window(qapp):
     QtWidgets.QApplication.sendPostedEvents(None, QtCore.QEvent.DeferredDelete)
 
 
+@pytest.mark.core
 def test_every_plugin_renders_with_time_on_x(window):
     plugins = [window._plugin_list.itemText(i) for i in range(window._plugin_list.count())]
     assert {"Raw DATA", "Spectrogram"} <= set(plugins)
@@ -107,6 +108,7 @@ def test_waveform_plot_methods_act_on_the_displayed_plot(player):
     assert plot.plotItem.getViewBox().viewRange()[0] == pytest.approx([1, 2])
 
 
+@pytest.mark.core
 def test_data_widget_renders_only_the_visible_slice(qapp):
     import numpy as np
     from pyqtgraph.Qt import QtGui
@@ -690,6 +692,7 @@ def test_overlays_are_listed_according_to_the_visualisation(window, overlays):
     assert overlays["Formants"]._plot is None
 
 
+@pytest.mark.core
 def test_several_overlays_can_be_shown_and_they_are_drawn_on_the_plot(window, overlays):
     window._visualisation_area._dock_wav.wav_plot.setXRange(0, 3, padding=0)
     tick(window, "Formants")
@@ -1345,6 +1348,7 @@ def test_lock_marks_the_tiers_and_toggles(two_locked_tiers):
     assert controller._list_tiers_widget.item(0).icon().isNull()
 
 
+@pytest.mark.core
 def test_moving_a_boundary_moves_the_aligned_ones_of_the_locked_tiers(two_locked_tiers):
     controller = two_locked_tiers
     rendered(controller, "a", 0).lines[1].setValue(0.6)  # the same as dragging it with the mouse
@@ -1615,6 +1619,7 @@ def test_undo_reordering_tiers(history):
     assert list(history.model.annotations) == ["a", "b"]
 
 
+@pytest.mark.core
 def test_undo_adding_and_removing_annotations(window, history):
     from spiny.core import player
 

@@ -41,4 +41,4 @@ jobs:
       - name: Check the type hints
         run: mypy
       - name: Run the tests
-        run: pytest -v
+        run: pytest -v -m core  # the bare minimum; the whole suite is run locally (pytest)

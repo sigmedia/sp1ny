@@ -18,6 +18,7 @@ def waveform(qapp):
     plot.close()
 
 
+@pytest.mark.core
 def test_envelope_matches_brute_force(waveform):
     _, item = waveform
     rng = np.random.default_rng(0)

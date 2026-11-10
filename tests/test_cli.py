@@ -42,6 +42,7 @@ def test_without_audio_file_a_dialog_asks_for_it(monkeypatch, qapp):
     assert asked == [True]
 
 
+@pytest.mark.core
 def test_packaged_application_starts(tmp_path):
     """The application starts and quits on its own when SPINY_AUTOQUIT_MS is set (used to check the binaries)"""
     import os
