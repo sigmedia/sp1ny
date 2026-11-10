@@ -6,12 +6,12 @@ build-backend = "poetry.core.masonry.api"
 name = "SpINY"
 version = "0.1"
 authors = [
-  "Sébastien Le Maguer <lemagues@tcd.ie>",
+  "Sébastien Le Maguer <sebastien.lemaguer@helsinki.fi>",
   "Mark Anderson <andersm3@tcd.ie>"
 ]
 description = "Speech vIsualisation and aNnotation in pYthon"
 readme = "README.md"
-license = "MIT"
+license = "GPL"
 classifiers = [
   'Development Status :: 3 - Alpha',
   # Audience
